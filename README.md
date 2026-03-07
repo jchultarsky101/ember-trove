@@ -64,39 +64,104 @@ ember-trove/
 
 ### Prerequisites
 
-| Tool              | Version  |
-|-------------------|----------|
-| Rust (stable)     | ≥ 1.82   |
-| cargo             | workspace|
-| wasm32 target     | `rustup target add wasm32-unknown-unknown` |
-| Trunk             | `cargo install trunk` |
-| sqlx-cli          | `cargo install sqlx-cli --features postgres` |
-| Docker + Compose  | ≥ 26     |
+| Tool              | Install                                              |
+|-------------------|------------------------------------------------------|
+| Rust (stable ≥ 1.82) | [rustup.rs](https://rustup.rs)                  |
+| wasm32 target     | `rustup target add wasm32-unknown-unknown`           |
+| Trunk             | `cargo install trunk`                                |
+| sqlx-cli          | `cargo install sqlx-cli --features postgres`         |
+| Docker + Compose  | [docs.docker.com](https://docs.docker.com/get-docker/) |
 
-### Local Development (Docker Compose)
+---
+
+### Quick Start (Phase 1 — UI shell, no auth required)
+
+Phase 1 stubs out auth, S3, and all repo logic. You only need **PostgreSQL** running.
+
+**Step 1 — Start PostgreSQL**
 
 ```bash
-# Start PostgreSQL, MinIO, Keycloak
-docker compose -f deploy/docker-compose.yml up -d postgres minio keycloak
-
-# Run database migrations
-export DATABASE_URL=postgres://ember_trove:ember_trove_dev@localhost/ember_trove
-sqlx migrate run --source migrations/
-
-# Start the API server
-cargo run -p api
-
-# In another terminal: start the UI dev server
-cd ui && trunk serve --port 8003
+docker compose -f deploy/docker-compose.yml up -d postgres
 ```
 
-The API is available at `http://localhost:3003` and the UI at `http://localhost:8003`.
-Swagger UI is at `http://localhost:3003/swagger-ui/`.
+This starts a `postgres:16` container on the default port 5432 with:
+- database: `ember_trove`
+- user / password: `ember_trove` / `ember_trove_dev`
+
+**Step 2 — Apply migrations**
+
+```bash
+export DATABASE_URL=postgres://ember_trove:ember_trove_dev@localhost/ember_trove
+sqlx migrate run --source migrations/
+```
+
+**Step 3 — Start the API** (Terminal 1)
+
+```bash
+export DATABASE_URL=postgres://ember_trove:ember_trove_dev@localhost/ember_trove
+cargo run -p api
+```
+
+You should see:
+```
+INFO ember_trove_api: listening on 0.0.0.0:3003
+```
+
+Verify with:
+```bash
+curl http://localhost:3003/health
+# {"status":"ok","service":"ember-trove-api"}
+```
+
+**Step 4 — Start the UI dev server** (Terminal 2)
+
+```bash
+cd ui
+trunk serve --port 8003
+```
+
+Trunk compiles the WASM bundle and watches for changes. First build takes ~30 s.
+
+You should see:
+```
+INFO  📡 server listening at: http://127.0.0.1:8003
+```
+
+**Step 5 — Open the browser**
+
+Navigate to **http://localhost:8003**
+
+You'll see the Ember Trove shell:
+- Left sidebar with navigation (Articles, Projects, Areas, Resources, References, Graph, Search, Tags)
+- Dark / light mode toggle (top-left, persisted in `localStorage`)
+- Main panel showing the empty node list
+
+> **Note:** In Phase 1 all data operations return `501 Not Implemented`. Full CRUD, auth, and search are implemented in Phases 2–7.
+
+---
+
+### Full Stack (all services)
+
+To run with Keycloak (OIDC) and MinIO (S3) as well:
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d
+```
+
+Services started:
+
+| Service   | URL                        |
+|-----------|----------------------------|
+| PostgreSQL | `localhost:5432`          |
+| MinIO      | http://localhost:9000      |
+| Keycloak   | http://localhost:8080      |
+| API        | http://localhost:3003      |
+| UI         | http://localhost:8003      |
 
 ### Cargo Check
 
 ```bash
-# Backend + common
+# Backend + common (host target)
 cargo check && cargo clippy -- -D warnings
 
 # WASM UI
