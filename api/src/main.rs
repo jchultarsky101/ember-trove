@@ -42,15 +42,16 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("database connection pool established");
 
+    // Phase 1: OIDC + S3 are stubs; use empty strings until Phase 2/6 wire them up.
     let auth = AuthConfig {
-        issuer: config.oidc_issuer.clone(),
-        client_id: config.oidc_client_id.clone(),
-        client_secret: config.oidc_client_secret.clone(),
+        issuer: config.oidc_issuer.clone().unwrap_or_default(),
+        client_id: config.oidc_client_id.clone().unwrap_or_default(),
+        client_secret: config.oidc_client_secret.clone().unwrap_or_default(),
     };
 
     let object_store = Arc::new(S3ObjectStore::new(
-        config.s3_bucket.clone(),
-        config.s3_endpoint.clone(),
+        config.s3_bucket.clone().unwrap_or_default(),
+        config.s3_endpoint.clone().unwrap_or_default(),
     ));
 
     let state = AppState {
