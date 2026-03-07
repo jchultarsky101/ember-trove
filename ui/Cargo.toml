@@ -30,3 +30,5 @@ web-sys = { version = "0.3", features = [
 js-sys = "0.3"
 pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
 ammonia = "3"
+# uuid needs its `js` feature to use crypto.getRandomValues on WASM
+uuid = { workspace = true, features = ["js"] }

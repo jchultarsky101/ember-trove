@@ -33,23 +33,11 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
     }
 }
 
-/// Gate that redirects unauthenticated users. Phase 2 will add real redirects.
+/// Gate that redirects unauthenticated users.
+/// Phase 1: pass-through. Phase 2 adds real OIDC redirect.
 #[component]
-pub fn AuthGate(children: Children, auth_state: AuthState) -> impl IntoView {
-    let is_authed = move || auth_state.get().is_some();
-
-    view! {
-        <Show
-            when=is_authed
-            fallback=move || view! {
-                <div class="flex items-center justify-center h-screen">
-                    <p class="text-gray-500 dark:text-gray-400">"Signing in…"</p>
-                </div>
-            }
-        >
-            {children()}
-        </Show>
-    }
+pub fn AuthGate(children: Children, _auth_state: AuthState) -> impl IntoView {
+    children()
 }
 
 // Suppress unused-import warning for UserInfo until Phase 2 uses it.
