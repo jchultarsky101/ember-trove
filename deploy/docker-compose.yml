@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ember_trove
+      POSTGRES_USER: ember_trove
+      POSTGRES_PASSWORD: ember_trove_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ember_trove"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ember_trove
+      MINIO_ROOT_PASSWORD: ember_trove_dev
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    command: start-dev
+    environment:
+      KC_DB: dev-file
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8180:8080"
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    environment:
+      DATABASE_URL: postgres://ember_trove:ember_trove_dev@postgres/ember_trove
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: ember-trove
+      S3_ACCESS_KEY: ember_trove
+      S3_SECRET_KEY: ember_trove_dev
+      S3_REGION: us-east-1
+      OIDC_ISSUER: http://keycloak:8080/realms/ember-trove
+      OIDC_CLIENT_ID: ember-trove-api
+      OIDC_CLIENT_SECRET: change-me
+      HOST: "0.0.0.0"
+      PORT: "3003"
+      RUST_LOG: info
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+
+  ui:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.ui
+    ports:
+      - "8003:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  miniodata:

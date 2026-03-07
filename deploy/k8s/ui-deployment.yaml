@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ember-trove-ui
+  namespace: ember-trove
+  labels:
+    app: ember-trove-ui
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ember-trove-ui
+  template:
+    metadata:
+      labels:
+        app: ember-trove-ui
+    spec:
+      containers:
+        - name: ui
+          image: ghcr.io/jchultarsky101/ember-trove-ui:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ember-trove-ui
+  namespace: ember-trove
+spec:
+  selector:
+    app: ember-trove-ui
+  ports:
+    - port: 8003
+      targetPort: 80

@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ember-trove-api
+  namespace: ember-trove
+  labels:
+    app: ember-trove-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ember-trove-api
+  template:
+    metadata:
+      labels:
+        app: ember-trove-api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/jchultarsky101/ember-trove-api:latest
+          ports:
+            - containerPort: 3003
+          envFrom:
+            - configMapRef:
+                name: ember-trove-config
+            - secretRef:
+                name: ember-trove-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3003
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3003
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ember-trove-api
+  namespace: ember-trove
+spec:
+  selector:
+    app: ember-trove-api
+  ports:
+    - port: 3003
+      targetPort: 3003

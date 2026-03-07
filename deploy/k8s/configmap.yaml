@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ember-trove-config
+  namespace: ember-trove
+data:
+  S3_ENDPOINT:   "http://minio:9000"
+  S3_BUCKET:     "ember-trove"
+  S3_REGION:     "us-east-1"
+  OIDC_ISSUER:   "https://keycloak.example.com/realms/ember-trove"
+  OIDC_CLIENT_ID: "ember-trove-api"
+  HOST:          "0.0.0.0"
+  PORT:          "3003"
+  RUST_LOG:      "info"

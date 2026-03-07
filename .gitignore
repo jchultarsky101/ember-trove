@@ -1,0 +1,6 @@
+/target
+/dist
+/.sqlx
+*.env
+.env.*
+!.env.example

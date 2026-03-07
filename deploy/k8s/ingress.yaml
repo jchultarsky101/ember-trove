@@ -1,0 +1,34 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ember-trove
+  namespace: ember-trove
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ember-trove.example.com
+      secretName: ember-trove-tls
+  rules:
+    - host: ember-trove.example.com
+      http:
+        paths:
+          # API traffic: /api/* → strip prefix → api service
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: ember-trove-api
+                port:
+                  number: 3003
+          # All other traffic → UI (SPA)
+          - path: /()(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: ember-trove-ui
+                port:
+                  number: 8003

@@ -1,0 +1,46 @@
+[workspace]
+members  = ["api", "ui", "common"]
+# Exclude the WASM UI crate from host-target default builds.
+# Use `cargo check -p ui --target wasm32-unknown-unknown` for the UI.
+default-members = ["api", "common"]
+resolver = "2"
+
+[workspace.dependencies]
+# Logging
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Serialisation
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "2"
+anyhow    = "1"
+
+# Validation
+garde = { version = "0.20", features = ["derive"] }
+
+# Async
+tokio      = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+bytes      = "1"
+
+# Async trait dispatch
+async-trait = "0.1"
+
+# Web framework
+axum       = { version = "0.8", features = ["multipart"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# OpenAPI
+utoipa            = { version = "5", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
+
+# Common domain types
+uuid   = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[profile.dist]
+inherits = "release"
+lto      = "thin"

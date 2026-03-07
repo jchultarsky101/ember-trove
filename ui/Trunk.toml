@@ -1,0 +1,8 @@
+[build]
+target = "index.html"
+
+[serve]
+port = 8003
+
+[tools]
+tailwindcss = "4.2.1"
