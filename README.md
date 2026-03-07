@@ -218,21 +218,22 @@ Interactive docs are served at `/swagger-ui/` when the API is running.
 
 ## Configuration
 
-All API configuration is loaded from environment variables:
+All API configuration is loaded from environment variables.
+Variables marked **optional\*** are not required until the noted phase.
 
-| Variable          | Default             | Description                    |
-|-------------------|---------------------|--------------------------------|
-| `DATABASE_URL`    | —                   | PostgreSQL connection string   |
-| `S3_ENDPOINT`     | —                   | S3-compatible endpoint URL     |
-| `S3_BUCKET`       | —                   | Bucket name                    |
-| `S3_ACCESS_KEY`   | —                   | S3 access key                  |
-| `S3_SECRET_KEY`   | —                   | S3 secret key                  |
-| `S3_REGION`       | `us-east-1`         | S3 region                      |
-| `OIDC_ISSUER`     | —                   | Keycloak realm issuer URL      |
-| `OIDC_CLIENT_ID`  | —                   | OIDC client ID                 |
-| `OIDC_CLIENT_SECRET` | —              | OIDC client secret             |
-| `HOST`            | `0.0.0.0`           | Bind address                   |
-| `PORT`            | `3003`              | Bind port                      |
+| Variable             | Default       | Required    | Description                    |
+|----------------------|---------------|-------------|--------------------------------|
+| `DATABASE_URL`       | —             | Always      | PostgreSQL connection string   |
+| `HOST`               | `0.0.0.0`     | Always      | Bind address                   |
+| `PORT`               | `3003`        | Always      | Bind port                      |
+| `OIDC_ISSUER`        | —             | Phase 2+    | Keycloak realm issuer URL      |
+| `OIDC_CLIENT_ID`     | —             | Phase 2+    | OIDC client ID                 |
+| `OIDC_CLIENT_SECRET` | —             | Phase 2+    | OIDC client secret             |
+| `S3_ENDPOINT`        | —             | Phase 6+    | S3-compatible endpoint URL     |
+| `S3_BUCKET`          | —             | Phase 6+    | Bucket name                    |
+| `S3_ACCESS_KEY`      | —             | Phase 6+    | S3 access key                  |
+| `S3_SECRET_KEY`      | —             | Phase 6+    | S3 secret key                  |
+| `S3_REGION`          | `us-east-1`   | Phase 6+    | S3 region                      |
 
 ---
 
