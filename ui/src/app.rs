@@ -27,6 +27,7 @@ pub fn storage_set(key: &str, value: &str) {
 
 // ── Current view ───────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum View {
     NodeList,

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Search-and-select modal for linking nodes with a typed edge.
 ///
 /// Phase 1 stub — Phase 4 wires the node search + edge creation.

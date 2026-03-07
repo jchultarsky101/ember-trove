@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Modal for creating a new node (title, type).
 ///
 /// Phase 1 stub — Phase 3 wires the API call.

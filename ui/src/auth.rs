@@ -20,6 +20,7 @@ pub fn provide_auth_state() -> AuthState {
 /// # Panics
 ///
 /// Panics if called outside a component that provides `AuthState`.
+#[allow(dead_code)]
 #[must_use]
 pub fn use_auth_state() -> AuthState {
     use_context::<AuthState>().expect("AuthState context must be provided")
