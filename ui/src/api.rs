@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// HTTP client helpers for communicating with the Ember Trove API.
 ///
 /// Phase 1 stub — individual request functions will be added per phase.

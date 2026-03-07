@@ -35,6 +35,7 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
 
 /// Gate that redirects unauthenticated users.
 /// Phase 1: pass-through. Phase 2 adds real OIDC redirect.
+#[allow(dead_code)]
 #[component]
 pub fn AuthGate(children: Children, _auth_state: AuthState) -> impl IntoView {
     children()

@@ -4,6 +4,7 @@
 use leptos::prelude::*;
 use pulldown_cmark::{html, Options, Parser};
 
+#[allow(dead_code)]
 fn render_markdown(source: &str) -> String {
     let opts = Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TABLES
