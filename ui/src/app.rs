@@ -1,8 +1,9 @@
+use common::id::NodeId;
 use leptos::prelude::*;
 
 use crate::{
     auth::provide_auth_state,
-    components::{layout::Layout, dark_mode_toggle::Theme},
+    components::{dark_mode_toggle::Theme, layout::Layout},
 };
 
 // ── localStorage helpers ───────────────────────────────────────────────────
@@ -31,8 +32,9 @@ pub fn storage_set(key: &str, value: &str) {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum View {
     NodeList,
-    NodeDetail,
-    NodeEdit,
+    NodeDetail(NodeId),
+    NodeCreate,
+    NodeEdit(NodeId),
     Graph,
     Search,
 }
@@ -54,21 +56,25 @@ pub fn App() -> impl IntoView {
     // Apply / remove the `dark` class on <html> whenever theme changes
     Effect::new(move |_| {
         let is_dark = theme.get() == Theme::Dark;
-        if let Some(doc) = web_sys::window().and_then(|w| w.document()) {
-            if let Some(html) = doc.document_element() {
-                if is_dark {
-                    let _ = html.class_list().add_1("dark");
-                    storage_set("theme", "dark");
-                } else {
-                    let _ = html.class_list().remove_1("dark");
-                    storage_set("theme", "light");
-                }
+        if let Some(doc) = web_sys::window().and_then(|w| w.document())
+            && let Some(html) = doc.document_element()
+        {
+            if is_dark {
+                let _ = html.class_list().add_1("dark");
+                storage_set("theme", "dark");
+            } else {
+                let _ = html.class_list().remove_1("dark");
+                storage_set("theme", "light");
             }
         }
     });
 
     let current_view = RwSignal::new(View::NodeList);
     provide_context(current_view);
+
+    // Refresh trigger — bump to re-fetch nodes list.
+    let refresh = RwSignal::new(0u32);
+    provide_context(refresh);
 
     view! {
         <Layout auth_state=auth_state />

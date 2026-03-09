@@ -11,10 +11,11 @@ mod state;
 
 use std::sync::Arc;
 
+use axum_extra::extract::cookie::Key;
 use sqlx::postgres::PgPoolOptions;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use auth::AuthConfig;
+use auth::{oidc::OidcClient, AuthConfig};
 use config::Config;
 use object_store::s3::S3ObjectStore;
 use repo::{
@@ -42,12 +43,28 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("database connection pool established");
 
-    // Phase 1: OIDC + S3 are stubs; use empty strings until Phase 2/6 wire them up.
+    // OIDC discovery — fetch endpoints and JWKS from Keycloak.
+    let oidc = Arc::new(
+        OidcClient::discover(
+            &config.oidc_issuer,
+            config.oidc_client_id.clone(),
+            config.oidc_client_secret.clone(),
+        )
+        .await?,
+    );
+
     let auth = AuthConfig {
-        issuer: config.oidc_issuer.clone().unwrap_or_default(),
-        client_id: config.oidc_client_id.clone().unwrap_or_default(),
-        client_secret: config.oidc_client_secret.clone().unwrap_or_default(),
+        issuer: config.oidc_issuer.clone(),
+        client_id: config.oidc_client_id.clone(),
+        client_secret: config.oidc_client_secret.clone(),
+        frontend_url: config.frontend_url.clone(),
+        api_external_url: config.api_external_url.clone(),
     };
+
+    // Derive cookie encryption key from hex-encoded COOKIE_KEY.
+    let key_bytes = hex::decode(&config.cookie_key)
+        .map_err(|e| anyhow::anyhow!("COOKIE_KEY is not valid hex: {e}"))?;
+    let cookie_key = Key::from(&key_bytes);
 
     let object_store = Arc::new(S3ObjectStore::new(
         config.s3_bucket.clone().unwrap_or_default(),
@@ -61,12 +78,14 @@ async fn main() -> anyhow::Result<()> {
         attachments: Arc::new(PgAttachmentRepo::new(pool.clone())),
         permissions: Arc::new(PgPermissionRepo::new(pool.clone())),
         object_store,
+        oidc,
+        cookie_key,
         auth,
         config: config.clone(),
         pool,
     };
 
-    let app = routes::build_router(state);
+    let app = axum::Router::new().nest("/api", routes::build_router(state));
 
     let addr = format!("{}:{}", config.host, config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;

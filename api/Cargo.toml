@@ -22,6 +22,11 @@ utoipa-swagger-ui  = { workspace = true }
 uuid               = { workspace = true }
 chrono             = { workspace = true }
 garde              = { workspace = true }
+jsonwebtoken       = { workspace = true }
+reqwest            = { workspace = true }
+axum-extra         = { workspace = true }
+urlencoding        = { workspace = true }
+hex                = { workspace = true }
 
 sqlx = { version = "0.8", features = [
     "runtime-tokio-native-tls",

@@ -1,27 +1,39 @@
-/// OIDC authentication state and helpers for the UI.
-///
-/// Phase 1 stub — Phase 2 implements the full OIDC redirect flow,
-/// token storage, and refresh logic.
+#![allow(dead_code)]
 use common::auth::UserInfo;
 use leptos::prelude::*;
 
-/// Global auth signal — `None` means unauthenticated.
-pub type AuthState = RwSignal<Option<UserInfo>>;
+/// Tri-state auth status: still loading, authenticated, or unauthenticated.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AuthStatus {
+    Loading,
+    Authenticated(UserInfo),
+    Unauthenticated,
+}
 
-/// Initialise the auth state signal and provide it via context.
+/// Global auth signal.
+pub type AuthState = RwSignal<AuthStatus>;
+
+/// Initialise the auth state signal, provide it via context, and kick off
+/// the `/api/auth/me` probe.
 pub fn provide_auth_state() -> AuthState {
-    let auth_state: AuthState = RwSignal::new(None);
+    let auth_state: AuthState = RwSignal::new(AuthStatus::Loading);
     provide_context(auth_state);
+    init_auth(auth_state);
     auth_state
 }
 
 /// Read the auth state from context.
-///
-/// # Panics
-///
-/// Panics if called outside a component that provides `AuthState`.
-#[allow(dead_code)]
 #[must_use]
 pub fn use_auth_state() -> AuthState {
     use_context::<AuthState>().expect("AuthState context must be provided")
+}
+
+/// On mount, call GET /api/auth/me to check if we have a valid session cookie.
+fn init_auth(auth_state: AuthState) {
+    wasm_bindgen_futures::spawn_local(async move {
+        match crate::api::fetch_me().await {
+            Ok(user_info) => auth_state.set(AuthStatus::Authenticated(user_info)),
+            Err(_) => auth_state.set(AuthStatus::Unauthenticated),
+        }
+    });
 }
