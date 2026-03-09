@@ -10,3 +10,4 @@ pub mod permission_dialog;
 pub mod search_bar;
 pub mod sidebar;
 pub mod tag_bar;
+pub mod tag_manager;

@@ -7,8 +7,7 @@ use crate::{
 
 #[component]
 pub fn Sidebar(auth_state: AuthState) -> impl IntoView {
-    let current_view =
-        use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
 
     let on_logout = move |_| {
         wasm_bindgen_futures::spawn_local(async move {
@@ -25,6 +24,11 @@ pub fn Sidebar(auth_state: AuthState) -> impl IntoView {
             <SidebarLink
                 icon="description" label="All Nodes"
                 on_click=move || current_view.set(View::NodeList)
+            />
+            <div class="border-t border-gray-200 dark:border-gray-700 my-3" />
+            <SidebarLink
+                icon="label" label="Tags"
+                on_click=move || current_view.set(View::TagManager)
             />
             <div class="border-t border-gray-200 dark:border-gray-700 my-3" />
             <SidebarLink
