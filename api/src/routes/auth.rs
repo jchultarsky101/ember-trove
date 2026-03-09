@@ -1,25 +1,99 @@
-/// Auth routes: login redirect, OIDC callback, token refresh, logout, /me.
-///
-/// Phase 1 stubs — full implementation in Phase 2.
-use axum::{http::StatusCode, routing::get, Router};
+use axum::{
+    extract::{Query, State},
+    response::Html,
+    routing::{get, post},
+    Extension, Json, Router,
+};
+use axum_extra::extract::{
+    cookie::{Cookie, SameSite},
+    PrivateCookieJar,
+};
+use common::auth::{AuthClaims, UserInfo};
+use serde::{Deserialize, Serialize};
 
-use crate::state::AppState;
+use crate::{
+    auth::middleware::SESSION_COOKIE,
+    error::ApiError,
+    state::AppState,
+};
 
-pub fn router() -> Router<AppState> {
+/// Public auth routes (no JWT required).
+pub fn public_router() -> Router<AppState> {
     Router::new()
-        .route("/login", get(login))
-        .route("/callback", get(callback))
-        .route("/me", get(me))
+        .route("/auth/login", get(login))
+        .route("/auth/callback", get(callback))
 }
 
-async fn login() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+/// Protected auth routes (JWT required — layered behind require_auth).
+pub fn protected_router() -> Router<AppState> {
+    Router::new()
+        .route("/auth/me", get(me))
+        .route("/auth/logout", post(logout))
 }
 
-async fn callback() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+#[derive(Serialize)]
+struct RedirectResponse {
+    redirect_url: String,
 }
 
-async fn me() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+async fn login(State(state): State<AppState>) -> Json<RedirectResponse> {
+    let redirect_uri = format!("{}/api/auth/callback", state.auth.api_external_url);
+    let url = format!(
+        "{}?client_id={}&redirect_uri={}&response_type=code&scope=openid+email+profile",
+        state.oidc.authorization_endpoint,
+        state.auth.client_id,
+        urlencoding::encode(&redirect_uri),
+    );
+    Json(RedirectResponse { redirect_url: url })
+}
+
+#[derive(Deserialize)]
+struct CallbackQuery {
+    code: String,
+}
+
+async fn callback(
+    State(state): State<AppState>,
+    jar: PrivateCookieJar,
+    Query(params): Query<CallbackQuery>,
+) -> Result<(PrivateCookieJar, Html<String>), ApiError> {
+    let redirect_uri = format!("{}/api/auth/callback", state.auth.api_external_url);
+    let token_resp = state
+        .oidc
+        .exchange_code(&params.code, &redirect_uri)
+        .await?;
+
+    let cookie = Cookie::build((SESSION_COOKIE, token_resp.access_token))
+        .path("/")
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .secure(false)
+        .build();
+
+    let updated_jar = jar.add(cookie);
+    let frontend_url = &state.auth.frontend_url;
+
+    let html = format!(
+        r#"<!DOCTYPE html>
+<html><head><title>Redirecting...</title></head>
+<body><script>window.location.replace("{frontend_url}");</script></body>
+</html>"#
+    );
+
+    Ok((updated_jar, Html(html)))
+}
+
+async fn me(Extension(claims): Extension<AuthClaims>) -> Json<UserInfo> {
+    Json(UserInfo::from(claims))
+}
+
+async fn logout(
+    State(state): State<AppState>,
+    jar: PrivateCookieJar,
+) -> (PrivateCookieJar, Json<RedirectResponse>) {
+    let updated_jar = jar.remove(Cookie::from(SESSION_COOKIE));
+    let redirect = RedirectResponse {
+        redirect_url: state.auth.frontend_url.clone(),
+    };
+    (updated_jar, Json(redirect))
 }

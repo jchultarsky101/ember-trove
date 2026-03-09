@@ -6,6 +6,7 @@ pub mod id;
 pub mod node;
 pub mod permission;
 pub mod search;
+pub mod slug;
 pub mod tag;
 
 pub use error::EmberTroveError;

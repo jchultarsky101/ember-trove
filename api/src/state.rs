@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
+use axum_extra::extract::cookie::Key;
 use sqlx::PgPool;
 
 use crate::{
-    auth::AuthConfig,
+    auth::{oidc::OidcClient, AuthConfig},
     config::Config,
     object_store::ObjectStore,
     repo::{
@@ -21,6 +22,16 @@ pub struct AppState {
     pub attachments: Arc<dyn AttachmentRepo>,
     pub permissions: Arc<dyn PermissionRepo>,
     pub object_store: Arc<dyn ObjectStore>,
+    pub oidc: Arc<OidcClient>,
+    pub cookie_key: Key,
     pub auth: AuthConfig,
     pub config: Config,
+}
+
+/// PrivateCookieJar needs `FromRef<AppState>` for `Key` to derive
+/// the encryption key from shared state.
+impl axum::extract::FromRef<AppState> for Key {
+    fn from_ref(state: &AppState) -> Self {
+        state.cookie_key.clone()
+    }
 }

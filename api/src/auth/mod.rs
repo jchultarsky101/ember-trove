@@ -11,4 +11,8 @@ pub struct AuthConfig {
     pub client_id: String,
     /// OIDC client secret.
     pub client_secret: String,
+    /// Frontend origin URL for redirects after login/logout.
+    pub frontend_url: String,
+    /// API external URL (used to build the callback redirect_uri).
+    pub api_external_url: String,
 }
