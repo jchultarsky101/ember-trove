@@ -1,7 +1,7 @@
 /// Search route: GET /search?q=...&fuzzy=bool
 ///
 /// Phase 1 stub — full implementation in Phase 5.
-use axum::{http::StatusCode, routing::get, Router};
+use axum::{Router, http::StatusCode, routing::get};
 
 use crate::state::AppState;
 

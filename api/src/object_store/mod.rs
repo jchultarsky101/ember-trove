@@ -8,8 +8,7 @@ use common::EmberTroveError;
 #[async_trait]
 pub trait ObjectStore: Send + Sync {
     /// Upload raw bytes at the given key.
-    async fn put(&self, key: &str, data: Bytes, content_type: &str)
-        -> Result<(), EmberTroveError>;
+    async fn put(&self, key: &str, data: Bytes, content_type: &str) -> Result<(), EmberTroveError>;
 
     /// Download bytes from the given key.
     async fn get(&self, key: &str) -> Result<Bytes, EmberTroveError>;
@@ -18,9 +17,5 @@ pub trait ObjectStore: Send + Sync {
     async fn delete(&self, key: &str) -> Result<(), EmberTroveError>;
 
     /// Generate a presigned download URL valid for `expires_secs`.
-    async fn presigned_url(
-        &self,
-        key: &str,
-        expires_secs: u32,
-    ) -> Result<String, EmberTroveError>;
+    async fn presigned_url(&self, key: &str, expires_secs: u32) -> Result<String, EmberTroveError>;
 }

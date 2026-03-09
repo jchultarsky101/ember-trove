@@ -15,12 +15,12 @@ use axum_extra::extract::cookie::Key;
 use sqlx::postgres::PgPoolOptions;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use auth::{oidc::OidcClient, AuthConfig};
+use auth::{AuthConfig, oidc::OidcClient};
 use config::Config;
 use object_store::s3::S3ObjectStore;
 use repo::{
-    attachment::PgAttachmentRepo, edge::PgEdgeRepo, node::PgNodeRepo,
-    permission::PgPermissionRepo, tag::PgTagRepo,
+    attachment::PgAttachmentRepo, edge::PgEdgeRepo, node::PgNodeRepo, permission::PgPermissionRepo,
+    tag::PgTagRepo,
 };
 use state::AppState;
 
@@ -28,8 +28,7 @@ use state::AppState;
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();

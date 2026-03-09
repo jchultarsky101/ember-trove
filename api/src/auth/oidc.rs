@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use jsonwebtoken::{jwk::JwkSet, DecodingKey, Validation};
+use jsonwebtoken::{DecodingKey, Validation, jwk::JwkSet};
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
@@ -134,10 +134,7 @@ impl OidcClient {
 
         if !resp.status().is_success() {
             let status = resp.status();
-            let body = resp
-                .text()
-                .await
-                .unwrap_or_else(|_| "unknown".to_string());
+            let body = resp.text().await.unwrap_or_else(|_| "unknown".to_string());
             return Err(ApiError::Internal(format!(
                 "token exchange failed ({status}): {body}"
             )));
@@ -149,10 +146,7 @@ impl OidcClient {
     }
 
     /// Validate an access token JWT, returning the decoded claims.
-    pub async fn validate_token(
-        &self,
-        token: &str,
-    ) -> Result<KeycloakClaims, ApiError> {
+    pub async fn validate_token(&self, token: &str) -> Result<KeycloakClaims, ApiError> {
         let jwks = self.get_jwks().await?;
 
         let header = jsonwebtoken::decode_header(token)

@@ -3,7 +3,7 @@ use common::{
     node::{CreateNodeRequest, NodeType, UpdateNodeRequest},
 };
 use leptos::prelude::*;
-use pulldown_cmark::{html, Options, Parser};
+use pulldown_cmark::{Options, Parser, html};
 
 use crate::app::View;
 
@@ -17,10 +17,8 @@ fn render_markdown(source: &str) -> String {
 
 #[component]
 pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
-    let current_view =
-        use_context::<RwSignal<View>>().expect("View signal must be provided");
-    let refresh =
-        use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
 
     let title = RwSignal::new(String::new());
     let body = RwSignal::new(String::new());

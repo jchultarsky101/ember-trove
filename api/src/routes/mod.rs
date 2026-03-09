@@ -6,9 +6,9 @@ pub mod permissions;
 pub mod search;
 pub mod tags;
 
-use axum::{middleware, routing::get, Json, Router};
-use axum::http::{header, Method};
-use serde_json::{json, Value};
+use axum::http::{Method, header};
+use axum::{Json, Router, middleware, routing::get};
+use serde_json::{Value, json};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use crate::{auth::middleware::require_auth, state::AppState};
@@ -49,10 +49,7 @@ pub fn build_router(state: AppState) -> Router {
         .nest("/tags", tags::router())
         .nest("/attachments", attachments::router())
         .nest("/search", search::router())
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            require_auth,
-        ));
+        .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
     // Public routes — no auth required.
     Router::new()

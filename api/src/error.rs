@@ -1,7 +1,7 @@
 use axum::{
+    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
 use common::EmberTroveError;
 use serde_json::json;
@@ -57,15 +57,24 @@ impl IntoResponse for ApiError {
             Self::Validation(msg) => (StatusCode::UNPROCESSABLE_ENTITY, msg.clone()),
             Self::Database(err) => {
                 tracing::error!(%err, "database error");
-                (StatusCode::INTERNAL_SERVER_ERROR, "database error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "database error".to_string(),
+                )
             }
             Self::Storage(msg) => {
                 tracing::error!(%msg, "storage error");
-                (StatusCode::INTERNAL_SERVER_ERROR, "storage error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "storage error".to_string(),
+                )
             }
             Self::Internal(msg) => {
                 tracing::error!(%msg, "internal error");
-                (StatusCode::INTERNAL_SERVER_ERROR, "internal error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "internal error".to_string(),
+                )
             }
         };
         (status, Json(json!({ "error": message }))).into_response()

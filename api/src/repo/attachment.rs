@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use common::{
+    EmberTroveError,
     attachment::Attachment,
     id::{AttachmentId, NodeId},
-    EmberTroveError,
 };
 use sqlx::PgPool;
 

@@ -1,21 +1,17 @@
 use axum::{
+    Extension, Json, Router,
     extract::{Query, State},
     response::Html,
     routing::{get, post},
-    Extension, Json, Router,
 };
 use axum_extra::extract::{
-    cookie::{Cookie, SameSite},
     PrivateCookieJar,
+    cookie::{Cookie, SameSite},
 };
 use common::auth::{AuthClaims, UserInfo};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    auth::middleware::SESSION_COOKIE,
-    error::ApiError,
-    state::AppState,
-};
+use crate::{auth::middleware::SESSION_COOKIE, error::ApiError, state::AppState};
 
 /// Public auth routes (no JWT required).
 pub fn public_router() -> Router<AppState> {

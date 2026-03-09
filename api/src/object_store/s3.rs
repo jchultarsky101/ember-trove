@@ -46,7 +46,11 @@ impl ObjectStore for S3ObjectStore {
         ))
     }
 
-    async fn presigned_url(&self, _key: &str, _expires_secs: u32) -> Result<String, EmberTroveError> {
+    async fn presigned_url(
+        &self,
+        _key: &str,
+        _expires_secs: u32,
+    ) -> Result<String, EmberTroveError> {
         Err(EmberTroveError::Internal(
             "S3 object store not yet implemented".to_string(),
         ))

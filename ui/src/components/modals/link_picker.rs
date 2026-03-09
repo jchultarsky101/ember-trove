@@ -5,10 +5,7 @@
 use leptos::prelude::*;
 
 #[component]
-pub fn LinkPickerModal(
-    #[prop(into)] show: Signal<bool>,
-    on_close: Callback<()>,
-) -> impl IntoView {
+pub fn LinkPickerModal(#[prop(into)] show: Signal<bool>, on_close: Callback<()>) -> impl IntoView {
     let query = RwSignal::new(String::new());
 
     view! {

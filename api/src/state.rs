@@ -4,7 +4,7 @@ use axum_extra::extract::cookie::Key;
 use sqlx::PgPool;
 
 use crate::{
-    auth::{oidc::OidcClient, AuthConfig},
+    auth::{AuthConfig, oidc::OidcClient},
     config::Config,
     object_store::ObjectStore,
     repo::{

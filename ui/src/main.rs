@@ -7,7 +7,7 @@ mod auth;
 mod components;
 mod error;
 
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 use tracing_web::MakeConsoleWriter;
 
 use app::App;
