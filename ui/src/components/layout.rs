@@ -5,7 +5,7 @@ use crate::{
     auth::{AuthState, AuthStatus},
     components::{
         dark_mode_toggle::DarkModeToggle, node_editor::NodeEditor, node_list::NodeList,
-        node_view::NodeView, sidebar::Sidebar, tag_manager::TagManager,
+        node_view::NodeView, search_view::SearchView, sidebar::Sidebar, tag_manager::TagManager,
     },
 };
 
@@ -45,9 +45,7 @@ fn ViewSwitch() -> impl IntoView {
         View::Graph => {
             view! { <div class="p-6 text-gray-400">"Graph view — coming soon."</div> }.into_any()
         }
-        View::Search => {
-            view! { <div class="p-6 text-gray-400">"Search — Phase 5."</div> }.into_any()
-        }
+        View::Search => view! { <SearchView /> }.into_any(),
     }
 }
 

@@ -9,7 +9,7 @@ use crate::{
     object_store::ObjectStore,
     repo::{
         attachment::AttachmentRepo, edge::EdgeRepo, node::NodeRepo, permission::PermissionRepo,
-        tag::TagRepo,
+        search::SearchRepo, tag::TagRepo,
     },
 };
 
@@ -21,6 +21,7 @@ pub struct AppState {
     pub tags: Arc<dyn TagRepo>,
     pub attachments: Arc<dyn AttachmentRepo>,
     pub permissions: Arc<dyn PermissionRepo>,
+    pub search: Arc<dyn SearchRepo>,
     pub object_store: Arc<dyn ObjectStore>,
     pub oidc: Arc<OidcClient>,
     pub cookie_key: Key,

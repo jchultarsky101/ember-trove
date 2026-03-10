@@ -1,11 +1,86 @@
-/// Full-text + fuzzy search bar with results dropdown.
+/// Compact search bar with live results dropdown.
 ///
-/// Phase 1 stub — Phase 5 wires the search API.
+/// Sits in the sidebar header area. Typing triggers a debounced search;
+/// clicking a result navigates to the node detail view. Pressing Enter
+/// opens the full search page.
+use common::search::SearchResult;
 use leptos::prelude::*;
+
+use crate::app::View;
 
 #[component]
 pub fn SearchBar() -> impl IntoView {
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+
     let query = RwSignal::new(String::new());
+    let results: RwSignal<Vec<SearchResult>> = RwSignal::new(vec![]);
+    let show_dropdown = RwSignal::new(false);
+    let loading = RwSignal::new(false);
+    let debounce_version = RwSignal::new(0u32);
+
+    // Debounced search: fires 300ms after last keystroke
+    let trigger_search = move || {
+        debounce_version.update(|v| *v += 1);
+        let version = debounce_version.get_untracked();
+        let q = query.get_untracked().trim().to_string();
+
+        if q.len() < 2 {
+            results.set(vec![]);
+            show_dropdown.set(false);
+            return;
+        }
+
+        loading.set(true);
+        wasm_bindgen_futures::spawn_local(async move {
+            // Poor-man's debounce: sleep then check if version is still current
+            gloo_timers::future::TimeoutFuture::new(300).await;
+            if debounce_version.get_untracked() != version {
+                return; // Superseded by a newer keystroke
+            }
+
+            match crate::api::search_nodes(&q, false, 1, 6).await {
+                Ok(resp) => {
+                    if debounce_version.get_untracked() == version {
+                        results.set(resp.results);
+                        show_dropdown.set(true);
+                    }
+                }
+                Err(_) => {
+                    results.set(vec![]);
+                }
+            }
+            loading.set(false);
+        });
+    };
+
+    let on_input = move |ev: web_sys::Event| {
+        query.set(event_target_value(&ev));
+        trigger_search();
+    };
+
+    let on_keydown = move |ev: web_sys::KeyboardEvent| {
+        if ev.key() == "Enter" {
+            ev.prevent_default();
+            show_dropdown.set(false);
+            current_view.set(View::Search);
+        } else if ev.key() == "Escape" {
+            show_dropdown.set(false);
+        }
+    };
+
+    let on_blur = move |_| {
+        // Delay to allow click on dropdown result to register
+        wasm_bindgen_futures::spawn_local(async move {
+            gloo_timers::future::TimeoutFuture::new(200).await;
+            show_dropdown.set(false);
+        });
+    };
+
+    let on_focus = move |_| {
+        if !results.get_untracked().is_empty() {
+            show_dropdown.set(true);
+        }
+    };
 
     view! {
         <div class="relative">
@@ -14,14 +89,69 @@ pub fn SearchBar() -> impl IntoView {
                 class="w-full px-4 py-2 pl-10 text-sm bg-gray-100 dark:bg-gray-800
                     border border-transparent rounded-lg focus:outline-none
                     focus:ring-2 focus:ring-blue-500 dark:text-gray-100"
-                placeholder="Search nodes…"
+                placeholder="Search nodes\u{2026}"
                 prop:value=move || query.get()
-                on:input=move |ev| query.set(event_target_value(&ev))
+                on:input=on_input
+                on:keydown=on_keydown
+                on:blur=on_blur
+                on:focus=on_focus
             />
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2
-                text-gray-400 pointer-events-none">
+                text-gray-400 pointer-events-none text-lg">
                 "search"
             </span>
+            {move || loading.get().then_some(view! {
+                <span class="absolute right-3 top-1/2 -translate-y-1/2
+                    text-gray-400 text-xs animate-pulse">
+                    "\u{2026}"
+                </span>
+            })}
+
+            // Dropdown results
+            {move || {
+                let visible = show_dropdown.get();
+                let items = results.get();
+                if !visible || items.is_empty() {
+                    return None;
+                }
+                Some(view! {
+                    <div class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-900 border
+                        border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden">
+                        {items.into_iter().map(|r| {
+                            let node_id = r.node_id;
+                            view! {
+                                <button
+                                    class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50
+                                        dark:hover:bg-gray-800 transition-colors border-b
+                                        border-gray-100 dark:border-gray-800 last:border-0"
+                                    on:mousedown=move |ev| {
+                                        ev.prevent_default(); // Prevent blur before click fires
+                                        show_dropdown.set(false);
+                                        current_view.set(View::NodeDetail(node_id));
+                                    }
+                                >
+                                    <div class="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                        {r.title}
+                                    </div>
+                                    <div class="text-xs text-gray-400 truncate">{r.slug}</div>
+                                </button>
+                            }
+                        }).collect::<Vec<_>>()}
+                        <button
+                            class="w-full text-center px-3 py-2 text-xs text-blue-600
+                                dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800
+                                transition-colors font-medium"
+                            on:mousedown=move |ev| {
+                                ev.prevent_default();
+                                show_dropdown.set(false);
+                                current_view.set(View::Search);
+                            }
+                        >
+                            "View all results \u{2192}"
+                        </button>
+                    </div>
+                })
+            }}
         </div>
     }
 }

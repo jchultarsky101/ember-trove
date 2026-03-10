@@ -4,6 +4,7 @@ use common::{
     edge::{CreateEdgeRequest, Edge},
     id::{EdgeId, NodeId, TagId},
     node::{CreateNodeRequest, Node, UpdateNodeRequest},
+    search::SearchResponse,
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
 };
 use gloo_net::http::Request;
@@ -248,4 +249,23 @@ pub async fn detach_tag(node_id: NodeId, tag_id: TagId) -> Result<(), UiError> {
             .unwrap_or_else(|_| "unknown error".to_string());
         Err(UiError::api(status, text))
     }
+}
+
+// ── Search ──────────────────────────────────────────────────────────────
+
+pub async fn search_nodes(
+    q: &str,
+    fuzzy: bool,
+    page: u32,
+    per_page: u32,
+) -> Result<SearchResponse, UiError> {
+    let encoded_q: String = js_sys::encode_uri_component(q).into();
+    let url = api_url(&format!(
+        "/search?q={encoded_q}&fuzzy={fuzzy}&page={page}&per_page={per_page}"
+    ));
+    let resp = Request::get(&url)
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
 }
