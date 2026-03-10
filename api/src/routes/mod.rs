@@ -6,7 +6,7 @@ pub mod permissions;
 pub mod search;
 pub mod tags;
 
-use axum::{middleware, routing::get, Json, Router};
+use axum::{extract::State, middleware, routing::get, Json, Router};
 use axum::http::{header, Method};
 use serde_json::{json, Value};
 use tower_http::cors::{AllowOrigin, CorsLayer};
@@ -63,6 +63,16 @@ pub fn build_router(state: AppState) -> Router {
         .with_state(state)
 }
 
-async fn health() -> Json<Value> {
-    Json(json!({ "status": "ok", "service": "ember-trove-api" }))
+async fn health(State(state): State<AppState>) -> Json<Value> {
+    let db_status = sqlx::query("SELECT 1")
+        .fetch_optional(&state.pool)
+        .await
+        .map(|r| if r.is_some() { "ok" } else { "error" })
+        .unwrap_or("error");
+    
+    Json(json!({ 
+        "status": if db_status == "ok" { "ok" } else { "degraded" },
+        "service": "ember-trove-api",
+        "database": db_status
+    }))
 }

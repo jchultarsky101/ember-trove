@@ -20,10 +20,10 @@ pub struct Config {
     pub s3_access_key: Option<String>,
     pub s3_secret_key: Option<String>,
     pub s3_region: String,
-    // OIDC — required for auth
-    pub oidc_issuer: String,
-    pub oidc_client_id: String,
-    pub oidc_client_secret: String,
+    // OIDC — optional for Phase 1 dev, required for auth
+    pub oidc_issuer: Option<String>,
+    pub oidc_client_id: Option<String>,
+    pub oidc_client_secret: Option<String>,
     // Cookie encryption key (128 hex chars → 64 bytes, required by cookie::Key)
     pub cookie_key: String,
     // URLs
@@ -58,9 +58,9 @@ impl Config {
             s3_access_key: env::var("S3_ACCESS_KEY").ok(),
             s3_secret_key: env::var("S3_SECRET_KEY").ok(),
             s3_region: env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
-            oidc_issuer: require("OIDC_ISSUER")?,
-            oidc_client_id: require("OIDC_CLIENT_ID")?,
-            oidc_client_secret: require("OIDC_CLIENT_SECRET")?,
+            oidc_issuer: env::var("OIDC_ISSUER").ok(),
+            oidc_client_id: env::var("OIDC_CLIENT_ID").ok(),
+            oidc_client_secret: env::var("OIDC_CLIENT_SECRET").ok(),
             cookie_key,
             frontend_url: require("FRONTEND_URL")?,
             api_external_url: require("API_EXTERNAL_URL")?,

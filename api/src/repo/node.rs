@@ -21,7 +21,7 @@ pub trait NodeRepo: Send + Sync {
 
     async fn get_by_slug(&self, slug: &str) -> Result<Node, EmberTroveError>;
 
-    async fn list(&self, params: NodeListParams) -> Result<Vec<Node>, EmberTroveError>;
+    async fn list(&self, params: NodeListParams) -> Result<(Vec<Node>, u64), EmberTroveError>;
 
     async fn update(
         &self,
@@ -196,22 +196,24 @@ impl NodeRepo for PgNodeRepo {
         row.into_node()
     }
 
-    async fn list(&self, params: NodeListParams) -> Result<Vec<Node>, EmberTroveError> {
+    async fn list(&self, params: NodeListParams) -> Result<(Vec<Node>, u64), EmberTroveError> {
         let page = params.page.unwrap_or(1).max(1);
         let per_page = params.per_page.unwrap_or(50).min(200);
         let offset = (page - 1) * per_page;
 
-        // Build dynamic query with optional filters.
-        let mut sql = String::from(
+        // Build dynamic count query with optional filters.
+        let mut count_sql = String::from("SELECT COUNT(*) FROM nodes n");
+        let mut data_sql = String::from(
             "SELECT n.id, n.owner_id, n.node_type::text, n.title, n.slug, n.body, \
              n.metadata, n.status::text, n.created_at, n.updated_at FROM nodes n",
         );
 
         let mut conditions: Vec<String> = Vec::new();
-        let mut param_idx = 1u32;
+        let mut param_idx = 1i32;
 
         if params.tag_id.is_some() {
-            sql.push_str(" JOIN node_tags nt ON nt.node_id = n.id");
+            count_sql.push_str(" JOIN node_tags nt ON nt.node_id = n.id");
+            data_sql.push_str(" JOIN node_tags nt ON nt.node_id = n.id");
             conditions.push(format!("nt.tag_id = ${param_idx}"));
             param_idx += 1;
         }
@@ -232,16 +234,38 @@ impl NodeRepo for PgNodeRepo {
         }
 
         if !conditions.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&conditions.join(" AND "));
+            let where_clause = " WHERE ".to_owned() + &conditions.join(" AND ");
+            count_sql.push_str(&where_clause);
+            data_sql.push_str(&where_clause);
         }
 
-        sql.push_str(&format!(
+        // Build count query with bindings.
+        let mut count_query = sqlx::query_scalar(&count_sql);
+        if let Some(ref tag_id) = params.tag_id {
+            count_query = count_query.bind(tag_id.0);
+        }
+        if let Some(ref node_type) = params.node_type {
+            count_query = count_query.bind(node_type_to_str(node_type));
+        }
+        if let Some(ref status) = params.status {
+            count_query = count_query.bind(node_status_to_str(status));
+        }
+        if let Some(ref owner_id) = params.owner_id {
+            count_query = count_query.bind(owner_id.as_str());
+        }
+
+        let total: i64 = count_query
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| EmberTroveError::Internal(format!("count query failed: {e}")))?;
+
+        // Get paginated data.
+        data_sql.push_str(&format!(
             " ORDER BY n.updated_at DESC LIMIT ${param_idx} OFFSET ${}",
             param_idx + 1
         ));
 
-        let mut query = sqlx::query_as::<_, NodeRow>(&sql);
+        let mut query = sqlx::query_as::<_, NodeRow>(&data_sql);
 
         if let Some(ref tag_id) = params.tag_id {
             query = query.bind(tag_id.0);
@@ -263,7 +287,9 @@ impl NodeRepo for PgNodeRepo {
             .await
             .map_err(|e| EmberTroveError::Internal(format!("list nodes failed: {e}")))?;
 
-        rows.into_iter().map(NodeRow::into_node).collect()
+        let nodes = rows.into_iter().map(NodeRow::into_node).collect::<Result<_, _>>()?;
+
+        Ok((nodes, total as u64))
     }
 
     async fn update(

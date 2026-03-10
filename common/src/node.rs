@@ -74,3 +74,13 @@ pub struct NodeListParams {
     pub page: Option<u32>,
     pub per_page: Option<u32>,
 }
+
+/// Paginated response for node list queries.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct NodeListResponse {
+    pub nodes: Vec<Node>,
+    pub total: u64,
+    pub page: u32,
+    pub per_page: u32,
+    pub has_more: bool,
+}

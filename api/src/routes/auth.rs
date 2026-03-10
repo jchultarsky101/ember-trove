@@ -37,10 +37,13 @@ struct RedirectResponse {
 }
 
 async fn login(State(state): State<AppState>) -> Json<RedirectResponse> {
+    let oidc = state.oidc.as_ref()
+        .expect("OIDC not configured — auth is disabled");
+    
     let redirect_uri = format!("{}/api/auth/callback", state.auth.api_external_url);
     let url = format!(
         "{}?client_id={}&redirect_uri={}&response_type=code&scope=openid+email+profile",
-        state.oidc.authorization_endpoint,
+        oidc.authorization_endpoint,
         state.auth.client_id,
         urlencoding::encode(&redirect_uri),
     );
@@ -57,9 +60,11 @@ async fn callback(
     jar: PrivateCookieJar,
     Query(params): Query<CallbackQuery>,
 ) -> Result<(PrivateCookieJar, Html<String>), ApiError> {
+    let oidc = state.oidc.as_ref()
+        .ok_or_else(|| ApiError::Internal("OIDC not configured — auth is disabled".to_string()))?;
+    
     let redirect_uri = format!("{}/api/auth/callback", state.auth.api_external_url);
-    let token_resp = state
-        .oidc
+    let token_resp = oidc
         .exchange_code(&params.code, &redirect_uri)
         .await?;
 

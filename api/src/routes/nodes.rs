@@ -7,7 +7,7 @@ use axum::{
 use common::{
     auth::AuthClaims,
     id::NodeId,
-    node::{CreateNodeRequest, Node, NodeListParams, UpdateNodeRequest},
+    node::{CreateNodeRequest, NodeListResponse, Node, NodeListParams, UpdateNodeRequest},
 };
 use garde::Validate;
 use uuid::Uuid;
@@ -38,9 +38,19 @@ pub fn router() -> Router<AppState> {
 async fn list_nodes(
     State(state): State<AppState>,
     Query(params): Query<NodeListParams>,
-) -> Result<Json<Vec<Node>>, ApiError> {
-    let nodes = state.nodes.list(params).await?;
-    Ok(Json(nodes))
+) -> Result<Json<NodeListResponse>, ApiError> {
+    let page = params.page.unwrap_or(1).max(1);
+    let per_page = params.per_page.unwrap_or(50).min(200);
+    let (nodes, total) = state.nodes.list(params).await?;
+    let has_more = ((page as u64) * (per_page as u64)) + (nodes.len() as u64) < total;
+    
+    Ok(Json(NodeListResponse {
+        nodes,
+        total,
+        page,
+        per_page,
+        has_more,
+    }))
 }
 
 async fn create_node(

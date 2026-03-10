@@ -22,7 +22,7 @@ pub struct AppState {
     pub attachments: Arc<dyn AttachmentRepo>,
     pub permissions: Arc<dyn PermissionRepo>,
     pub object_store: Arc<dyn ObjectStore>,
-    pub oidc: Arc<OidcClient>,
+    pub oidc: Option<Arc<OidcClient>>,
     pub cookie_key: Key,
     pub auth: AuthConfig,
     pub config: Config,

@@ -1,10 +1,20 @@
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use jsonwebtoken::{jwk::JwkSet, DecodingKey, Validation};
 use serde::Deserialize;
 use tokio::sync::RwLock;
 
 use crate::error::ApiError;
+
+/// TTL for JWKS cache — refresh after 1 hour to handle key rotation.
+const JWKS_TTL: Duration = Duration::from_secs(3600);
+
+/// Cached JWKS with timestamp for TTL invalidation.
+struct CachedJwks {
+    jwks: JwkSet,
+    fetched_at: Instant,
+}
 
 /// OIDC discovery document (subset of fields we need).
 #[derive(Debug, Deserialize)]
@@ -67,7 +77,7 @@ pub struct OidcClient {
     token_endpoint: String,
     client_id: String,
     client_secret: String,
-    jwks: Arc<RwLock<Option<JwkSet>>>,
+    jwks: Arc<RwLock<Option<CachedJwks>>>,
     jwks_uri: String,
     http: reqwest::Client,
 }
@@ -187,11 +197,15 @@ impl OidcClient {
     async fn get_jwks(&self) -> Result<JwkSet, ApiError> {
         {
             let cached = self.jwks.read().await;
-            if let Some(ref jwks) = *cached {
-                return Ok(jwks.clone());
+            if let Some(ref cached) = *cached {
+                // Return cached JWKS if still within TTL window.
+                if cached.fetched_at.elapsed() < JWKS_TTL {
+                    return Ok(cached.jwks.clone());
+                }
             }
         }
 
+        // Fetch fresh JWKS from provider.
         let jwks: JwkSet = self
             .http
             .get(&self.jwks_uri)
@@ -202,8 +216,12 @@ impl OidcClient {
             .await
             .map_err(|e| ApiError::Internal(format!("JWKS parse failed: {e}")))?;
 
+        // Update cache with fresh JWKS and current timestamp.
         let mut cached = self.jwks.write().await;
-        *cached = Some(jwks.clone());
+        *cached = Some(CachedJwks {
+            jwks: jwks.clone(),
+            fetched_at: Instant::now(),
+        });
 
         Ok(jwks)
     }

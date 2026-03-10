@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use axum::{
     extract::{Request, State},
     middleware::Next,
@@ -22,8 +20,11 @@ pub async fn require_auth(
     mut request: Request,
     next: Next,
 ) -> Result<Response, ApiError> {
+    let oidc = state.oidc.as_ref()
+        .ok_or_else(|| ApiError::Internal("OIDC not configured — auth is disabled".to_string()))?;
+    
     let token = extract_token(&jar, &request)?;
-    let claims = validate_and_map(&state.oidc, &token).await?;
+    let claims = validate_and_map(oidc, &token).await?;
 
     request.extensions_mut().insert(claims);
     Ok(next.run(request).await)
@@ -57,7 +58,7 @@ fn extract_token(jar: &PrivateCookieJar, request: &Request) -> Result<String, Ap
 
 /// Validate the JWT and map Keycloak claims to our AuthClaims.
 async fn validate_and_map(
-    oidc: &Arc<OidcClient>,
+    oidc: &OidcClient,
     token: &str,
 ) -> Result<AuthClaims, ApiError> {
     let kc_claims = oidc.validate_token(token).await?;

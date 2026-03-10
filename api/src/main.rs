@@ -43,20 +43,29 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("database connection pool established");
 
-    // OIDC discovery — fetch endpoints and JWKS from Keycloak.
-    let oidc = Arc::new(
-        OidcClient::discover(
-            &config.oidc_issuer,
-            config.oidc_client_id.clone(),
-            config.oidc_client_secret.clone(),
-        )
-        .await?,
-    );
+    // Run pending migrations on startup.
+    sqlx::migrate!("../migrations")
+        .run(&pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("database migration failed: {e}"))?;
+    tracing::info!("database migrations complete");
+
+    // OIDC discovery — fetch endpoints and JWKS from Keycloak (optional for Phase 1 dev).
+    let oidc = if let (Some(issuer), Some(client_id), Some(client_secret)) =
+        (&config.oidc_issuer, &config.oidc_client_id, &config.oidc_client_secret)
+    {
+        Some(Arc::new(
+            OidcClient::discover(issuer, client_id.clone(), client_secret.clone()).await?,
+        ))
+    } else {
+        tracing::warn!("OIDC not configured — auth endpoints will be disabled");
+        None
+    };
 
     let auth = AuthConfig {
-        issuer: config.oidc_issuer.clone(),
-        client_id: config.oidc_client_id.clone(),
-        client_secret: config.oidc_client_secret.clone(),
+        issuer: config.oidc_issuer.clone().unwrap_or_default(),
+        client_id: config.oidc_client_id.clone().unwrap_or_default(),
+        client_secret: config.oidc_client_secret.clone().unwrap_or_default(),
         frontend_url: config.frontend_url.clone(),
         api_external_url: config.api_external_url.clone(),
     };
