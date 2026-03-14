@@ -9,8 +9,9 @@ use common::{
     attachment::Attachment,
     auth::AuthClaims,
     edge::Edge,
-    id::{NodeId, TagId},
+    id::{NodeId, PermissionId, TagId},
     node::{CreateNodeRequest, Node, NodeListParams, NodeListResponse, UpdateNodeRequest},
+    permission::{GrantPermissionRequest, Permission},
     tag::Tag,
 };
 use garde::Validate;
@@ -210,14 +211,53 @@ async fn upload_attachment(
     Ok((StatusCode::CREATED, Json(attachment)))
 }
 
-// ── Phase 7+ stubs ──────────────────────────────────────────────────────
+// ── Phase 7: Permissions ─────────────────────────────────────────────────
 
-async fn list_permissions() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+async fn list_permissions(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<Permission>>, ApiError> {
+    let perms = state.permissions.list(NodeId(id)).await?;
+    Ok(Json(perms))
 }
-async fn grant_permission() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+
+async fn grant_permission(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<GrantPermissionRequest>,
+) -> Result<(StatusCode, Json<Permission>), ApiError> {
+    req.validate()
+        .map_err(|e| ApiError::Validation(e.to_string()))?;
+
+    // Only the node owner may grant/modify permissions.
+    let node = state.nodes.get(NodeId(id)).await?;
+    if node.owner_id != claims.sub {
+        return Err(ApiError::Forbidden(
+            "only the node owner can manage permissions".to_string(),
+        ));
+    }
+
+    let perm = state
+        .permissions
+        .grant(NodeId(id), &claims.sub, req)
+        .await?;
+    Ok((StatusCode::CREATED, Json(perm)))
 }
-async fn revoke_permission() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+
+async fn revoke_permission(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Path((id, perm_id)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, ApiError> {
+    // Only the node owner may revoke permissions.
+    let node = state.nodes.get(NodeId(id)).await?;
+    if node.owner_id != claims.sub {
+        return Err(ApiError::Forbidden(
+            "only the node owner can manage permissions".to_string(),
+        ));
+    }
+
+    state.permissions.revoke(PermissionId(perm_id)).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
