@@ -3,6 +3,36 @@ use leptos::prelude::*;
 
 use crate::app::View;
 
+/// Strip basic Markdown and return up to 120 chars as a plain-text preview.
+fn body_preview(body: &str) -> Option<String> {
+    let text: String = body
+        .lines()
+        .map(str::trim)
+        .filter(|l| {
+            !l.is_empty()
+                && !l.starts_with('#')
+                && !l.starts_with("```")
+                && !l.starts_with("---")
+                && !l.starts_with("===")
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    if text.is_empty() {
+        return None;
+    }
+    let clean = text.replace("**", "").replace("__", "").replace('`', "");
+    let chars: Vec<char> = clean.chars().collect();
+    if chars.is_empty() {
+        return None;
+    }
+    let preview: String = chars.iter().take(120).collect();
+    Some(if chars.len() > 120 {
+        format!("{preview}…")
+    } else {
+        preview
+    })
+}
+
 #[component]
 pub fn NodeList() -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
@@ -34,8 +64,14 @@ pub fn NodeList() -> impl IntoView {
                         nodes.get().map(|result| {
                             match result {
                                 Ok(list) if list.is_empty() => view! {
-                                    <div class="flex-1 flex items-center justify-center p-6">
-                                        <p class="text-gray-400 dark:text-gray-600 text-sm">
+                                    <div class="flex flex-col items-center justify-center h-full gap-3 p-12">
+                                        <span
+                                            class="material-symbols-outlined text-gray-300 dark:text-gray-700"
+                                            style="font-size: 48px;"
+                                        >
+                                            "description"
+                                        </span>
+                                        <p class="text-gray-400 dark:text-gray-600 text-sm text-center">
                                             "No nodes yet. Create your first node to get started."
                                         </p>
                                     </div>
@@ -71,19 +107,26 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
                         class="px-6 py-4 hover:bg-gray-100 dark:hover:bg-gray-900 cursor-pointer transition-colors"
                         on:click=move |_| current_view.set(View::NodeDetail(id))
                     >
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                    {node.title.clone()}
-                                </span>
-                                <span class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                                    {node_type}
-                                </span>
-                                <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                                    {status}
-                                </span>
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        {node.title.clone()}
+                                    </span>
+                                    <span class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                                        {node_type}
+                                    </span>
+                                    <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                        {status}
+                                    </span>
+                                </div>
+                                {node.body.as_deref().and_then(body_preview).map(|preview| view! {
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+                                        {preview}
+                                    </p>
+                                })}
                             </div>
-                            <span class="text-xs text-gray-400">{updated}</span>
+                            <span class="text-xs text-gray-400 shrink-0 mt-0.5">{updated}</span>
                         </div>
                     </li>
                 }

@@ -111,9 +111,17 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                     attachments.get().map(|result| {
                         match result {
                             Ok(list) if list.is_empty() => view! {
-                                <p class="text-xs text-gray-400 dark:text-gray-600">
-                                    "No attachments yet."
-                                </p>
+                                <div class="flex flex-col items-center gap-2 py-6">
+                                    <span
+                                        class="material-symbols-outlined text-gray-300 dark:text-gray-700"
+                                        style="font-size: 32px;"
+                                    >
+                                        "attach_file"
+                                    </span>
+                                    <p class="text-xs text-gray-400 dark:text-gray-600">
+                                        "No attachments yet."
+                                    </p>
+                                </div>
                             }.into_any(),
                             Ok(list) => view! {
                                 <div class="space-y-1">
