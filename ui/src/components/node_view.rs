@@ -1,6 +1,6 @@
 use common::edge::{CreateEdgeRequest, EdgeType};
 use common::id::NodeId;
-use leptos::prelude::*;
+use leptos::{html::Input, prelude::*};
 use pulldown_cmark::{Options, Parser, html};
 
 use crate::app::View;
@@ -100,7 +100,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         <TagBar node_id=id />
                                     </div>
                                     <div class="flex-1 overflow-auto p-6">
-                                        <div class="prose max-w-none dark:prose-invert" inner_html=body_html />
+                                        <div class="prose max-w-2xl dark:prose-invert" inner_html=body_html />
                                         <EdgePanel node_id=id />
                                         <AttachmentPanel node_id=id />
                                     </div>
@@ -127,6 +127,23 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
     let edge_type_input = RwSignal::new("references".to_string());
     let label_input = RwSignal::new(String::new());
     let error_msg = RwSignal::new(Option::<String>::None);
+    let node_search_query = RwSignal::new(String::new());
+    let search_open = RwSignal::new(false);
+    let search_input_ref = NodeRef::<Input>::new();
+
+    let picker_results: LocalResource<Vec<common::search::SearchResult>> =
+        LocalResource::new(move || {
+            let q = node_search_query.get();
+            async move {
+                if q.len() < 2 {
+                    return Vec::new();
+                }
+                crate::api::search_nodes(&q, false, 0, 6)
+                    .await
+                    .map(|r| r.results)
+                    .unwrap_or_default()
+            }
+        });
 
     let edges = LocalResource::new(move || {
         let _ = refresh_edges.get();
@@ -169,6 +186,10 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                 Ok(_) => {
                     show_add.set(false);
                     target_id_input.set(String::new());
+                    node_search_query.set(String::new());
+                    if let Some(el) = search_input_ref.get_untracked() {
+                        el.set_value("");
+                    }
                     label_input.set(String::new());
                     refresh_edges.update(|n| *n += 1);
                 }
@@ -196,15 +217,59 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
             {move || show_add.get().then(|| view! {
                 <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-2">
                     <div class="flex gap-2">
-                        <input
-                            type="text"
-                            class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600
-                                bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none
-                                focus:ring-1 focus:ring-blue-500"
-                            placeholder="Target node UUID..."
-                            prop:value=move || target_id_input.get()
-                            on:input=move |ev| target_id_input.set(event_target_value(&ev))
-                        />
+                        <div class="relative flex-1">
+                            <input
+                                type="text"
+                                node_ref=search_input_ref
+                                class="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600
+                                    bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none
+                                    focus:ring-1 focus:ring-blue-500"
+                                placeholder="Search for a node…"
+                                on:input=move |ev| {
+                                    let v = event_target_value(&ev);
+                                    node_search_query.set(v.clone());
+                                    target_id_input.set(v);
+                                    search_open.set(true);
+                                }
+                                on:focus=move |_| search_open.set(true)
+                                on:blur=move |_| search_open.set(false)
+                            />
+                            <Suspense fallback=|| ()>
+                            {move || {
+                                let results = picker_results.get().unwrap_or_default();
+                                if !search_open.get() || results.is_empty() {
+                                    return None;
+                                }
+                                Some(view! {
+                                    <div class="absolute z-30 top-full left-0 right-0 mt-0.5
+                                        bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700
+                                        rounded-lg shadow-lg overflow-hidden">
+                                        {results.into_iter().map(|r| {
+                                            let id_str = r.node_id.to_string();
+                                            let title = r.title;
+                                            let title2 = title.clone();
+                                            view! {
+                                                <button
+                                                    class="w-full text-left px-3 py-1.5 text-xs
+                                                        hover:bg-gray-100 dark:hover:bg-gray-800
+                                                        text-gray-700 dark:text-gray-300"
+                                                    on:mousedown=move |_| {
+                                                        target_id_input.set(id_str.clone());
+                                                        node_search_query.set(title.clone());
+                                                        if let Some(el) = search_input_ref.get_untracked() {
+                                                            el.set_value(&title);
+                                                        }
+                                                        search_open.set(false);
+                                                    }
+                                                >
+                                                    {title2}
+                                                </button>
+                                            }
+                                        }).collect::<Vec<_>>()}
+                                    </div>
+                                })
+                            }}
+                            </Suspense></div>
                         <select
                             class="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600
                                 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300
@@ -252,9 +317,17 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                         match result {
                             Ok(edge_list) if edge_list.is_empty() => {
                                 view! {
-                                    <p class="text-xs text-gray-400 dark:text-gray-600">
-                                        "No connections yet."
-                                    </p>
+                                    <div class="flex flex-col items-center gap-2 py-6">
+                                        <span
+                                            class="material-symbols-outlined text-gray-300 dark:text-gray-700"
+                                            style="font-size: 32px;"
+                                        >
+                                            "hub"
+                                        </span>
+                                        <p class="text-xs text-gray-400 dark:text-gray-600">
+                                            "No connections yet."
+                                        </p>
+                                    </div>
                                 }.into_any()
                             }
                             Ok(edge_list) => {
