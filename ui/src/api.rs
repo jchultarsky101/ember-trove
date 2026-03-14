@@ -30,6 +30,16 @@ pub async fn parse_json<T: serde::de::DeserializeOwned>(
             .map_err(|e| UiError::Parse(e.to_string()))
     } else {
         let status = response.status();
+        if status == 401 {
+            // Attempt a silent token refresh. On success reload the page so
+            // all resources re-fetch with the new session cookie. On failure
+            // the reload still happens, which causes init_auth to detect an
+            // unauthenticated state and show the login screen.
+            let _ = refresh_session().await;
+            if let Some(win) = web_sys::window() {
+                let _ = win.location().reload();
+            }
+        }
         let text = response
             .text()
             .await
@@ -60,6 +70,25 @@ pub async fn fetch_login_url() -> Result<String, UiError> {
         .map_err(|e| UiError::Network(e.to_string()))?;
     let data: RedirectResponse = parse_json(resp).await?;
     Ok(data.redirect_url)
+}
+
+/// Call the backend refresh endpoint. On success the server sets a new
+/// session cookie. The UI then reloads to pick it up.
+pub async fn refresh_session() -> Result<(), UiError> {
+    let resp = Request::post(&api_url("/auth/refresh"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    if resp.ok() {
+        Ok(())
+    } else {
+        let status = resp.status();
+        let text = resp
+            .text()
+            .await
+            .unwrap_or_else(|_| "unknown error".to_string());
+        Err(UiError::api(status, text))
+    }
 }
 
 pub async fn fetch_logout_url() -> Result<String, UiError> {
