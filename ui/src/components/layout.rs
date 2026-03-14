@@ -63,7 +63,7 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
 #[component]
 fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
     view! {
-        <div class="flex items-center border-b border-gray-200 dark:border-gray-800 px-3 py-3 gap-2">
+        <div class="flex items-center border-b border-gray-200 dark:border-gray-800 px-3 py-4 gap-2">
             // Banner icon — inline SVG ember flame
             <div class="flex-shrink-0 w-8 h-8">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="w-full h-full">
