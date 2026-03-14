@@ -22,7 +22,7 @@ pub fn DarkModeToggle() -> impl IntoView {
 
     view! {
         <button
-            class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             aria-label=label
             on:click=move |_| {
                 theme.update(|t| {

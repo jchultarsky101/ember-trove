@@ -91,7 +91,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     view! {
         <div class="flex flex-col h-full">
             // Header
-            <div class="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-gray-800">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
                 <div class="flex items-center gap-3 flex-1">
                     <button
                         class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
