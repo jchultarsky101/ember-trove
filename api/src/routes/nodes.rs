@@ -1,10 +1,12 @@
 use axum::{
-    Extension, Json, Router,
-    extract::{Path, Query, State},
+    extract::{Multipart, Path, Query, State},
     http::StatusCode,
     routing::{delete, get, post},
+    Extension, Json, Router,
 };
+use bytes::Bytes;
 use common::{
+    attachment::Attachment,
     auth::AuthClaims,
     edge::Edge,
     id::{NodeId, TagId},
@@ -153,13 +155,59 @@ async fn detach_tag(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ── Phase 6+ stubs ──────────────────────────────────────────────────────
+// ── Phase 6: Attachments ─────────────────────────────────────────────────
 
-async fn list_attachments() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+async fn list_attachments(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<Attachment>>, ApiError> {
+    let attachments = state.attachments.list(NodeId(id)).await?;
+    Ok(Json(attachments))
 }
-async fn upload_attachment() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+
+async fn upload_attachment(
+    State(state): State<AppState>,
+    Extension(_claims): Extension<AuthClaims>,
+    Path(id): Path<Uuid>,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<Attachment>), ApiError> {
+    // Read the first field — expected to be the file.
+    let field = multipart
+        .next_field()
+        .await
+        .map_err(|e| ApiError::Validation(format!("multipart error: {e}")))?
+        .ok_or_else(|| ApiError::Validation("no file field in request".to_string()))?;
+
+    let filename = field
+        .file_name()
+        .unwrap_or("upload")
+        .to_string();
+    let content_type = field
+        .content_type()
+        .unwrap_or("application/octet-stream")
+        .to_string();
+
+    let data: Bytes = field
+        .bytes()
+        .await
+        .map_err(|e| ApiError::Validation(format!("read multipart field: {e}")))?;
+    let size_bytes = data.len() as i64;
+
+    // Generate a unique S3 key: <node_id>/<uuid>/<filename>
+    let s3_key = format!("{}/{}/{}", id, Uuid::new_v4(), filename);
+
+    state
+        .object_store
+        .put(&s3_key, data, &content_type)
+        .await
+        .map_err(|e| ApiError::Storage(e.to_string()))?;
+
+    let attachment = state
+        .attachments
+        .create(NodeId(id), &filename, &content_type, size_bytes, &s3_key)
+        .await?;
+
+    Ok((StatusCode::CREATED, Json(attachment)))
 }
 
 // ── Phase 7+ stubs ──────────────────────────────────────────────────────

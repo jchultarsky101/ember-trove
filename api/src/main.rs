@@ -74,10 +74,26 @@ async fn main() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("COOKIE_KEY is not valid hex: {e}"))?;
     let cookie_key = Key::from(&key_bytes);
 
-    let object_store = Arc::new(S3ObjectStore::new(
-        config.s3_bucket.clone().unwrap_or_default(),
-        config.s3_endpoint.clone().unwrap_or_default(),
-    ));
+    let object_store: Arc<dyn object_store::ObjectStore> =
+        if let (Some(bucket), Some(access_key), Some(secret_key)) = (
+            config.s3_bucket.as_deref(),
+            config.s3_access_key.as_deref(),
+            config.s3_secret_key.as_deref(),
+        ) {
+            Arc::new(
+                S3ObjectStore::new(
+                    bucket,
+                    &config.s3_region,
+                    access_key,
+                    secret_key,
+                    config.s3_endpoint.as_deref(),
+                )
+                .map_err(|e| anyhow::anyhow!("S3 init failed: {e}"))?,
+            )
+        } else {
+            tracing::warn!("S3 not configured — attachment upload/download will be unavailable");
+            Arc::new(object_store::NullObjectStore)
+        };
 
     let state = AppState {
         nodes: Arc::new(PgNodeRepo::new(pool.clone())),

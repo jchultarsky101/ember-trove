@@ -4,6 +4,7 @@ use leptos::prelude::*;
 use pulldown_cmark::{Options, Parser, html};
 
 use crate::app::View;
+use crate::components::attachment_panel::AttachmentPanel;
 use crate::components::tag_bar::TagBar;
 
 fn render_markdown(source: &str) -> String {
@@ -92,8 +93,8 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                     </div>
                                     <div class="flex-1 overflow-auto p-6">
                                         <div class="prose max-w-none dark:prose-invert" inner_html=body_html />
-                                        // Edges section
                                         <EdgePanel node_id=id />
+                                        <AttachmentPanel node_id=id />
                                     </div>
                                 </div>
                             }.into_any()
