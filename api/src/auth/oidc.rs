@@ -155,6 +155,37 @@ impl OidcClient {
             .map_err(|e| ApiError::Internal(format!("token response parse failed: {e}")))
     }
 
+    /// Exchange a refresh token for a new set of tokens.
+    pub async fn exchange_refresh_token(
+        &self,
+        refresh_token: &str,
+    ) -> Result<TokenResponse, ApiError> {
+        let resp = self
+            .http
+            .post(&self.token_endpoint)
+            .form(&[
+                ("grant_type", "refresh_token"),
+                ("refresh_token", refresh_token),
+                ("client_id", &self.client_id),
+                ("client_secret", &self.client_secret),
+            ])
+            .send()
+            .await
+            .map_err(|e| ApiError::Internal(format!("refresh token request failed: {e}")))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_else(|_| "unknown".to_string());
+            return Err(ApiError::Unauthorized(format!(
+                "refresh token exchange failed ({status}): {body}"
+            )));
+        }
+
+        resp.json::<TokenResponse>()
+            .await
+            .map_err(|e| ApiError::Internal(format!("refresh token response parse failed: {e}")))
+    }
+
     /// Validate an access token JWT, returning the decoded claims.
     pub async fn validate_token(&self, token: &str) -> Result<KeycloakClaims, ApiError> {
         let jwks = self.get_jwks().await?;
