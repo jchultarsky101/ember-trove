@@ -158,6 +158,14 @@ pub async fn delete_node(id: NodeId) -> Result<(), UiError> {
 
 // ── Edges ───────────────────────────────────────────────────────────────
 
+pub async fn fetch_all_edges() -> Result<Vec<Edge>, UiError> {
+    let resp = Request::get(&api_url("/edges"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
 pub async fn fetch_edges_for_node(node_id: NodeId) -> Result<Vec<Edge>, UiError> {
     let resp = Request::get(&api_url(&format!("/nodes/{node_id}/edges")))
         .send()

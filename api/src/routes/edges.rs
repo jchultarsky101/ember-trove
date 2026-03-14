@@ -2,7 +2,7 @@ use axum::{
     Json, Router,
     extract::{Path, State},
     http::StatusCode,
-    routing::{delete, post},
+    routing::{delete, get},
 };
 use common::{
     edge::{CreateEdgeRequest, Edge},
@@ -14,8 +14,15 @@ use crate::{error::ApiError, state::AppState};
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/", post(create_edge))
+        .route("/", get(list_edges).post(create_edge))
         .route("/{id}", delete(delete_edge))
+}
+
+async fn list_edges(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<Edge>>, ApiError> {
+    let edges = state.edges.list_all().await?;
+    Ok(Json(edges))
 }
 
 async fn create_edge(

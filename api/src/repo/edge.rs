@@ -13,6 +13,7 @@ pub trait EdgeRepo: Send + Sync {
     async fn create(&self, req: CreateEdgeRequest) -> Result<Edge, EmberTroveError>;
     async fn delete(&self, id: EdgeId) -> Result<(), EmberTroveError>;
     async fn list_for_node(&self, node_id: NodeId) -> Result<Vec<Edge>, EmberTroveError>;
+    async fn list_all(&self) -> Result<Vec<Edge>, EmberTroveError>;
 }
 
 pub struct PgEdgeRepo {
@@ -139,6 +140,21 @@ impl EdgeRepo for PgEdgeRepo {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("list edges failed: {e}")))?;
+
+        rows.into_iter().map(EdgeRow::into_edge).collect()
+    }
+
+    async fn list_all(&self) -> Result<Vec<Edge>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, EdgeRow>(
+            r#"
+            SELECT id, source_id, target_id, edge_type::text, label, created_at
+            FROM edges
+            ORDER BY created_at DESC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list all edges failed: {e}")))?;
 
         rows.into_iter().map(EdgeRow::into_edge).collect()
     }
