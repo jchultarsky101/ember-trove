@@ -15,9 +15,7 @@ fn local_storage() -> Option<web_sys::Storage> {
 }
 
 pub fn storage_get(key: &str) -> Option<String> {
-    local_storage()
-        .and_then(|s| s.get_item(key).ok())
-        .flatten()
+    local_storage().and_then(|s| s.get_item(key).ok()).flatten()
 }
 
 pub fn storage_set(key: &str, value: &str) {
@@ -35,6 +33,7 @@ pub enum View {
     NodeDetail(NodeId),
     NodeCreate,
     NodeEdit(NodeId),
+    TagManager,
     Graph,
     Search,
 }
@@ -47,7 +46,13 @@ pub fn App() -> impl IntoView {
 
     // Persist theme in localStorage
     let initial_theme = storage_get("theme")
-        .map(|s| if s == "dark" { Theme::Dark } else { Theme::Light })
+        .map(|s| {
+            if s == "dark" {
+                Theme::Dark
+            } else {
+                Theme::Light
+            }
+        })
         .unwrap_or(Theme::Light);
 
     let theme = RwSignal::new(initial_theme);

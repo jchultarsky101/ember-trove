@@ -5,10 +5,8 @@ use crate::app::View;
 
 #[component]
 pub fn NodeList() -> impl IntoView {
-    let current_view =
-        use_context::<RwSignal<View>>().expect("View signal must be provided");
-    let refresh =
-        use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
 
     let nodes = LocalResource::new(move || {
         let _ = refresh.get();
@@ -20,11 +18,12 @@ pub fn NodeList() -> impl IntoView {
             <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
                 <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100">"Nodes"</h1>
                 <button
-                    class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm
-                        font-medium rounded-lg transition-colors"
+                    class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
+                        hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     on:click=move |_| current_view.set(View::NodeCreate)
+                    title="New node"
                 >
-                    "New Node"
+                    <span class="material-symbols-outlined">"add"</span>
                 </button>
             </div>
             <div class="flex-1 overflow-auto">

@@ -1,8 +1,11 @@
+use common::edge::{CreateEdgeRequest, EdgeType};
 use common::id::NodeId;
 use leptos::prelude::*;
-use pulldown_cmark::{html, Options, Parser};
+use pulldown_cmark::{Options, Parser, html};
 
 use crate::app::View;
+use crate::components::attachment_panel::AttachmentPanel;
+use crate::components::tag_bar::TagBar;
 
 fn render_markdown(source: &str) -> String {
     let opts = Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES | Options::ENABLE_TASKLISTS;
@@ -14,10 +17,8 @@ fn render_markdown(source: &str) -> String {
 
 #[component]
 pub fn NodeView(id: NodeId) -> impl IntoView {
-    let current_view =
-        use_context::<RwSignal<View>>().expect("View signal must be provided");
-    let refresh =
-        use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
 
     let node = LocalResource::new(move || {
         let id = id;
@@ -70,24 +71,38 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                                 {status}
                                             </span>
                                         </div>
-                                        <div class="flex items-center gap-2">
+                                        <div class="flex items-center gap-1">
                                             <button
-                                                class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                                                class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
+                                                    dark:hover:text-gray-300 hover:bg-gray-100
+                                                    dark:hover:bg-gray-800 transition-colors"
                                                 on:click=move |_| current_view.set(View::NodeEdit(edit_id))
+                                                title="Edit"
                                             >
-                                                "Edit"
+                                                <span class="material-symbols-outlined">"edit"</span>
                                             </button>
                                             <button
-                                                class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
+                                                class="p-1.5 rounded-lg text-gray-400 hover:text-red-600
+                                                    dark:hover:text-red-400 hover:bg-red-50
+                                                    dark:hover:bg-red-900/30 transition-colors"
                                                 on:click=on_delete
                                                 disabled=move || deleting.get()
+                                                title=move || if deleting.get() { "Deleting…" } else { "Delete" }
                                             >
-                                                {move || if deleting.get() { "Deleting..." } else { "Delete" }}
+                                                <span class="material-symbols-outlined">
+                                                    {move || if deleting.get() { "hourglass_empty" } else { "delete" }}
+                                                </span>
                                             </button>
                                         </div>
                                     </div>
+                                    // Tags
+                                    <div class="border-b border-gray-200 dark:border-gray-800">
+                                        <TagBar node_id=id />
+                                    </div>
                                     <div class="flex-1 overflow-auto p-6">
                                         <div class="prose max-w-none dark:prose-invert" inner_html=body_html />
+                                        <EdgePanel node_id=id />
+                                        <AttachmentPanel node_id=id />
                                     </div>
                                 </div>
                             }.into_any()
@@ -99,5 +114,201 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                 })
             }}
         </Suspense>
+    }
+}
+
+/// Shows edges (incoming + outgoing) for a node, with ability to add/remove.
+#[component]
+fn EdgePanel(node_id: NodeId) -> impl IntoView {
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let refresh_edges = RwSignal::new(0u32);
+    let show_add = RwSignal::new(false);
+    let target_id_input = RwSignal::new(String::new());
+    let edge_type_input = RwSignal::new("references".to_string());
+    let label_input = RwSignal::new(String::new());
+    let error_msg = RwSignal::new(Option::<String>::None);
+
+    let edges = LocalResource::new(move || {
+        let _ = refresh_edges.get();
+        let node_id = node_id;
+        async move { crate::api::fetch_edges_for_node(node_id).await }
+    });
+
+    let on_add_edge = move |_| {
+        let target_str = target_id_input.get_untracked().trim().to_string();
+        let et = edge_type_input.get_untracked();
+        let label = label_input.get_untracked().trim().to_string();
+        error_msg.set(None);
+
+        let target_uuid = match uuid::Uuid::parse_str(&target_str) {
+            Ok(u) => u,
+            Err(_) => {
+                error_msg.set(Some("Invalid target node UUID".to_string()));
+                return;
+            }
+        };
+
+        let edge_type = match et.as_str() {
+            "references" => EdgeType::References,
+            "contains" => EdgeType::Contains,
+            "related_to" => EdgeType::RelatedTo,
+            "depends_on" => EdgeType::DependsOn,
+            "derived_from" => EdgeType::DerivedFrom,
+            _ => EdgeType::References,
+        };
+
+        let req = CreateEdgeRequest {
+            source_id: node_id,
+            target_id: common::id::NodeId(target_uuid),
+            edge_type,
+            label: if label.is_empty() { None } else { Some(label) },
+        };
+
+        wasm_bindgen_futures::spawn_local(async move {
+            match crate::api::create_edge(&req).await {
+                Ok(_) => {
+                    show_add.set(false);
+                    target_id_input.set(String::new());
+                    label_input.set(String::new());
+                    refresh_edges.update(|n| *n += 1);
+                }
+                Err(e) => error_msg.set(Some(format!("{e}"))),
+            }
+        });
+    };
+
+    view! {
+        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    "Connections"
+                </h2>
+                <button
+                    class="text-xs px-2 py-1 rounded-lg text-gray-500 dark:text-gray-400
+                        hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    on:click=move |_| show_add.update(|v| *v = !*v)
+                >
+                    {move || if show_add.get() { "Cancel" } else { "+ Add Edge" }}
+                </button>
+            </div>
+
+            // Add edge form
+            {move || show_add.get().then(|| view! {
+                <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-2">
+                    <div class="flex gap-2">
+                        <input
+                            type="text"
+                            class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600
+                                bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none
+                                focus:ring-1 focus:ring-blue-500"
+                            placeholder="Target node UUID..."
+                            prop:value=move || target_id_input.get()
+                            on:input=move |ev| target_id_input.set(event_target_value(&ev))
+                        />
+                        <select
+                            class="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600
+                                bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300
+                                focus:outline-none"
+                            prop:value=move || edge_type_input.get()
+                            on:change=move |ev| edge_type_input.set(event_target_value(&ev))
+                        >
+                            <option value="references">"References"</option>
+                            <option value="contains">"Contains"</option>
+                            <option value="related_to">"Related To"</option>
+                            <option value="depends_on">"Depends On"</option>
+                            <option value="derived_from">"Derived From"</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2">
+                        <input
+                            type="text"
+                            class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600
+                                bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none
+                                focus:ring-1 focus:ring-blue-500"
+                            placeholder="Label (optional)..."
+                            prop:value=move || label_input.get()
+                            on:input=move |ev| label_input.set(event_target_value(&ev))
+                        />
+                        <button
+                            class="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white
+                                rounded font-medium transition-colors"
+                            on:click=on_add_edge
+                        >
+                            "Add"
+                        </button>
+                    </div>
+                    {move || error_msg.get().map(|msg| view! {
+                        <div class="text-xs text-red-500">{msg}</div>
+                    })}
+                </div>
+            })}
+
+            // Edge list
+            <Suspense fallback=|| view! {
+                <div class="text-xs text-gray-400">"Loading edges..."</div>
+            }>
+                {move || {
+                    edges.get().map(|result| {
+                        match result {
+                            Ok(edge_list) if edge_list.is_empty() => {
+                                view! {
+                                    <p class="text-xs text-gray-400 dark:text-gray-600">
+                                        "No connections yet."
+                                    </p>
+                                }.into_any()
+                            }
+                            Ok(edge_list) => {
+                                view! {
+                                    <div class="space-y-1">
+                                        {edge_list.into_iter().map(|edge| {
+                                            let edge_id = edge.id;
+                                            let is_outgoing = edge.source_id == node_id;
+                                            let other_id = if is_outgoing { edge.target_id } else { edge.source_id };
+                                            let direction = if is_outgoing { "\u{2192}" } else { "\u{2190}" };
+                                            let edge_type_label = format!("{:?}", edge.edge_type).to_lowercase().replace('_', " ");
+                                            let label = edge.label.clone().unwrap_or_default();
+                                            view! {
+                                                <div class="flex items-center justify-between py-1.5 px-2 rounded
+                                                    hover:bg-gray-50 dark:hover:bg-gray-800/50 group">
+                                                    <button
+                                                        class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400
+                                                            hover:text-blue-600 dark:hover:text-blue-400"
+                                                        on:click=move |_| current_view.set(View::NodeDetail(other_id))
+                                                    >
+                                                        <span>{direction}</span>
+                                                        <span class="font-medium">{edge_type_label}</span>
+                                                        <span class="text-gray-400 dark:text-gray-500 font-mono text-[10px] truncate max-w-[150px]">
+                                                            {other_id.to_string()}
+                                                        </span>
+                                                        {(!label.is_empty()).then(|| view! {
+                                                            <span class="italic text-gray-400">{format!("({label})")}</span>
+                                                        })}
+                                                    </button>
+                                                    <button
+                                                        class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600
+                                                            text-xs transition-opacity"
+                                                        on:click=move |_| {
+                                                            wasm_bindgen_futures::spawn_local(async move {
+                                                                let _ = crate::api::delete_edge(edge_id).await;
+                                                                refresh_edges.update(|n| *n += 1);
+                                                            });
+                                                        }
+                                                    >
+                                                        "\u{00d7}"
+                                                    </button>
+                                                </div>
+                                            }
+                                        }).collect::<Vec<_>>()}
+                                    </div>
+                                }.into_any()
+                            }
+                            Err(e) => view! {
+                                <div class="text-xs text-red-500">{format!("Error: {e}")}</div>
+                            }.into_any(),
+                        }
+                    })
+                }}
+            </Suspense>
+        </div>
     }
 }

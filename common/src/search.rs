@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::node::NodeType;
 use crate::id::NodeId;
+use crate::node::NodeType;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SearchQuery {

@@ -15,12 +15,12 @@ use axum_extra::extract::cookie::Key;
 use sqlx::postgres::PgPoolOptions;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use auth::{oidc::OidcClient, AuthConfig};
+use auth::{AuthConfig, oidc::OidcClient};
 use config::Config;
 use object_store::s3::S3ObjectStore;
 use repo::{
-    attachment::PgAttachmentRepo, edge::PgEdgeRepo, node::PgNodeRepo,
-    permission::PgPermissionRepo, tag::PgTagRepo,
+    attachment::PgAttachmentRepo, edge::PgEdgeRepo, node::PgNodeRepo, permission::PgPermissionRepo,
+    search::PgSearchRepo, tag::PgTagRepo,
 };
 use state::AppState;
 
@@ -28,8 +28,7 @@ use state::AppState;
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -75,10 +74,26 @@ async fn main() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("COOKIE_KEY is not valid hex: {e}"))?;
     let cookie_key = Key::from(&key_bytes);
 
-    let object_store = Arc::new(S3ObjectStore::new(
-        config.s3_bucket.clone().unwrap_or_default(),
-        config.s3_endpoint.clone().unwrap_or_default(),
-    ));
+    let object_store: Arc<dyn object_store::ObjectStore> =
+        if let (Some(bucket), Some(access_key), Some(secret_key)) = (
+            config.s3_bucket.as_deref(),
+            config.s3_access_key.as_deref(),
+            config.s3_secret_key.as_deref(),
+        ) {
+            Arc::new(
+                S3ObjectStore::new(
+                    bucket,
+                    &config.s3_region,
+                    access_key,
+                    secret_key,
+                    config.s3_endpoint.as_deref(),
+                )
+                .map_err(|e| anyhow::anyhow!("S3 init failed: {e}"))?,
+            )
+        } else {
+            tracing::warn!("S3 not configured — attachment upload/download will be unavailable");
+            Arc::new(object_store::NullObjectStore)
+        };
 
     let state = AppState {
         nodes: Arc::new(PgNodeRepo::new(pool.clone())),
@@ -86,6 +101,7 @@ async fn main() -> anyhow::Result<()> {
         tags: Arc::new(PgTagRepo::new(pool.clone())),
         attachments: Arc::new(PgAttachmentRepo::new(pool.clone())),
         permissions: Arc::new(PgPermissionRepo::new(pool.clone())),
+        search: Arc::new(PgSearchRepo::new(pool.clone())),
         object_store,
         oidc,
         cookie_key,
