@@ -5,6 +5,7 @@ use pulldown_cmark::{Options, Parser, html};
 
 use crate::app::View;
 use crate::components::attachment_panel::AttachmentPanel;
+use crate::components::permission_dialog::PermissionPanel;
 use crate::components::tag_bar::TagBar;
 
 fn render_markdown(source: &str) -> String {
@@ -103,6 +104,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         <div class="prose max-w-2xl dark:prose-invert" inner_html=body_html />
                                         <EdgePanel node_id=id />
                                         <AttachmentPanel node_id=id />
+                                        <PermissionPanel node_id=id />
                                     </div>
                                 </div>
                             }.into_any()
