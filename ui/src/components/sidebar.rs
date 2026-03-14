@@ -3,12 +3,12 @@ use leptos::prelude::*;
 use crate::{
     app::View,
     auth::{AuthState, AuthStatus},
+    components::search_bar::SearchBar,
 };
 
 #[component]
 pub fn Sidebar(auth_state: AuthState) -> impl IntoView {
-    let current_view =
-        use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
 
     let on_logout = move |_| {
         wasm_bindgen_futures::spawn_local(async move {
@@ -28,6 +28,11 @@ pub fn Sidebar(auth_state: AuthState) -> impl IntoView {
             />
             <div class="border-t border-gray-200 dark:border-gray-700 my-3" />
             <SidebarLink
+                icon="label" label="Tags"
+                on_click=move || current_view.set(View::TagManager)
+            />
+            <div class="border-t border-gray-200 dark:border-gray-700 my-3" />
+            <SidebarLink
                 icon="share" label="Graph"
                 on_click=move || current_view.set(View::Graph)
             />
@@ -35,6 +40,10 @@ pub fn Sidebar(auth_state: AuthState) -> impl IntoView {
                 icon="search" label="Search"
                 on_click=move || current_view.set(View::Search)
             />
+            <div class="border-t border-gray-200 dark:border-gray-700 my-3" />
+            <div class="px-1">
+                <SearchBar />
+            </div>
         </nav>
         <div class="px-3 py-3 border-t border-gray-200 dark:border-gray-800">
             {move || {

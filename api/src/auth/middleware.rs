@@ -57,10 +57,7 @@ fn extract_token(jar: &PrivateCookieJar, request: &Request) -> Result<String, Ap
 }
 
 /// Validate the JWT and map Keycloak claims to our AuthClaims.
-async fn validate_and_map(
-    oidc: &OidcClient,
-    token: &str,
-) -> Result<AuthClaims, ApiError> {
+async fn validate_and_map(oidc: &OidcClient, token: &str) -> Result<AuthClaims, ApiError> {
     let kc_claims = oidc.validate_token(token).await?;
 
     let roles = kc_claims

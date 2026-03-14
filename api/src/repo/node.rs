@@ -1,21 +1,18 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use common::{
+    EmberTroveError,
     id::NodeId,
     node::{CreateNodeRequest, Node, NodeListParams, NodeStatus, NodeType, UpdateNodeRequest},
     slug::slugify,
-    EmberTroveError,
 };
 use sqlx::PgPool;
 use uuid::Uuid;
 
 #[async_trait]
 pub trait NodeRepo: Send + Sync {
-    async fn create(
-        &self,
-        owner_id: &str,
-        req: CreateNodeRequest,
-    ) -> Result<Node, EmberTroveError>;
+    async fn create(&self, owner_id: &str, req: CreateNodeRequest)
+    -> Result<Node, EmberTroveError>;
 
     async fn get(&self, id: NodeId) -> Result<Node, EmberTroveError>;
 
@@ -23,11 +20,7 @@ pub trait NodeRepo: Send + Sync {
 
     async fn list(&self, params: NodeListParams) -> Result<(Vec<Node>, u64), EmberTroveError>;
 
-    async fn update(
-        &self,
-        id: NodeId,
-        req: UpdateNodeRequest,
-    ) -> Result<Node, EmberTroveError>;
+    async fn update(&self, id: NodeId, req: UpdateNodeRequest) -> Result<Node, EmberTroveError>;
 
     async fn delete(&self, id: NodeId) -> Result<(), EmberTroveError>;
 
@@ -131,9 +124,7 @@ impl NodeRepo for PgNodeRepo {
     ) -> Result<Node, EmberTroveError> {
         let slug = slugify(&req.title);
         let node_type_str = node_type_to_str(&req.node_type);
-        let status_str = node_status_to_str(
-            req.status.as_ref().unwrap_or(&NodeStatus::Draft),
-        );
+        let status_str = node_status_to_str(req.status.as_ref().unwrap_or(&NodeStatus::Draft));
 
         let row = sqlx::query_as::<_, NodeRow>(
             r#"
@@ -292,11 +283,7 @@ impl NodeRepo for PgNodeRepo {
         Ok((nodes, total as u64))
     }
 
-    async fn update(
-        &self,
-        id: NodeId,
-        req: UpdateNodeRequest,
-    ) -> Result<Node, EmberTroveError> {
+    async fn update(&self, id: NodeId, req: UpdateNodeRequest) -> Result<Node, EmberTroveError> {
         let status_str = req.status.as_ref().map(node_status_to_str);
 
         let row = sqlx::query_as::<_, NodeRow>(

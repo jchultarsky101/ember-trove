@@ -4,12 +4,12 @@ use axum_extra::extract::cookie::Key;
 use sqlx::PgPool;
 
 use crate::{
-    auth::{oidc::OidcClient, AuthConfig},
+    auth::{AuthConfig, oidc::OidcClient},
     config::Config,
     object_store::ObjectStore,
     repo::{
         attachment::AttachmentRepo, edge::EdgeRepo, node::NodeRepo, permission::PermissionRepo,
-        tag::TagRepo,
+        search::SearchRepo, tag::TagRepo,
     },
 };
 
@@ -21,6 +21,7 @@ pub struct AppState {
     pub tags: Arc<dyn TagRepo>,
     pub attachments: Arc<dyn AttachmentRepo>,
     pub permissions: Arc<dyn PermissionRepo>,
+    pub search: Arc<dyn SearchRepo>,
     pub object_store: Arc<dyn ObjectStore>,
     pub oidc: Option<Arc<OidcClient>>,
     pub cookie_key: Key,

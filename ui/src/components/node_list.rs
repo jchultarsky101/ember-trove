@@ -5,10 +5,8 @@ use crate::app::View;
 
 #[component]
 pub fn NodeList() -> impl IntoView {
-    let current_view =
-        use_context::<RwSignal<View>>().expect("View signal must be provided");
-    let refresh =
-        use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
 
     let nodes = LocalResource::new(move || {
         let _ = refresh.get();

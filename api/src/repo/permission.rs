@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use common::{
-    permission::{GrantPermissionRequest, Permission},
-    id::{NodeId, PermissionId},
     EmberTroveError,
+    id::{NodeId, PermissionId},
+    permission::{GrantPermissionRequest, Permission},
 };
 use sqlx::PgPool;
 

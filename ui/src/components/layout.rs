@@ -4,11 +4,8 @@ use crate::{
     app::View,
     auth::{AuthState, AuthStatus},
     components::{
-        dark_mode_toggle::DarkModeToggle,
-        node_editor::NodeEditor,
-        node_list::NodeList,
-        node_view::NodeView,
-        sidebar::Sidebar,
+        dark_mode_toggle::DarkModeToggle, node_editor::NodeEditor, node_list::NodeList,
+        node_view::NodeView, search_view::SearchView, sidebar::Sidebar, tag_manager::TagManager,
     },
 };
 
@@ -37,20 +34,18 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
 
 #[component]
 fn ViewSwitch() -> impl IntoView {
-    let current_view =
-        use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
 
     move || match current_view.get() {
         View::NodeList => view! { <NodeList /> }.into_any(),
         View::NodeDetail(id) => view! { <NodeView id=id /> }.into_any(),
         View::NodeCreate => view! { <NodeEditor node=None /> }.into_any(),
         View::NodeEdit(id) => view! { <NodeEditor node=Some(id) /> }.into_any(),
+        View::TagManager => view! { <TagManager /> }.into_any(),
         View::Graph => {
-            view! { <div class="p-6 text-gray-400">"Graph view — Phase 4."</div> }.into_any()
+            view! { <div class="p-6 text-gray-400">"Graph view — coming soon."</div> }.into_any()
         }
-        View::Search => {
-            view! { <div class="p-6 text-gray-400">"Search — Phase 5."</div> }.into_any()
-        }
+        View::Search => view! { <SearchView /> }.into_any(),
     }
 }
 

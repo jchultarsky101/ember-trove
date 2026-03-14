@@ -1,13 +1,15 @@
 use axum::{
+    Extension, Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{delete, get, post},
-    Extension, Json, Router,
 };
 use common::{
     auth::AuthClaims,
-    id::NodeId,
-    node::{CreateNodeRequest, NodeListResponse, Node, NodeListParams, UpdateNodeRequest},
+    edge::Edge,
+    id::{NodeId, TagId},
+    node::{CreateNodeRequest, Node, NodeListParams, NodeListResponse, UpdateNodeRequest},
+    tag::Tag,
 };
 use garde::Validate;
 use uuid::Uuid;
@@ -21,8 +23,8 @@ pub fn router() -> Router<AppState> {
         .route("/{id}", get(get_node).put(update_node).delete(delete_node))
         .route("/{id}/neighbors", get(neighbors))
         .route("/{id}/backlinks", get(backlinks))
-        // Phase 4+ stubs
         .route("/{id}/edges", get(list_edges_for_node))
+        .route("/{id}/tags", get(list_tags_for_node))
         .route("/{id}/tags/{tag_id}", post(attach_tag).delete(detach_tag))
         .route(
             "/{id}/attachments",
@@ -58,7 +60,8 @@ async fn create_node(
     Extension(claims): Extension<AuthClaims>,
     Json(req): Json<CreateNodeRequest>,
 ) -> Result<(StatusCode, Json<Node>), ApiError> {
-    req.validate().map_err(|e| ApiError::Validation(e.to_string()))?;
+    req.validate()
+        .map_err(|e| ApiError::Validation(e.to_string()))?;
     let node = state.nodes.create(&claims.sub, req).await?;
     Ok((StatusCode::CREATED, Json(node)))
 }
@@ -114,23 +117,53 @@ async fn backlinks(
     Ok(Json(nodes))
 }
 
-// ── Phase 4+ stubs ───────────────────────────────────────────────────────
+// ── Phase 4: Edges & Tags ────────────────────────────────────────────────
 
-async fn list_edges_for_node() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+async fn list_edges_for_node(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<Edge>>, ApiError> {
+    let edges = state.edges.list_for_node(NodeId(id)).await?;
+    Ok(Json(edges))
 }
-async fn attach_tag() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+
+async fn list_tags_for_node(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Vec<Tag>>, ApiError> {
+    let tags = state.tags.list_for_node(NodeId(id)).await?;
+    Ok(Json(tags))
 }
-async fn detach_tag() -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+
+async fn attach_tag(
+    State(state): State<AppState>,
+    Extension(_claims): Extension<AuthClaims>,
+    Path((id, tag_id)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, ApiError> {
+    state.tags.attach(NodeId(id), TagId(tag_id)).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
+
+async fn detach_tag(
+    State(state): State<AppState>,
+    Extension(_claims): Extension<AuthClaims>,
+    Path((id, tag_id)): Path<(Uuid, Uuid)>,
+) -> Result<StatusCode, ApiError> {
+    state.tags.detach(NodeId(id), TagId(tag_id)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ── Phase 6+ stubs ──────────────────────────────────────────────────────
+
 async fn list_attachments() -> StatusCode {
     StatusCode::NOT_IMPLEMENTED
 }
 async fn upload_attachment() -> StatusCode {
     StatusCode::NOT_IMPLEMENTED
 }
+
+// ── Phase 7+ stubs ──────────────────────────────────────────────────────
+
 async fn list_permissions() -> StatusCode {
     StatusCode::NOT_IMPLEMENTED
 }
