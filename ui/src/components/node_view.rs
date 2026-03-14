@@ -71,19 +71,27 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                                 {status}
                                             </span>
                                         </div>
-                                        <div class="flex items-center gap-2">
+                                        <div class="flex items-center gap-1">
                                             <button
-                                                class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                                                class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
+                                                    dark:hover:text-gray-300 hover:bg-gray-100
+                                                    dark:hover:bg-gray-800 transition-colors"
                                                 on:click=move |_| current_view.set(View::NodeEdit(edit_id))
+                                                title="Edit"
                                             >
-                                                "Edit"
+                                                <span class="material-symbols-outlined">"edit"</span>
                                             </button>
                                             <button
-                                                class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors"
+                                                class="p-1.5 rounded-lg text-gray-400 hover:text-red-600
+                                                    dark:hover:text-red-400 hover:bg-red-50
+                                                    dark:hover:bg-red-900/30 transition-colors"
                                                 on:click=on_delete
                                                 disabled=move || deleting.get()
+                                                title=move || if deleting.get() { "Deleting…" } else { "Delete" }
                                             >
-                                                {move || if deleting.get() { "Deleting..." } else { "Delete" }}
+                                                <span class="material-symbols-outlined">
+                                                    {move || if deleting.get() { "hourglass_empty" } else { "delete" }}
+                                                </span>
                                             </button>
                                         </div>
                                     </div>

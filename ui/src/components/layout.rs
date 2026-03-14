@@ -9,19 +9,24 @@ use crate::{
     },
 };
 
+/// Whether the sidebar is collapsed (icon-only mode).
+pub type SidebarCollapsed = RwSignal<bool>;
+
 #[component]
 pub fn Layout(auth_state: AuthState) -> impl IntoView {
+    let collapsed: SidebarCollapsed = RwSignal::new(false);
+
     view! {
         <AuthGate auth_state=auth_state>
             <div class="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
-                <aside class="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 flex flex-col">
-                    <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
-                        <span class="font-semibold text-gray-900 dark:text-gray-100">
-                            "Ember Trove"
-                        </span>
-                        <DarkModeToggle />
-                    </div>
-                    <Sidebar auth_state=auth_state />
+                // Left sidebar
+                <aside
+                    class="flex-shrink-0 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-all duration-200"
+                    class:w-64=move || !collapsed.get()
+                    class:w-16=move || collapsed.get()
+                >
+                    <SidebarHeader collapsed=collapsed />
+                    <Sidebar auth_state=auth_state collapsed=collapsed />
                 </aside>
 
                 <main class="flex-1 overflow-auto flex flex-col">
@@ -29,6 +34,71 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                 </main>
             </div>
         </AuthGate>
+    }
+}
+
+/// Sidebar header: banner icon + title + dark-mode toggle + collapse toggle.
+#[component]
+fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
+    let toggle = move |_| collapsed.update(|c| *c = !*c);
+
+    view! {
+        <div class="flex items-center border-b border-gray-200 dark:border-gray-800 px-3 py-3 gap-2">
+            // Banner icon — inline SVG ember flame
+            <div class="flex-shrink-0 w-8 h-8">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="w-full h-full">
+                    <defs>
+                        <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+                            <stop offset="0%" stop-color="#f59e0b"/>
+                            <stop offset="50%" stop-color="#ef4444"/>
+                            <stop offset="100%" stop-color="#f97316"/>
+                        </linearGradient>
+                    </defs>
+                    <path d="M32 4 C24 16, 12 24, 12 38 C12 50, 20 60, 32 60 C44 60, 52 50, 52 38 C52 24, 40 16, 32 4Z"
+                        fill="url(#flame)" opacity="0.9"/>
+                    <path d="M32 22 C28 30, 22 34, 22 42 C22 50, 26 54, 32 54 C38 54, 42 50, 42 42 C42 34, 36 30, 32 22Z"
+                        fill="#fbbf24" opacity="0.85"/>
+                    <circle cx="32" cy="38" r="3" fill="#ffffff" opacity="0.9"/>
+                    <circle cx="26" cy="45" r="2" fill="#ffffff" opacity="0.7"/>
+                    <circle cx="38" cy="45" r="2" fill="#ffffff" opacity="0.7"/>
+                    <line x1="32" y1="38" x2="26" y2="45" stroke="#ffffff" stroke-width="0.8" opacity="0.5"/>
+                    <line x1="32" y1="38" x2="38" y2="45" stroke="#ffffff" stroke-width="0.8" opacity="0.5"/>
+                    <line x1="26" y1="45" x2="38" y2="45" stroke="#ffffff" stroke-width="0.8" opacity="0.5"/>
+                </svg>
+            </div>
+
+            // Title + dark-mode toggle + collapse button (hidden when collapsed)
+            <div
+                class="flex-1 flex items-center justify-between min-w-0 overflow-hidden"
+                class:hidden=move || collapsed.get()
+            >
+                <span class="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                    "Ember Trove"
+                </span>
+                <div class="flex items-center gap-1">
+                    <DarkModeToggle />
+                    <button
+                        on:click=toggle
+                        class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800
+                            text-gray-500 dark:text-gray-400 cursor-pointer"
+                        title="Collapse sidebar"
+                    >
+                        <span class="material-symbols-outlined text-lg">"chevron_left"</span>
+                    </button>
+                </div>
+            </div>
+
+            // Expand button — shown only when collapsed
+            <button
+                on:click=toggle
+                class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800
+                    text-gray-500 dark:text-gray-400 cursor-pointer"
+                class:hidden=move || !collapsed.get()
+                title="Expand sidebar"
+            >
+                <span class="material-symbols-outlined text-lg">"chevron_right"</span>
+            </button>
+        </div>
     }
 }
 

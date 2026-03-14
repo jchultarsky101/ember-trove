@@ -4,7 +4,7 @@ use common::{
     auth::UserInfo,
     edge::{CreateEdgeRequest, Edge},
     id::{AttachmentId, EdgeId, NodeId, TagId},
-    node::{CreateNodeRequest, Node, UpdateNodeRequest},
+    node::{CreateNodeRequest, Node, NodeListResponse, UpdateNodeRequest},
     search::SearchResponse,
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
 };
@@ -78,7 +78,8 @@ pub async fn fetch_nodes() -> Result<Vec<Node>, UiError> {
         .send()
         .await
         .map_err(|e| UiError::Network(e.to_string()))?;
-    parse_json(resp).await
+    let list: NodeListResponse = parse_json(resp).await?;
+    Ok(list.nodes)
 }
 
 pub async fn fetch_node(id: NodeId) -> Result<Node, UiError> {
