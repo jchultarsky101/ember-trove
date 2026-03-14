@@ -122,18 +122,23 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         <option value="reference">"Reference"</option>
                     </select>
                     <button
-                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+                        class="p-1.5 rounded-lg text-gray-400 hover:text-green-600 dark:hover:text-green-400
+                            hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
                         on:click=on_save
                         disabled=move || saving.get()
+                        title=move || if saving.get() { "Saving…" } else { "Save" }
                     >
-                        {move || if saving.get() { "Saving..." } else { "Save" }}
+                        <span class="material-symbols-outlined">
+                            {move || if saving.get() { "hourglass_empty" } else { "check" }}
+                        </span>
                     </button>
                     <button
-                        class="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600
-                            text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg transition-colors"
+                        class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
+                            hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                         on:click=move |_| current_view.set(View::NodeList)
+                        title="Cancel"
                     >
-                        "Cancel"
+                        <span class="material-symbols-outlined">"close"</span>
                     </button>
                 </div>
             </div>

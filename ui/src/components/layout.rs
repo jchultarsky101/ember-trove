@@ -19,14 +19,35 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
     view! {
         <AuthGate auth_state=auth_state>
             <div class="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
-                // Left sidebar
+                // Left sidebar — `relative` allows the floating toggle to be positioned on the border
                 <aside
-                    class="flex-shrink-0 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-all duration-200"
+                    class="relative flex-shrink-0 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-all duration-200"
                     class:w-64=move || !collapsed.get()
                     class:w-16=move || collapsed.get()
                 >
                     <SidebarHeader collapsed=collapsed />
                     <Sidebar auth_state=auth_state collapsed=collapsed />
+
+                    // Floating circular toggle — sits exactly on the right border, centred vertically
+                    <button
+                        on:click=move |_| collapsed.update(|c| *c = !*c)
+                        class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20
+                            w-5 h-5 rounded-full
+                            bg-white dark:bg-gray-900
+                            border border-gray-200 dark:border-gray-700
+                            shadow-sm flex items-center justify-center
+                            text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
+                            hover:border-gray-400 dark:hover:border-gray-500
+                            hover:shadow-md transition-all cursor-pointer"
+                        title=move || if collapsed.get() { "Expand sidebar" } else { "Collapse sidebar" }
+                    >
+                        <span
+                            class="material-symbols-outlined"
+                            style="font-size: 14px; line-height: 1;"
+                        >
+                            {move || if collapsed.get() { "chevron_right" } else { "chevron_left" }}
+                        </span>
+                    </button>
                 </aside>
 
                 <main class="flex-1 overflow-auto flex flex-col">
@@ -37,11 +58,10 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
     }
 }
 
-/// Sidebar header: banner icon + title + dark-mode toggle + collapse toggle.
+/// Sidebar header: banner icon + title + dark-mode toggle.
+/// The collapse toggle is now a floating button on the aside border (see Layout).
 #[component]
 fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
-    let toggle = move |_| collapsed.update(|c| *c = !*c);
-
     view! {
         <div class="flex items-center border-b border-gray-200 dark:border-gray-800 px-3 py-3 gap-2">
             // Banner icon — inline SVG ember flame
@@ -67,7 +87,7 @@ fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
                 </svg>
             </div>
 
-            // Title + dark-mode toggle + collapse button (hidden when collapsed)
+            // Title + dark-mode toggle (hidden when collapsed)
             <div
                 class="flex-1 flex items-center justify-between min-w-0 overflow-hidden"
                 class:hidden=move || collapsed.get()
@@ -75,29 +95,8 @@ fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
                 <span class="font-semibold text-gray-900 dark:text-gray-100 truncate">
                     "Ember Trove"
                 </span>
-                <div class="flex items-center gap-1">
-                    <DarkModeToggle />
-                    <button
-                        on:click=toggle
-                        class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800
-                            text-gray-500 dark:text-gray-400 cursor-pointer"
-                        title="Collapse sidebar"
-                    >
-                        <span class="material-symbols-outlined text-lg">"chevron_left"</span>
-                    </button>
-                </div>
+                <DarkModeToggle />
             </div>
-
-            // Expand button — shown only when collapsed
-            <button
-                on:click=toggle
-                class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800
-                    text-gray-500 dark:text-gray-400 cursor-pointer"
-                class:hidden=move || !collapsed.get()
-                title="Expand sidebar"
-            >
-                <span class="material-symbols-outlined text-lg">"chevron_right"</span>
-            </button>
         </div>
     }
 }
@@ -120,9 +119,6 @@ fn ViewSwitch() -> impl IntoView {
 }
 
 /// Auth gate: spinner → login redirect → render app.
-///
-/// Children are always mounted but hidden until auth succeeds. The gate
-/// overlay covers the viewport in Loading / Unauthenticated states.
 #[component]
 fn AuthGate(auth_state: AuthState, children: Children) -> impl IntoView {
     let app_view = children();
