@@ -56,6 +56,10 @@ services:
       OIDC_ISSUER: http://keycloak:8080/realms/ember-trove
       OIDC_CLIENT_ID: ember-trove-api
       OIDC_CLIENT_SECRET: change-me
+      # 128-char hex key (64 bytes) for cookie encryption — CHANGE IN PRODUCTION
+      COOKIE_KEY: "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      FRONTEND_URL: "http://localhost:8003"
+      API_EXTERNAL_URL: "http://localhost:3003"
       HOST: "0.0.0.0"
       PORT: "3003"
       RUST_LOG: info
