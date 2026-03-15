@@ -3,24 +3,28 @@ use leptos::prelude::*;
 
 use crate::app::View;
 
-/// Full-page search view with query input, fuzzy toggle, paginated results.
+/// Full-page search results view.
+///
+/// The query comes from the shared `search_query` context signal written by the
+/// sidebar `SearchBar` — there is no duplicate input here. Results auto-update
+/// whenever the sidebar query changes. The Fuzzy and Published checkboxes let
+/// the user refine results without re-typing the query.
 #[component]
 pub fn SearchView() -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    // Shared with SearchBar — sidebar is the single query input.
+    let search_query =
+        use_context::<RwSignal<String>>().expect("search_query signal must be provided");
 
-    let query = RwSignal::new(String::new());
     let fuzzy = RwSignal::new(false);
-    // When true, only "published" nodes are included in results.
     let published_only = RwSignal::new(false);
     let page = RwSignal::new(1u32);
-    let search_trigger = RwSignal::new(0u32);
     let error_msg = RwSignal::new(Option::<String>::None);
-
     let results: RwSignal<Option<SearchResponse>> = RwSignal::new(None);
     let loading = RwSignal::new(false);
 
     let do_search = move || {
-        let q = query.get_untracked().trim().to_string();
+        let q = search_query.get_untracked().trim().to_string();
         if q.is_empty() {
             results.set(None);
             return;
@@ -48,54 +52,30 @@ pub fn SearchView() -> impl IntoView {
         });
     };
 
-    // Re-run search when trigger changes (but not on initial mount with value 0)
-    Effect::new(move |prev: Option<u32>| {
-        let trigger = search_trigger.get();
-        if prev.is_some() && trigger > 0 {
-            do_search();
-        }
-        trigger
-    });
-
-    let on_submit = move || {
+    // Auto-search when query changes or when options change.
+    Effect::new(move |_| {
+        let _q = search_query.get(); // subscribe
+        let _f = fuzzy.get();
+        let _p = published_only.get();
         page.set(1);
-        search_trigger.update(|n| *n += 1);
-    };
-
-    let on_keydown = move |ev: web_sys::KeyboardEvent| {
-        if ev.key() == "Enter" {
-            ev.prevent_default();
-            on_submit();
-        }
-    };
+        do_search();
+    });
 
     let on_page_change = move |new_page: u32| {
         page.set(new_page);
-        search_trigger.update(|n| *n += 1);
+        do_search();
     };
 
     view! {
         <div class="flex flex-col h-full">
-            // Search header
-            <div class="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-6 py-4">
-                <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">"Search"</h1>
-                <div class="flex items-center gap-3">
-                    <div class="relative flex-1">
-                        <input
-                            type="search"
-                            class="w-full px-4 py-2 pl-10 text-sm bg-gray-100 dark:bg-gray-800
-                                border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none
-                                focus:ring-2 focus:ring-blue-500 dark:text-gray-100"
-                            placeholder="Search nodes by title or body content..."
-                            prop:value=move || query.get()
-                            on:input=move |ev| query.set(event_target_value(&ev))
-                            on:keydown=on_keydown
-                        />
-                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2
-                            text-gray-400 pointer-events-none text-lg">
-                            "search"
-                        </span>
-                    </div>
+            // Compact filter bar — no duplicate search input
+            <div class="flex items-center gap-4 px-6 py-3 border-b border-gray-200 dark:border-gray-800
+                bg-white dark:bg-gray-900">
+                <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100 shrink-0">"Search"</h1>
+                <div class="flex items-center gap-3 ml-auto">
+                    {move || loading.get().then_some(view! {
+                        <span class="text-xs text-gray-400 dark:text-gray-500 animate-pulse">"Searching\u{2026}"</span>
+                    })}
                     <label class="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
                         <input
                             type="checkbox"
@@ -114,29 +94,19 @@ pub fn SearchView() -> impl IntoView {
                             prop:checked=move || published_only.get()
                             on:change=move |_| published_only.update(|v| *v = !*v)
                         />
-                        "Published only"
+                        "Published"
                     </label>
-                    <button
-                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg
-                            hover:bg-blue-700 transition-colors disabled:opacity-50"
-                        prop:disabled=move || loading.get()
-                        on:click=move |_| on_submit()
-                    >
-                        {move || if loading.get() { "Searching..." } else { "Search" }}
-                    </button>
                 </div>
             </div>
 
             // Results area
             <div class="flex-1 overflow-y-auto px-6 py-4">
-                // Error
                 {move || error_msg.get().map(|msg| view! {
                     <div class="mb-4 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
                         {msg}
                     </div>
                 })}
 
-                // Results list
                 {move || {
                     results.get().map(|resp| {
                         let total = resp.total;
@@ -199,7 +169,6 @@ pub fn SearchView() -> impl IntoView {
                                         }).collect::<Vec<_>>()}
                                     </div>
 
-                                    // Pagination
                                     {if total_pages > 1 {
                                         Some(view! {
                                             <Pagination
@@ -217,15 +186,20 @@ pub fn SearchView() -> impl IntoView {
                     })
                 }}
 
-                // Empty state (before any search)
+                // Empty state — before any search or when query is empty
                 {move || {
                     if results.get().is_none() && !loading.get() {
-                        Some(view! {
-                            <div class="text-center py-16 text-gray-400 dark:text-gray-600">
-                                <span class="material-symbols-outlined text-5xl mb-3 block">"manage_search"</span>
-                                <p class="text-lg mb-1">"Search your knowledge base"</p>
-                                <p class="text-sm">"Use full-text search or enable fuzzy matching for approximate results."</p>
-                            </div>
+                        let q = search_query.get();
+                        Some(if q.trim().is_empty() {
+                            view! {
+                                <div class="text-center py-16 text-gray-400 dark:text-gray-600">
+                                    <span class="material-symbols-outlined text-5xl mb-3 block">"manage_search"</span>
+                                    <p class="text-lg mb-1">"Search your knowledge base"</p>
+                                    <p class="text-sm">"Type in the search bar on the left to find nodes."</p>
+                                </div>
+                            }.into_any()
+                        } else {
+                            view! { <div /> }.into_any()
                         })
                     } else {
                         None

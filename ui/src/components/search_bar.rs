@@ -1,8 +1,9 @@
-/// Compact search bar with live results dropdown.
+/// Compact search bar in the sidebar header.
 ///
-/// Sits in the sidebar header area. Typing triggers a debounced search;
-/// clicking a result navigates to the node detail view. Pressing Enter
-/// opens the full search page.
+/// Writes to the shared `search_query` context signal so SearchView can read
+/// the same value without a duplicate input. When already on the Search view
+/// the live-results dropdown is suppressed — SearchView shows the full results.
+/// Pressing Enter (or clicking "View all") navigates to the Search view.
 use common::search::SearchResult;
 use leptos::prelude::*;
 
@@ -11,33 +12,41 @@ use crate::app::View;
 #[component]
 pub fn SearchBar() -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    // Shared query — also read by SearchView.
+    let search_query =
+        use_context::<RwSignal<String>>().expect("search_query signal must be provided");
 
-    let query = RwSignal::new(String::new());
     let results: RwSignal<Vec<SearchResult>> = RwSignal::new(vec![]);
     let show_dropdown = RwSignal::new(false);
     let loading = RwSignal::new(false);
     let debounce_version = RwSignal::new(0u32);
 
-    // Debounced search: fires 300ms after last keystroke
+    // Debounced search: fires 300 ms after last keystroke.
+    // Suppressed when already on the Search view (SearchView handles results there).
     let trigger_search = move || {
         debounce_version.update(|v| *v += 1);
         let version = debounce_version.get_untracked();
-        let q = query.get_untracked().trim().to_string();
+        let q = search_query.get_untracked().trim().to_string();
 
-        if q.len() < 2 {
+        if q.len() < 2 || current_view.get_untracked() == View::Search {
             results.set(vec![]);
             show_dropdown.set(false);
+            loading.set(false);
             return;
         }
 
         loading.set(true);
         wasm_bindgen_futures::spawn_local(async move {
-            // Poor-man's debounce: sleep then check if version is still current
             gloo_timers::future::TimeoutFuture::new(300).await;
             if debounce_version.get_untracked() != version {
-                return; // Superseded by a newer keystroke
+                return;
             }
-
+            // Re-check: user might have navigated to Search view during debounce.
+            if current_view.get_untracked() == View::Search {
+                loading.set(false);
+                show_dropdown.set(false);
+                return;
+            }
             match crate::api::search_nodes(&q, false, None, 1, 6).await {
                 Ok(resp) => {
                     if debounce_version.get_untracked() == version {
@@ -54,7 +63,7 @@ pub fn SearchBar() -> impl IntoView {
     };
 
     let on_input = move |ev: web_sys::Event| {
-        query.set(event_target_value(&ev));
+        search_query.set(event_target_value(&ev));
         trigger_search();
     };
 
@@ -69,7 +78,6 @@ pub fn SearchBar() -> impl IntoView {
     };
 
     let on_blur = move |_| {
-        // Delay to allow click on dropdown result to register
         wasm_bindgen_futures::spawn_local(async move {
             gloo_timers::future::TimeoutFuture::new(200).await;
             show_dropdown.set(false);
@@ -77,7 +85,8 @@ pub fn SearchBar() -> impl IntoView {
     };
 
     let on_focus = move |_| {
-        if !results.get_untracked().is_empty() {
+        // Only show dropdown when not already on the Search view.
+        if current_view.get_untracked() != View::Search && !results.get_untracked().is_empty() {
             show_dropdown.set(true);
         }
     };
@@ -90,7 +99,7 @@ pub fn SearchBar() -> impl IntoView {
                     border border-transparent rounded-lg focus:outline-none
                     focus:ring-2 focus:ring-blue-500 dark:text-gray-100"
                 placeholder="Search nodes\u{2026}"
-                prop:value=move || query.get()
+                prop:value=move || search_query.get()
                 on:input=on_input
                 on:keydown=on_keydown
                 on:blur=on_blur
@@ -107,11 +116,12 @@ pub fn SearchBar() -> impl IntoView {
                 </span>
             })}
 
-            // Dropdown results
+            // Dropdown — only when NOT on Search view
             {move || {
                 let visible = show_dropdown.get();
+                let on_search_view = current_view.get() == View::Search;
                 let items = results.get();
-                if !visible || items.is_empty() {
+                if !visible || on_search_view || items.is_empty() {
                     return None;
                 }
                 Some(view! {
@@ -125,7 +135,7 @@ pub fn SearchBar() -> impl IntoView {
                                         dark:hover:bg-gray-800 transition-colors border-b
                                         border-gray-100 dark:border-gray-800 last:border-0"
                                     on:mousedown=move |ev| {
-                                        ev.prevent_default(); // Prevent blur before click fires
+                                        ev.prevent_default();
                                         show_dropdown.set(false);
                                         current_view.set(View::NodeDetail(node_id));
                                     }
