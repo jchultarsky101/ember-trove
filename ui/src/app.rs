@@ -85,6 +85,10 @@ pub fn App() -> impl IntoView {
     let tag_filter: RwSignal<Option<TagId>> = RwSignal::new(None);
     provide_context(tag_filter);
 
+    // Shared search query — written by SearchBar, read by SearchView.
+    let search_query: RwSignal<String> = RwSignal::new(String::new());
+    provide_context(search_query);
+
     view! {
         <Layout auth_state=auth_state />
     }
