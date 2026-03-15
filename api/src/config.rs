@@ -24,6 +24,11 @@ pub struct Config {
     pub oidc_issuer: Option<String>,
     pub oidc_client_id: Option<String>,
     pub oidc_client_secret: Option<String>,
+    /// Optional external base URL for Keycloak (e.g. `http://localhost:8180`).
+    /// When set, rewrites the `authorization_endpoint` from OIDC discovery so
+    /// browser redirects point to the externally reachable host instead of an
+    /// internal Docker hostname.
+    pub oidc_external_url: Option<String>,
     // Cookie encryption key (128 hex chars → 64 bytes, required by cookie::Key)
     pub cookie_key: String,
     // URLs
@@ -61,6 +66,7 @@ impl Config {
             oidc_issuer: env::var("OIDC_ISSUER").ok(),
             oidc_client_id: env::var("OIDC_CLIENT_ID").ok(),
             oidc_client_secret: env::var("OIDC_CLIENT_SECRET").ok(),
+            oidc_external_url: env::var("OIDC_EXTERNAL_URL").ok(),
             cookie_key,
             frontend_url: require("FRONTEND_URL")?,
             api_external_url: require("API_EXTERNAL_URL")?,

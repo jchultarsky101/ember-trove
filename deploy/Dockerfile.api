@@ -25,11 +25,14 @@ COPY common/  ./common/
 COPY api/     ./api/
 COPY migrations/ ./migrations/
 
+# Touch sources so cargo sees them as newer than the stub artifacts
+RUN find common/src api/src -name '*.rs' -exec touch {} +
+
 # Build for real (only changed crates recompile)
 RUN cargo build --release -p api
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y \
     ca-certificates libssl3 \

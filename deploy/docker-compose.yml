@@ -54,6 +54,7 @@ services:
       S3_SECRET_KEY: ember_trove_dev
       S3_REGION: us-east-1
       OIDC_ISSUER: http://keycloak:8080/realms/ember-trove
+      OIDC_EXTERNAL_URL: "http://localhost:8180"
       OIDC_CLIENT_ID: ember-trove-api
       OIDC_CLIENT_SECRET: change-me
       # 128-char hex key (64 bytes) for cookie encryption — CHANGE IN PRODUCTION

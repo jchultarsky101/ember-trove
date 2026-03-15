@@ -53,9 +53,21 @@ async fn main() -> anyhow::Result<()> {
     let oidc = if let (Some(issuer), Some(client_id), Some(client_secret)) =
         (&config.oidc_issuer, &config.oidc_client_id, &config.oidc_client_secret)
     {
-        Some(Arc::new(
-            OidcClient::discover(issuer, client_id.clone(), client_secret.clone()).await?,
-        ))
+        let mut client =
+            OidcClient::discover(issuer, client_id.clone(), client_secret.clone()).await?;
+
+        // When running behind Docker the internal authorization_endpoint URL
+        // (e.g. http://keycloak:8080/...) is unreachable from the browser.
+        // OIDC_EXTERNAL_URL lets operators supply the browser-facing base URL
+        // (e.g. http://localhost:8180) so that the login redirect works.
+        if let Some(ref ext) = config.oidc_external_url {
+            if let Some(path_start) = client.authorization_endpoint.find("/realms") {
+                client.authorization_endpoint =
+                    format!("{}{}", ext.trim_end_matches('/'), &client.authorization_endpoint[path_start..]);
+            }
+        }
+
+        Some(Arc::new(client))
     } else {
         tracing::warn!("OIDC not configured — auth endpoints will be disabled");
         None
