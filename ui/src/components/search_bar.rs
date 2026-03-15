@@ -38,7 +38,7 @@ pub fn SearchBar() -> impl IntoView {
                 return; // Superseded by a newer keystroke
             }
 
-            match crate::api::search_nodes(&q, false, 1, 6).await {
+            match crate::api::search_nodes(&q, false, None, 1, 6).await {
                 Ok(resp) => {
                     if debounce_version.get_untracked() == version {
                         results.set(resp.results);

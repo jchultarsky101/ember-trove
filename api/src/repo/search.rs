@@ -70,10 +70,10 @@ impl SearchRepo for PgSearchRepo {
         let fuzzy = query.fuzzy.unwrap_or(false);
 
         if fuzzy {
-            self.fuzzy_search(q, &query.node_type, page, per_page, offset)
+            self.fuzzy_search(q, &query.node_type, &query.status, page, per_page, offset)
                 .await
         } else {
-            self.fulltext_search(q, &query.node_type, page, per_page, offset)
+            self.fulltext_search(q, &query.node_type, &query.status, page, per_page, offset)
                 .await
         }
     }
@@ -86,11 +86,13 @@ impl PgSearchRepo {
         &self,
         q: &str,
         node_type: &Option<common::node::NodeType>,
+        status: &Option<common::node::NodeStatus>,
         page: u32,
         per_page: u32,
         offset: u32,
     ) -> Result<SearchResponse, EmberTroveError> {
         let type_filter = node_type.as_ref().map(node_type_to_str);
+        let status_filter = status.as_ref().map(node_status_to_str);
 
         // Count query
         let count_row = sqlx::query_as::<_, CountRow>(
@@ -99,10 +101,12 @@ impl PgSearchRepo {
             FROM nodes
             WHERE search_vec @@ websearch_to_tsquery('english', $1)
               AND ($2::text IS NULL OR node_type = $2::node_type)
+              AND ($3::text IS NULL OR status = $3::node_status)
             "#,
         )
         .bind(q)
         .bind(type_filter)
+        .bind(status_filter)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("search count failed: {e}")))?;
@@ -124,12 +128,14 @@ impl PgSearchRepo {
             FROM nodes
             WHERE search_vec @@ websearch_to_tsquery('english', $1)
               AND ($2::text IS NULL OR node_type = $2::node_type)
+              AND ($3::text IS NULL OR status = $3::node_status)
             ORDER BY rank DESC, updated_at DESC
-            LIMIT $3 OFFSET $4
+            LIMIT $4 OFFSET $5
             "#,
         )
         .bind(q)
         .bind(type_filter)
+        .bind(status_filter)
         .bind(per_page as i64)
         .bind(offset as i64)
         .fetch_all(&self.pool)
@@ -150,11 +156,13 @@ impl PgSearchRepo {
         &self,
         q: &str,
         node_type: &Option<common::node::NodeType>,
+        status: &Option<common::node::NodeStatus>,
         page: u32,
         per_page: u32,
         offset: u32,
     ) -> Result<SearchResponse, EmberTroveError> {
         let type_filter = node_type.as_ref().map(node_type_to_str);
+        let status_filter = status.as_ref().map(node_status_to_str);
         let like_pattern = format!("%{q}%");
 
         // Count query
@@ -164,11 +172,13 @@ impl PgSearchRepo {
             FROM nodes
             WHERE (similarity(title, $1) > 0.1 OR body ILIKE $2)
               AND ($3::text IS NULL OR node_type = $3::node_type)
+              AND ($4::text IS NULL OR status = $4::node_status)
             "#,
         )
         .bind(q)
         .bind(&like_pattern)
         .bind(type_filter)
+        .bind(status_filter)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("fuzzy count failed: {e}")))?;
@@ -189,13 +199,15 @@ impl PgSearchRepo {
             FROM nodes
             WHERE (similarity(title, $1) > 0.1 OR body ILIKE $2)
               AND ($3::text IS NULL OR node_type = $3::node_type)
+              AND ($4::text IS NULL OR status = $4::node_status)
             ORDER BY rank DESC, updated_at DESC
-            LIMIT $4 OFFSET $5
+            LIMIT $5 OFFSET $6
             "#,
         )
         .bind(q)
         .bind(&like_pattern)
         .bind(type_filter)
+        .bind(status_filter)
         .bind(per_page as i64)
         .bind(offset as i64)
         .fetch_all(&self.pool)
@@ -218,5 +230,13 @@ fn node_type_to_str(t: &common::node::NodeType) -> &'static str {
         common::node::NodeType::Area => "area",
         common::node::NodeType::Resource => "resource",
         common::node::NodeType::Reference => "reference",
+    }
+}
+
+fn node_status_to_str(s: &common::node::NodeStatus) -> &'static str {
+    match s {
+        common::node::NodeStatus::Draft => "draft",
+        common::node::NodeStatus::Published => "published",
+        common::node::NodeStatus::Archived => "archived",
     }
 }

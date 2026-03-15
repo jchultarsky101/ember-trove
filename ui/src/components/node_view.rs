@@ -141,7 +141,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                 if q.len() < 2 {
                     return Vec::new();
                 }
-                crate::api::search_nodes(&q, false, 0, 6)
+                crate::api::search_nodes(&q, false, None, 0, 6)
                     .await
                     .map(|r| r.results)
                     .unwrap_or_default()

@@ -2,13 +2,15 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::id::NodeId;
-use crate::node::NodeType;
+use crate::node::{NodeStatus, NodeType};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SearchQuery {
     pub q: String,
     pub fuzzy: Option<bool>,
     pub node_type: Option<NodeType>,
+    /// When set, only nodes with this status are returned.
+    pub status: Option<NodeStatus>,
     pub page: Option<u32>,
     pub per_page: Option<u32>,
 }

@@ -1,4 +1,4 @@
-use common::id::NodeId;
+use common::id::{NodeId, TagId};
 use leptos::prelude::*;
 
 use crate::{
@@ -80,6 +80,10 @@ pub fn App() -> impl IntoView {
     // Refresh trigger — bump to re-fetch nodes list.
     let refresh = RwSignal::new(0u32);
     provide_context(refresh);
+
+    // Tag filter — set to Some(tag_id) to filter NodeList by tag.
+    let tag_filter: RwSignal<Option<TagId>> = RwSignal::new(None);
+    provide_context(tag_filter);
 
     view! {
         <Layout auth_state=auth_state />
