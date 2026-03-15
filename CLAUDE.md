@@ -69,7 +69,7 @@ ember-trove/
 - Features: `feature/jc/...` branched from `develop`, worked in
   `.claude/worktrees/<name>/`, merged back with `--no-ff`, worktree + branch
   deleted after merge.
-- **Current state**: Phase 1 skeleton in progress.
+- **Current state**: All 8 phases complete. `develop` is the active branch.
 
 ## Environment Quirks
 
@@ -95,6 +95,8 @@ ember-trove/
   command silently fails** (exit code non-zero, only the cd error printed). Fix: use the `Write` tool
   to create a placeholder file at `<worktree-path>/.keep` — this recreates the directory and unblocks
   the shell immediately. Never delete the current session's worktree directory.
+- **Docker single-service rebuild**: `docker compose -f deploy/docker-compose.yml build <svc> && docker compose -f deploy/docker-compose.yml up -d <svc>` — rebuilds one container without restarting others.
+- **Verify merge state first**: At session start, run `git log --oneline -5` on `develop` to confirm what's already merged before re-doing work in a worktree.
 
 ## Leptos Patterns
 
@@ -107,6 +109,11 @@ ember-trove/
 - **SearchBar suppress on Search view**: When `current_view == View::Search`, return early in
   `trigger_search` to suppress the dropdown — but still call `search_query.set(...)` first so the
   `SearchView` `Effect` fires and auto-searches.
+
+## Browser Testing (mcp__Claude_in_Chrome)
+
+- **Checkbox clicks**: Coordinate-based clicks miss small checkboxes. Use `mcp__Claude_in_Chrome__find`
+  to locate by description, then `left_click` via the returned `ref`.
 
 ## Implementation Phases
 
