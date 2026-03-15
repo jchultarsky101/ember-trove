@@ -88,8 +88,13 @@ ember-trove/
 - **Keycloak usernames are read-only**: `kcadm.sh update users/<id> -s username=...` →
   `error-user-attribute-read-only`. Delete and recreate the user to rename.
 - **Keycloak `set-password`**: `--temporary false` flag removed in recent KC — omit it entirely.
-- **Worktree cwd resets**: Bash cwd resets to the worktree root between tool calls; always use
+- **Worktree cwd resets**: Bash cwd resets to the session's worktree root between tool calls; always use
   absolute paths (e.g. `cd /Users/julian/projects/ember-trove && git ...`).
+- **Worktree directory deleted → shell broken**: If the session worktree directory is deleted (e.g. by
+  `rm -rf .claude/worktrees/`), the shell snapshot fails to `cd` there and **every subsequent Bash
+  command silently fails** (exit code non-zero, only the cd error printed). Fix: use the `Write` tool
+  to create a placeholder file at `<worktree-path>/.keep` — this recreates the directory and unblocks
+  the shell immediately. Never delete the current session's worktree directory.
 
 ## Leptos Patterns
 
