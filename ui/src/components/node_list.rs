@@ -3,6 +3,7 @@ use leptos::prelude::*;
 
 use crate::app::View;
 
+
 /// Strip basic Markdown and return up to 120 chars as a plain-text preview.
 fn body_preview(body: &str) -> Option<String> {
     let text: String = body
@@ -155,6 +156,7 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
                 let node_type = format!("{:?}", node.node_type).to_lowercase();
                 let status = format!("{:?}", node.status).to_lowercase();
                 let updated = node.updated_at.format("%Y-%m-%d %H:%M").to_string();
+                let tags = node.tags.clone();
                 // Status-specific badge colour
                 let status_class = match status.as_str() {
                     "published" => "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
@@ -178,6 +180,11 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
                                     <span class=format!("px-2 py-0.5 text-xs rounded-full {status_class}")>
                                         {status}
                                     </span>
+                                    {tags.into_iter().map(|tag| view! {
+                                        <span class="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+                                            {tag.name}
+                                        </span>
+                                    }).collect::<Vec<_>>()}
                                 </div>
                                 {node.body.as_deref().and_then(body_preview).map(|preview| view! {
                                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">

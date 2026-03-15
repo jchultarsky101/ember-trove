@@ -2,11 +2,13 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use common::{
     EmberTroveError,
-    id::NodeId,
+    id::{NodeId, TagId},
     node::{CreateNodeRequest, Node, NodeListParams, NodeStatus, NodeType, UpdateNodeRequest},
     slug::slugify,
+    tag::Tag,
 };
 use sqlx::PgPool;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 #[async_trait]
@@ -71,6 +73,53 @@ impl NodeRow {
             updated_at: self.updated_at,
         })
     }
+}
+
+/// Row type for batch tag fetch — includes the owning node_id.
+#[derive(sqlx::FromRow)]
+struct NodeTagRow {
+    node_id: Uuid,
+    id: Uuid,
+    owner_id: String,
+    name: String,
+    color: String,
+    created_at: DateTime<Utc>,
+}
+
+/// Fetch all tags for a slice of node IDs in one query.
+/// Returns a map of node_id → Vec<Tag>.
+async fn fetch_tags_for_nodes(
+    pool: &PgPool,
+    node_ids: &[Uuid],
+) -> Result<HashMap<Uuid, Vec<Tag>>, EmberTroveError> {
+    if node_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let rows = sqlx::query_as::<_, NodeTagRow>(
+        r#"
+        SELECT nt.node_id, t.id, t.owner_id, t.name, t.color, t.created_at
+        FROM tags t
+        JOIN node_tags nt ON nt.tag_id = t.id
+        WHERE nt.node_id = ANY($1)
+        ORDER BY t.name
+        "#,
+    )
+    .bind(node_ids)
+    .fetch_all(pool)
+    .await
+    .map_err(|e| EmberTroveError::Internal(format!("fetch tags for nodes failed: {e}")))?;
+
+    let mut map: HashMap<Uuid, Vec<Tag>> = HashMap::new();
+    for row in rows {
+        map.entry(row.node_id).or_default().push(Tag {
+            id: TagId(row.id),
+            owner_id: row.owner_id,
+            name: row.name,
+            color: row.color,
+            created_at: row.created_at,
+        });
+    }
+    Ok(map)
 }
 
 fn parse_node_type(s: &str) -> Result<NodeType, EmberTroveError> {
@@ -167,7 +216,10 @@ impl NodeRepo for PgNodeRepo {
         .map_err(|e| EmberTroveError::Internal(format!("get node failed: {e}")))?
         .ok_or_else(|| EmberTroveError::NotFound(format!("node {id} not found")))?;
 
-        row.into_node()
+        let mut node = row.into_node()?;
+        let mut tag_map = fetch_tags_for_nodes(&self.pool, &[id.0]).await?;
+        node.tags = tag_map.remove(&id.0).unwrap_or_default();
+        Ok(node)
     }
 
     async fn get_by_slug(&self, slug: &str) -> Result<Node, EmberTroveError> {
@@ -278,7 +330,14 @@ impl NodeRepo for PgNodeRepo {
             .await
             .map_err(|e| EmberTroveError::Internal(format!("list nodes failed: {e}")))?;
 
-        let nodes = rows.into_iter().map(NodeRow::into_node).collect::<Result<_, _>>()?;
+        let mut nodes = rows.into_iter().map(NodeRow::into_node).collect::<Result<Vec<_>, _>>()?;
+
+        // Batch-fetch tags for all returned nodes in a single query.
+        let node_ids: Vec<Uuid> = nodes.iter().map(|n| n.id.0).collect();
+        let mut tag_map = fetch_tags_for_nodes(&self.pool, &node_ids).await?;
+        for node in &mut nodes {
+            node.tags = tag_map.remove(&node.id.0).unwrap_or_default();
+        }
 
         Ok((nodes, total as u64))
     }
