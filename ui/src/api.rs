@@ -2,7 +2,7 @@
 use common::{
     attachment::Attachment,
     auth::UserInfo,
-    edge::{CreateEdgeRequest, Edge},
+    edge::{CreateEdgeRequest, Edge, EdgeWithTitles},
     id::{AttachmentId, EdgeId, NodeId, TagId},
     node::{CreateNodeRequest, Node, NodeListResponse, UpdateNodeRequest},
     search::SearchResponse,
@@ -166,8 +166,16 @@ pub async fn fetch_all_edges() -> Result<Vec<Edge>, UiError> {
     parse_json(resp).await
 }
 
-pub async fn fetch_edges_for_node(node_id: NodeId) -> Result<Vec<Edge>, UiError> {
+pub async fn fetch_edges_for_node(node_id: NodeId) -> Result<Vec<EdgeWithTitles>, UiError> {
     let resp = Request::get(&api_url(&format!("/nodes/{node_id}/edges")))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn fetch_backlinks(node_id: NodeId) -> Result<Vec<common::node::Node>, UiError> {
+    let resp = Request::get(&api_url(&format!("/nodes/{node_id}/backlinks")))
         .send()
         .await
         .map_err(|e| UiError::Network(e.to_string()))?;

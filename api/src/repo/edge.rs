@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use common::{
     EmberTroveError,
-    edge::{CreateEdgeRequest, Edge, EdgeType},
+    edge::{CreateEdgeRequest, Edge, EdgeType, EdgeWithTitles},
     id::{EdgeId, NodeId},
 };
 use sqlx::PgPool;
@@ -13,6 +13,10 @@ pub trait EdgeRepo: Send + Sync {
     async fn create(&self, req: CreateEdgeRequest) -> Result<Edge, EmberTroveError>;
     async fn delete(&self, id: EdgeId) -> Result<(), EmberTroveError>;
     async fn list_for_node(&self, node_id: NodeId) -> Result<Vec<Edge>, EmberTroveError>;
+    async fn list_for_node_with_titles(
+        &self,
+        node_id: NodeId,
+    ) -> Result<Vec<EdgeWithTitles>, EmberTroveError>;
     async fn list_all(&self) -> Result<Vec<Edge>, EmberTroveError>;
 }
 
@@ -35,6 +39,33 @@ struct EdgeRow {
     edge_type: String,
     label: Option<String>,
     created_at: DateTime<Utc>,
+}
+
+#[derive(sqlx::FromRow)]
+struct EdgeWithTitlesRow {
+    id: Uuid,
+    source_id: Uuid,
+    source_title: String,
+    target_id: Uuid,
+    target_title: String,
+    edge_type: String,
+    label: Option<String>,
+    created_at: DateTime<Utc>,
+}
+
+impl EdgeWithTitlesRow {
+    fn into_edge_with_titles(self) -> Result<EdgeWithTitles, EmberTroveError> {
+        Ok(EdgeWithTitles {
+            id: EdgeId(self.id),
+            source_id: NodeId(self.source_id),
+            source_title: self.source_title,
+            target_id: NodeId(self.target_id),
+            target_title: self.target_title,
+            edge_type: parse_edge_type(&self.edge_type)?,
+            label: self.label,
+            created_at: self.created_at,
+        })
+    }
 }
 
 impl EdgeRow {
@@ -142,6 +173,38 @@ impl EdgeRepo for PgEdgeRepo {
         .map_err(|e| EmberTroveError::Internal(format!("list edges failed: {e}")))?;
 
         rows.into_iter().map(EdgeRow::into_edge).collect()
+    }
+
+    async fn list_for_node_with_titles(
+        &self,
+        node_id: NodeId,
+    ) -> Result<Vec<EdgeWithTitles>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, EdgeWithTitlesRow>(
+            r#"
+            SELECT
+                e.id,
+                e.source_id,
+                sn.title AS source_title,
+                e.target_id,
+                tn.title AS target_title,
+                e.edge_type::text,
+                e.label,
+                e.created_at
+            FROM edges e
+            JOIN nodes sn ON sn.id = e.source_id
+            JOIN nodes tn ON tn.id = e.target_id
+            WHERE e.source_id = $1 OR e.target_id = $1
+            ORDER BY e.created_at DESC
+            "#,
+        )
+        .bind(node_id.0)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list edges with titles failed: {e}")))?;
+
+        rows.into_iter()
+            .map(EdgeWithTitlesRow::into_edge_with_titles)
+            .collect()
     }
 
     async fn list_all(&self) -> Result<Vec<Edge>, EmberTroveError> {

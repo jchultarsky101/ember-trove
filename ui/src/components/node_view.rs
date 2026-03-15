@@ -1,4 +1,4 @@
-use common::edge::{CreateEdgeRequest, EdgeType};
+use common::edge::{CreateEdgeRequest, EdgeType, EdgeWithTitles};
 use common::id::NodeId;
 use leptos::{html::Input, prelude::*};
 use pulldown_cmark::{Options, Parser, html};
@@ -103,6 +103,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                     <div class="flex-1 overflow-auto p-6">
                                         <div class="prose max-w-2xl dark:prose-invert" inner_html=body_html />
                                         <EdgePanel node_id=id />
+                                        <BacklinksPanel node_id=id />
                                         <AttachmentPanel node_id=id />
                                         <PermissionPanel node_id=id />
                                     </div>
@@ -147,11 +148,12 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
             }
         });
 
-    let edges = LocalResource::new(move || {
-        let _ = refresh_edges.get();
-        let node_id = node_id;
-        async move { crate::api::fetch_edges_for_node(node_id).await }
-    });
+    let edges: LocalResource<Result<Vec<EdgeWithTitles>, crate::error::UiError>> =
+        LocalResource::new(move || {
+            let _ = refresh_edges.get();
+            let node_id = node_id;
+            async move { crate::api::fetch_edges_for_node(node_id).await }
+        });
 
     let on_add_edge = move |_| {
         let target_str = target_id_input.get_untracked().trim().to_string();
@@ -345,6 +347,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                                             let edge_id = edge.id;
                                             let is_outgoing = edge.source_id == node_id;
                                             let other_id = if is_outgoing { edge.target_id } else { edge.source_id };
+                                            let other_title = if is_outgoing { edge.target_title.clone() } else { edge.source_title.clone() };
                                             let direction = if is_outgoing { "\u{2192}" } else { "\u{2190}" };
                                             let edge_type_label = format!("{:?}", edge.edge_type).to_lowercase().replace('_', " ");
                                             let label = edge.label.clone().unwrap_or_default();
@@ -353,16 +356,14 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                                                     hover:bg-gray-50 dark:hover:bg-gray-800/50 group">
                                                     <button
                                                         class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400
-                                                            hover:text-blue-600 dark:hover:text-blue-400"
+                                                            hover:text-blue-600 dark:hover:text-blue-400 min-w-0"
                                                         on:click=move |_| current_view.set(View::NodeDetail(other_id))
                                                     >
-                                                        <span>{direction}</span>
-                                                        <span class="font-medium">{edge_type_label}</span>
-                                                        <span class="text-gray-400 dark:text-gray-500 font-mono text-[10px] truncate max-w-[150px]">
-                                                            {other_id.to_string()}
-                                                        </span>
+                                                        <span class="shrink-0">{direction}</span>
+                                                        <span class="text-gray-400 dark:text-gray-500 shrink-0">{edge_type_label}</span>
+                                                        <span class="font-medium truncate">{other_title}</span>
                                                         {(!label.is_empty()).then(|| view! {
-                                                            <span class="italic text-gray-400">{format!("({label})")}</span>
+                                                            <span class="italic text-gray-400 shrink-0">{format!("({label})")}</span>
                                                         })}
                                                     </button>
                                                     <button
@@ -383,6 +384,76 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                                     </div>
                                 }.into_any()
                             }
+                            Err(e) => view! {
+                                <div class="text-xs text-red-500">{format!("Error: {e}")}</div>
+                            }.into_any(),
+                        }
+                    })
+                }}
+            </Suspense>
+        </div>
+    }
+}
+
+/// Shows nodes that link to this node (incoming edges from other nodes).
+#[component]
+fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+
+    let backlinks = LocalResource::new(move || {
+        let node_id = node_id;
+        async move { crate::api::fetch_backlinks(node_id).await }
+    });
+
+    view! {
+        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                "Linked Here"
+            </h2>
+            <Suspense fallback=|| view! {
+                <div class="text-xs text-gray-400">"Loading backlinks..."</div>
+            }>
+                {move || {
+                    backlinks.get().map(|result| {
+                        match result {
+                            Ok(nodes) if nodes.is_empty() => view! {
+                                <div class="flex flex-col items-center gap-2 py-6">
+                                    <span
+                                        class="material-symbols-outlined text-gray-300 dark:text-gray-700"
+                                        style="font-size: 32px;"
+                                    >
+                                        "link_off"
+                                    </span>
+                                    <p class="text-xs text-gray-400 dark:text-gray-600">
+                                        "No other notes link here."
+                                    </p>
+                                </div>
+                            }.into_any(),
+                            Ok(nodes) => view! {
+                                <div class="space-y-1">
+                                    {nodes.into_iter().map(|node| {
+                                        let node_id = node.id;
+                                        let title = node.title.clone();
+                                        let node_type = format!("{:?}", node.node_type).to_lowercase();
+                                        view! {
+                                            <button
+                                                class="flex items-center gap-2 w-full text-left py-1.5 px-2 rounded
+                                                    text-xs hover:bg-gray-50 dark:hover:bg-gray-800/50
+                                                    text-gray-600 dark:text-gray-400
+                                                    hover:text-blue-600 dark:hover:text-blue-400"
+                                                on:click=move |_| current_view.set(View::NodeDetail(node_id))
+                                            >
+                                                <span class="material-symbols-outlined text-gray-400 dark:text-gray-600"
+                                                    style="font-size: 14px;">"arrow_back"</span>
+                                                <span class="font-medium truncate">{title}</span>
+                                                <span class="text-gray-400 dark:text-gray-600 shrink-0">
+                                                    {format!("({node_type})")}
+                                                </span>
+                                            </button>
+                                        }
+                                    }).collect::<Vec<_>>()}
+                                </div>
+                            }.into_any(),
                             Err(e) => view! {
                                 <div class="text-xs text-red-500">{format!("Error: {e}")}</div>
                             }.into_any(),

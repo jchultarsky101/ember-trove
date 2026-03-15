@@ -8,7 +8,7 @@ use bytes::Bytes;
 use common::{
     attachment::Attachment,
     auth::AuthClaims,
-    edge::Edge,
+    edge::EdgeWithTitles,
     id::{NodeId, PermissionId, TagId},
     node::{CreateNodeRequest, Node, NodeListParams, NodeListResponse, UpdateNodeRequest},
     permission::{GrantPermissionRequest, Permission},
@@ -125,8 +125,8 @@ async fn backlinks(
 async fn list_edges_for_node(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-) -> Result<Json<Vec<Edge>>, ApiError> {
-    let edges = state.edges.list_for_node(NodeId(id)).await?;
+) -> Result<Json<Vec<EdgeWithTitles>>, ApiError> {
+    let edges = state.edges.list_for_node_with_titles(NodeId(id)).await?;
     Ok(Json(edges))
 }
 
