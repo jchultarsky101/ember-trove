@@ -22,11 +22,16 @@ pub fn SearchView() -> impl IntoView {
     let error_msg = RwSignal::new(Option::<String>::None);
     let results: RwSignal<Option<SearchResponse>> = RwSignal::new(None);
     let loading = RwSignal::new(false);
+    // Monotonic counter: each new call increments this; async tasks check it
+    // before writing results so stale responses from earlier keystrokes are
+    // discarded (prevents race conditions when the user types quickly).
+    let search_version = RwSignal::new(0u32);
 
     let do_search = move || {
         let q = search_query.get_untracked().trim().to_string();
         if q.is_empty() {
             results.set(None);
+            loading.set(false);
             return;
         }
         loading.set(true);
@@ -38,17 +43,30 @@ pub fn SearchView() -> impl IntoView {
             None
         };
         let current_page = page.get_untracked();
+        search_version.update(|v| *v += 1);
+        let version = search_version.get_untracked();
 
         wasm_bindgen_futures::spawn_local(async move {
+            // 300 ms debounce — discard if a newer call arrived during the wait.
+            gloo_timers::future::TimeoutFuture::new(300).await;
+            if search_version.get_untracked() != version {
+                return;
+            }
             match crate::api::search_nodes(&q, is_fuzzy, status, current_page, 20).await {
                 Ok(resp) => {
-                    results.set(Some(resp));
+                    if search_version.get_untracked() == version {
+                        results.set(Some(resp));
+                    }
                 }
                 Err(e) => {
-                    error_msg.set(Some(format!("{e}")));
+                    if search_version.get_untracked() == version {
+                        error_msg.set(Some(format!("{e}")));
+                    }
                 }
             }
-            loading.set(false);
+            if search_version.get_untracked() == version {
+                loading.set(false);
+            }
         });
     };
 
