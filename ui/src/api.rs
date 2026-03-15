@@ -103,7 +103,29 @@ pub async fn fetch_logout_url() -> Result<String, UiError> {
 // ── Nodes ────────────────────────────────────────────────────────────────
 
 pub async fn fetch_nodes() -> Result<Vec<Node>, UiError> {
-    let resp = Request::get(&api_url("/nodes"))
+    fetch_nodes_filtered(None, None).await
+}
+
+/// Fetch nodes with optional status and tag_id filters.
+/// `status`: one of "draft", "published", "archived" or None for all.
+/// `tag_id`: UUID string of a tag to filter by, or None for all.
+pub async fn fetch_nodes_filtered(
+    status: Option<&str>,
+    tag_id: Option<uuid::Uuid>,
+) -> Result<Vec<Node>, UiError> {
+    let mut params: Vec<String> = Vec::new();
+    if let Some(s) = status {
+        params.push(format!("status={}", js_sys::encode_uri_component(s)));
+    }
+    if let Some(tid) = tag_id {
+        params.push(format!("tag_id={tid}"));
+    }
+    let url = if params.is_empty() {
+        api_url("/nodes")
+    } else {
+        format!("{}?{}", api_url("/nodes"), params.join("&"))
+    };
+    let resp = Request::get(&url)
         .send()
         .await
         .map_err(|e| UiError::Network(e.to_string()))?;
@@ -395,16 +417,22 @@ pub async fn revoke_permission(
 
 // ── Search ──────────────────────────────────────────────────────────────
 
+/// Search nodes. `status` is an optional filter (e.g. `Some("published")`).
 pub async fn search_nodes(
     q: &str,
     fuzzy: bool,
+    status: Option<&str>,
     page: u32,
     per_page: u32,
 ) -> Result<SearchResponse, UiError> {
     let encoded_q: String = js_sys::encode_uri_component(q).into();
-    let url = api_url(&format!(
-        "/search?q={encoded_q}&fuzzy={fuzzy}&page={page}&per_page={per_page}"
-    ));
+    let mut url = format!(
+        "{}?q={encoded_q}&fuzzy={fuzzy}&page={page}&per_page={per_page}",
+        api_url("/search")
+    );
+    if let Some(s) = status {
+        url.push_str(&format!("&status={}", js_sys::encode_uri_component(s)));
+    }
     let resp = Request::get(&url)
         .send()
         .await

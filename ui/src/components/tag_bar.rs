@@ -1,11 +1,18 @@
-use common::id::NodeId;
+use common::id::{NodeId, TagId};
 use common::tag::CreateTagRequest;
 use leptos::prelude::*;
 
+use crate::app::View;
+
 /// Tag chips for a node — shows attached tags with remove buttons, plus an
 /// inline input for attaching existing or creating new tags.
+/// Each chip has a small funnel icon: clicking it sets the global tag_filter
+/// and navigates to the NodeList so the user sees all nodes with that tag.
 #[component]
 pub fn TagBar(node_id: NodeId) -> impl IntoView {
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let tag_filter =
+        use_context::<RwSignal<Option<TagId>>>().unwrap_or_else(|| RwSignal::new(None));
     let refresh_tags = RwSignal::new(0u32);
     let input_value = RwSignal::new(String::new());
     let show_input = RwSignal::new(false);
@@ -85,12 +92,25 @@ pub fn TagBar(node_id: NodeId) -> impl IntoView {
                                         let color = tag.color.clone();
                                         view! {
                                             <span
-                                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                                                class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium text-white"
                                                 style:background-color=color
                                             >
+                                                // Filter-by-tag button (funnel icon)
+                                                <button
+                                                    class="hover:opacity-70 mr-0.5"
+                                                    title="Filter nodes by this tag"
+                                                    on:click=move |_| {
+                                                        tag_filter.set(Some(tag_id));
+                                                        current_view.set(View::NodeList);
+                                                    }
+                                                >
+                                                    <span class="material-symbols-outlined" style="font-size:11px;">"filter_list"</span>
+                                                </button>
                                                 {tag.name.clone()}
+                                                // Detach button
                                                 <button
                                                     class="hover:opacity-70 ml-0.5"
+                                                    title="Remove tag"
                                                     on:click=move |_| {
                                                         let node_id = node_id;
                                                         wasm_bindgen_futures::spawn_local(async move {

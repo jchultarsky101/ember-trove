@@ -1,6 +1,6 @@
 use common::{
     id::NodeId,
-    node::{CreateNodeRequest, NodeType, UpdateNodeRequest},
+    node::{CreateNodeRequest, NodeStatus, NodeType, UpdateNodeRequest},
 };
 use leptos::prelude::*;
 use pulldown_cmark::{Options, Parser, html};
@@ -15,6 +15,14 @@ fn render_markdown(source: &str) -> String {
     ammonia::clean(&html_out)
 }
 
+fn parse_status(s: &str) -> NodeStatus {
+    match s {
+        "published" => NodeStatus::Published,
+        "archived" => NodeStatus::Archived,
+        _ => NodeStatus::Draft,
+    }
+}
+
 #[component]
 pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
@@ -23,6 +31,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     let title = RwSignal::new(String::new());
     let body = RwSignal::new(String::new());
     let node_type = RwSignal::new("article".to_string());
+    let status = RwSignal::new("draft".to_string());
     let saving = RwSignal::new(false);
     let error_msg = RwSignal::new(Option::<String>::None);
 
@@ -33,6 +42,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                 title.set(n.title);
                 body.set(n.body.unwrap_or_default());
                 node_type.set(format!("{:?}", n.node_type).to_lowercase());
+                status.set(format!("{:?}", n.status).to_lowercase());
             }
         });
     }
@@ -43,6 +53,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
         let t = title.get_untracked();
         let b = body.get_untracked();
         let nt_str = node_type.get_untracked();
+        let st_str = status.get_untracked();
 
         wasm_bindgen_futures::spawn_local(async move {
             let result = if let Some(id) = node {
@@ -51,7 +62,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                     title: Some(t),
                     body: Some(b),
                     metadata: None,
-                    status: None,
+                    status: Some(parse_status(&st_str)),
                 };
                 crate::api::update_node(id, &req).await
             } else {
@@ -68,7 +79,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                     node_type: nt,
                     body: Some(b),
                     metadata: serde_json::Value::Object(serde_json::Map::new()),
-                    status: None,
+                    status: Some(parse_status(&st_str)),
                 };
                 crate::api::create_node(&req).await
             };
@@ -109,6 +120,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                     />
                 </div>
                 <div class="flex items-center gap-2">
+                    // Node type picker
                     <select
                         class="text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300
                             rounded-lg px-2 py-1.5 focus:outline-none"
@@ -121,12 +133,23 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         <option value="resource">"Resource"</option>
                         <option value="reference">"Reference"</option>
                     </select>
+                    // Status picker
+                    <select
+                        class="text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300
+                            rounded-lg px-2 py-1.5 focus:outline-none"
+                        prop:value=move || status.get()
+                        on:change=move |ev| status.set(event_target_value(&ev))
+                    >
+                        <option value="draft">"Draft"</option>
+                        <option value="published">"Published"</option>
+                        <option value="archived">"Archived"</option>
+                    </select>
                     <button
                         class="p-1.5 rounded-lg text-gray-400 hover:text-green-600 dark:hover:text-green-400
                             hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
                         on:click=on_save
                         disabled=move || saving.get()
-                        title=move || if saving.get() { "Saving…" } else { "Save" }
+                        title=move || if saving.get() { "Saving\u{2026}" } else { "Save" }
                     >
                         <span class="material-symbols-outlined">
                             {move || if saving.get() { "hourglass_empty" } else { "check" }}

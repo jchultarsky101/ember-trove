@@ -1,4 +1,4 @@
-use common::node::Node;
+use common::{id::TagId, node::Node};
 use leptos::prelude::*;
 
 use crate::app::View;
@@ -27,7 +27,7 @@ fn body_preview(body: &str) -> Option<String> {
     }
     let preview: String = chars.iter().take(120).collect();
     Some(if chars.len() > 120 {
-        format!("{preview}…")
+        format!("{preview}\u{2026}")
     } else {
         preview
     })
@@ -37,25 +37,78 @@ fn body_preview(body: &str) -> Option<String> {
 pub fn NodeList() -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
     let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
+    // tag_filter: provided by App; None = no filter
+    let tag_filter =
+        use_context::<RwSignal<Option<TagId>>>().unwrap_or_else(|| RwSignal::new(None));
+
+    // None = "All", Some("draft") | Some("published") | Some("archived")
+    let status_filter: RwSignal<Option<String>> = RwSignal::new(None);
 
     let nodes = LocalResource::new(move || {
         let _ = refresh.get();
-        async move { crate::api::fetch_nodes().await }
+        let status = status_filter.get();
+        let tag = tag_filter.get();
+        async move {
+            crate::api::fetch_nodes_filtered(status.as_deref(), tag.map(|t| t.0)).await
+        }
     });
 
     view! {
         <div class="flex flex-col h-full">
             <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
                 <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100">"Nodes"</h1>
-                <button
-                    class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
-                        hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    on:click=move |_| current_view.set(View::NodeCreate)
-                    title="New node"
-                >
-                    <span class="material-symbols-outlined">"add"</span>
-                </button>
+                <div class="flex items-center gap-2">
+                    // Active tag-filter badge with dismiss
+                    {move || tag_filter.get().map(|_| view! {
+                        <button
+                            class="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full
+                                bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300
+                                hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
+                            on:click=move |_| tag_filter.set(None)
+                            title="Clear tag filter"
+                        >
+                            <span class="material-symbols-outlined" style="font-size:12px;">"label"</span>
+                            "\u{00d7} tag"
+                        </button>
+                    })}
+                    <button
+                        class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
+                            hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        on:click=move |_| current_view.set(View::NodeCreate)
+                        title="New node"
+                    >
+                        <span class="material-symbols-outlined">"add"</span>
+                    </button>
+                </div>
             </div>
+
+            // Status filter pills
+            <div class="flex gap-1 px-6 py-2 border-b border-gray-100 dark:border-gray-800">
+                {[("All", None), ("Draft", Some("draft")), ("Published", Some("published")), ("Archived", Some("archived"))].iter().map(|&(label, value)| {
+                    let value_owned: Option<String> = value.map(|s| s.to_string());
+                    let value_cmp = value_owned.clone();
+                    view! {
+                        <button
+                            class=move || {
+                                let active = status_filter.get() == value_cmp;
+                                let base = "px-2.5 py-0.5 text-xs rounded-full font-medium transition-colors";
+                                if active {
+                                    format!("{base} bg-blue-600 text-white")
+                                } else {
+                                    format!("{base} bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700")
+                                }
+                            }
+                            on:click={
+                                let value_set = value_owned.clone();
+                                move |_| status_filter.set(value_set.clone())
+                            }
+                        >
+                            {label}
+                        </button>
+                    }
+                }).collect::<Vec<_>>()}
+            </div>
+
             <div class="flex-1 overflow-auto">
                 <Suspense fallback=move || view! {
                     <div class="p-6 text-gray-400 text-sm">"Loading nodes..."</div>
@@ -72,7 +125,7 @@ pub fn NodeList() -> impl IntoView {
                                             "description"
                                         </span>
                                         <p class="text-gray-400 dark:text-gray-600 text-sm text-center">
-                                            "No nodes yet. Create your first node to get started."
+                                            "No nodes found."
                                         </p>
                                     </div>
                                 }.into_any(),
@@ -102,6 +155,12 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
                 let node_type = format!("{:?}", node.node_type).to_lowercase();
                 let status = format!("{:?}", node.status).to_lowercase();
                 let updated = node.updated_at.format("%Y-%m-%d %H:%M").to_string();
+                // Status-specific badge colour
+                let status_class = match status.as_str() {
+                    "published" => "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+                    "archived"  => "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
+                    _           => "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+                };
                 view! {
                     <li
                         class="px-6 py-4 hover:bg-gray-100 dark:hover:bg-gray-900 cursor-pointer transition-colors"
@@ -116,7 +175,7 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
                                     <span class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
                                         {node_type}
                                     </span>
-                                    <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                    <span class=format!("px-2 py-0.5 text-xs rounded-full {status_class}")>
                                         {status}
                                     </span>
                                 </div>

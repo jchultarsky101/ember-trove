@@ -10,6 +10,8 @@ pub fn SearchView() -> impl IntoView {
 
     let query = RwSignal::new(String::new());
     let fuzzy = RwSignal::new(false);
+    // When true, only "published" nodes are included in results.
+    let published_only = RwSignal::new(false);
     let page = RwSignal::new(1u32);
     let search_trigger = RwSignal::new(0u32);
     let error_msg = RwSignal::new(Option::<String>::None);
@@ -26,10 +28,15 @@ pub fn SearchView() -> impl IntoView {
         loading.set(true);
         error_msg.set(None);
         let is_fuzzy = fuzzy.get_untracked();
+        let status = if published_only.get_untracked() {
+            Some("published")
+        } else {
+            None
+        };
         let current_page = page.get_untracked();
 
         wasm_bindgen_futures::spawn_local(async move {
-            match crate::api::search_nodes(&q, is_fuzzy, current_page, 20).await {
+            match crate::api::search_nodes(&q, is_fuzzy, status, current_page, 20).await {
                 Ok(resp) => {
                     results.set(Some(resp));
                 }
@@ -98,6 +105,16 @@ pub fn SearchView() -> impl IntoView {
                             on:change=move |_| fuzzy.update(|f| *f = !*f)
                         />
                         "Fuzzy"
+                    </label>
+                    <label class="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            class="rounded border-gray-300 dark:border-gray-600 text-green-500
+                                focus:ring-green-500 dark:bg-gray-700"
+                            prop:checked=move || published_only.get()
+                            on:change=move |_| published_only.update(|v| *v = !*v)
+                        />
+                        "Published only"
                     </label>
                     <button
                         class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg
