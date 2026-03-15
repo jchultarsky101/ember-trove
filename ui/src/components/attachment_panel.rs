@@ -91,12 +91,16 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                             hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50"
                     />
                     <button
-                        class="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white
-                            rounded font-medium transition-colors disabled:opacity-50"
+                        class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
+                            dark:hover:text-gray-300 hover:bg-gray-100
+                            dark:hover:bg-gray-800 transition-colors disabled:opacity-30"
                         on:click=on_upload
                         disabled=move || uploading.get()
+                        title=move || if uploading.get() { "Uploading…" } else { "Upload" }
                     >
-                        {move || if uploading.get() { "Uploading..." } else { "Upload" }}
+                        <span class="material-symbols-outlined" style="font-size: 16px;">
+                            {move || if uploading.get() { "hourglass_empty" } else { "upload" }}
+                        </span>
                     </button>
                 </div>
                 {move || error_msg.get().map(|msg| view! {
