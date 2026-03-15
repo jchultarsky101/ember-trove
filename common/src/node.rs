@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::id::{NodeId, TagId};
+use crate::tag::Tag;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -33,7 +34,7 @@ pub struct Node {
     pub body: Option<String>,
     pub metadata: serde_json::Value,
     pub status: NodeStatus,
-    pub tags: Vec<TagId>,
+    pub tags: Vec<Tag>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
