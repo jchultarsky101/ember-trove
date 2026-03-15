@@ -56,11 +56,15 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">"Sharing"</h2>
                 <button
-                    class="text-xs px-2 py-1 rounded-lg text-gray-500 dark:text-gray-400
-                        hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
+                        dark:hover:text-gray-300 hover:bg-gray-100
+                        dark:hover:bg-gray-800 transition-colors"
                     on:click=move |_| show_add.update(|v| *v = !*v)
+                    title=move || if show_add.get() { "Cancel" } else { "Add permission" }
                 >
-                    {move || if show_add.get() { "Cancel" } else { "+ Add" }}
+                    <span class="material-symbols-outlined" style="font-size: 16px;">
+                        {move || if show_add.get() { "close" } else { "person_add" }}
+                    </span>
                 </button>
             </div>
 
@@ -91,12 +95,16 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                     </div>
                     <div class="flex items-center gap-2">
                         <button
-                            class="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white
-                                rounded font-medium transition-colors disabled:opacity-50"
+                            class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
+                                dark:hover:text-gray-300 hover:bg-gray-100
+                                dark:hover:bg-gray-800 transition-colors disabled:opacity-30"
                             on:click=on_grant
                             disabled=move || saving.get()
+                            title=move || if saving.get() { "Saving…" } else { "Grant" }
                         >
-                            {move || if saving.get() { "Saving…" } else { "Grant" }}
+                            <span class="material-symbols-outlined" style="font-size: 16px;">
+                                {move || if saving.get() { "hourglass_empty" } else { "check" }}
+                            </span>
                         </button>
                     </div>
                     {move || error_msg.get().map(|msg| view! {

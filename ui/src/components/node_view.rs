@@ -207,11 +207,15 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                     "Connections"
                 </h2>
                 <button
-                    class="text-xs px-2 py-1 rounded-lg text-gray-500 dark:text-gray-400
-                        hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
+                        dark:hover:text-gray-300 hover:bg-gray-100
+                        dark:hover:bg-gray-800 transition-colors"
                     on:click=move |_| show_add.update(|v| *v = !*v)
+                    title=move || if show_add.get() { "Cancel" } else { "Add Edge" }
                 >
-                    {move || if show_add.get() { "Cancel" } else { "+ Add Edge" }}
+                    <span class="material-symbols-outlined" style="font-size: 16px;">
+                        {move || if show_add.get() { "close" } else { "add_link" }}
+                    </span>
                 </button>
             </div>
 
@@ -297,11 +301,13 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                             on:input=move |ev| label_input.set(event_target_value(&ev))
                         />
                         <button
-                            class="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white
-                                rounded font-medium transition-colors"
+                            class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
+                                dark:hover:text-gray-300 hover:bg-gray-100
+                                dark:hover:bg-gray-800 transition-colors"
                             on:click=on_add_edge
+                            title="Add edge"
                         >
-                            "Add"
+                            <span class="material-symbols-outlined" style="font-size: 16px;">"check"</span>
                         </button>
                     </div>
                     {move || error_msg.get().map(|msg| view! {
