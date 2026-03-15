@@ -22,6 +22,26 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
 
     view! {
         <nav class="flex-1 overflow-y-auto px-2 py-4 space-y-1">
+            // Search — top of sidebar, always first
+            // Expanded: inline SearchBar; Collapsed: icon navigates to Search view
+            {move || {
+                if collapsed.get() {
+                    view! {
+                        <SidebarLink
+                            icon="search" label="Search"
+                            on_click=move || current_view.set(View::Search)
+                            collapsed=collapsed
+                        />
+                    }.into_any()
+                } else {
+                    view! {
+                        <div class="px-1 mb-1">
+                            <SearchBar />
+                        </div>
+                    }.into_any()
+                }
+            }}
+            <div class="border-t border-gray-200 dark:border-gray-700 my-3" />
             <SidebarLink
                 icon="description" label="All Nodes"
                 on_click=move || current_view.set(View::NodeList)
@@ -39,22 +59,6 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                 on_click=move || current_view.set(View::Graph)
                 collapsed=collapsed
             />
-            <SidebarLink
-                icon="search" label="Search"
-                on_click=move || current_view.set(View::Search)
-                collapsed=collapsed
-            />
-            // SearchBar — hidden in icon-only mode
-            <div
-                class="border-t border-gray-200 dark:border-gray-700 my-3"
-                class:hidden=move || collapsed.get()
-            />
-            <div
-                class="px-1"
-                class:hidden=move || collapsed.get()
-            >
-                <SearchBar />
-            </div>
         </nav>
         // User / logout section
         <div class="px-2 py-3 border-t border-gray-200 dark:border-gray-800">

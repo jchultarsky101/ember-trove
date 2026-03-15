@@ -10,6 +10,7 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
     let refresh = RwSignal::new(0u32);
     let uploading = RwSignal::new(false);
     let error_msg = RwSignal::new(Option::<String>::None);
+    let selected_filename = RwSignal::new(Option::<String>::None);
     let file_input_ref = NodeRef::<Input>::new();
 
     let attachments = LocalResource::new(move || {
@@ -63,6 +64,7 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
             match api::upload_attachment(node_id, form_data).await {
                 Ok(_) => {
                     refresh.update(|n| *n += 1);
+                    selected_filename.set(None);
                     if let Some(el) = file_input_ref.get_untracked() {
                         el.set_value("");
                     }
@@ -73,23 +75,49 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
         });
     };
 
+    let on_pick = move |_| {
+        if let Some(el) = file_input_ref.get_untracked() {
+            el.click();
+        }
+    };
+
+    let on_file_change = move |_| {
+        let name = file_input_ref
+            .get_untracked()
+            .and_then(|el| el.files())
+            .and_then(|files| files.get(0))
+            .map(|f| f.name());
+        selected_filename.set(name);
+    };
+
     view! {
         <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
             <div class="mb-4">
                 <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                     "Attachments"
                 </h2>
-                // Upload row
-                <div class="flex items-center gap-2">
+                // Upload row — hidden native input, icon buttons
+                <div class="flex items-center gap-1">
                     <input
                         type="file"
                         node_ref=file_input_ref
-                        class="flex-1 text-xs text-gray-700 dark:text-gray-300
-                            file:mr-2 file:py-1 file:px-2 file:rounded file:border-0
-                            file:text-xs file:bg-blue-50 file:text-blue-700
-                            dark:file:bg-blue-900/30 dark:file:text-blue-300
-                            hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50"
+                        on:change=on_file_change
+                        class="hidden"
                     />
+                    <button
+                        class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
+                            dark:hover:text-gray-300 hover:bg-gray-100
+                            dark:hover:bg-gray-800 transition-colors"
+                        on:click=on_pick
+                        title="Choose file"
+                    >
+                        <span class="material-symbols-outlined" style="font-size: 16px;">
+                            "folder_open"
+                        </span>
+                    </button>
+                    <span class="flex-1 text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {move || selected_filename.get().unwrap_or_else(|| "No file chosen".to_string())}
+                    </span>
                     <button
                         class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
                             dark:hover:text-gray-300 hover:bg-gray-100
