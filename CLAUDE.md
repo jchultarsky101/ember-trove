@@ -71,6 +71,21 @@ ember-trove/
   deleted after merge.
 - **Current state**: Phase 1 skeleton in progress.
 
+## Environment Quirks
+
+- **Docker PATH**: Binary at `/Applications/Docker.app/Contents/Resources/bin/docker`; always
+  `export PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"` before any `docker` call.
+- **`cat` aliased to `bat`**: Heredoc git commit messages (`-m "$(cat <<'EOF'...)"`) silently produce
+  empty messages in this shell. Use plain multi-line `-m "..."` strings for all commits.
+- **Stray Docker containers**: Old `docker compose` runs (e.g. `partorbital-*`) leave containers on
+  a different network from `deploy-*`. Run `docker ps` and stop orphans before troubleshooting
+  networking between services.
+- **Keycloak usernames are read-only**: `kcadm.sh update users/<id> -s username=...` →
+  `error-user-attribute-read-only`. Delete and recreate the user to rename.
+- **Keycloak `set-password`**: `--temporary false` flag removed in recent KC — omit it entirely.
+- **Worktree cwd resets**: Bash cwd resets to the worktree root between tool calls; always use
+  absolute paths (e.g. `cd /Users/julian/projects/ember-trove && git ...`).
+
 ## Implementation Phases
 
 | Phase | Scope                                    |
