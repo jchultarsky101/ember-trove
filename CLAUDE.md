@@ -75,8 +75,13 @@ ember-trove/
 
 - **Docker PATH**: Binary at `/Applications/Docker.app/Contents/Resources/bin/docker`; always
   `export PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"` before any `docker` call.
+- **`cargo` PATH**: Not on default shell PATH; always `export PATH="$HOME/.cargo/bin:$PATH"` in
+  Bash tool calls.
 - **`cat` aliased to `bat`**: Heredoc git commit messages (`-m "$(cat <<'EOF'...)"`) silently produce
   empty messages in this shell. Use plain multi-line `-m "..."` strings for all commits.
+- **Docker build output**: BuildKit output does not stream to the task file in real-time; `tail` of
+  the output file shows only the initial lines while building. Use `/bin/ps aux | grep docker` to
+  confirm the build is still alive.
 - **Stray Docker containers**: Old `docker compose` runs (e.g. `partorbital-*`) leave containers on
   a different network from `deploy-*`. Run `docker ps` and stop orphans before troubleshooting
   networking between services.
@@ -85,6 +90,18 @@ ember-trove/
 - **Keycloak `set-password`**: `--temporary false` flag removed in recent KC — omit it entirely.
 - **Worktree cwd resets**: Bash cwd resets to the worktree root between tool calls; always use
   absolute paths (e.g. `cd /Users/julian/projects/ember-trove && git ...`).
+
+## Leptos Patterns
+
+- **Reactive Effect + async race**: `Effect::new` fires on every signal change (each keystroke).
+  Any `spawn_local` inside must use a monotonic version counter (`RwSignal<u32>`) to discard stale
+  responses, plus `gloo_timers::future::TimeoutFuture::new(300).await` debounce before the API call.
+- **Shared context signals**: Lift `RwSignal<T>` to the App root, `provide_context(sig)` there,
+  `use_context::<RwSignal<T>>()` in children. No prop-drilling. Example: `search_query` written by
+  sidebar `SearchBar`, read by `SearchView`.
+- **SearchBar suppress on Search view**: When `current_view == View::Search`, return early in
+  `trigger_search` to suppress the dropdown — but still call `search_query.set(...)` first so the
+  `SearchView` `Effect` fires and auto-searches.
 
 ## Implementation Phases
 
