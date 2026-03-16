@@ -40,13 +40,6 @@ pub fn SearchView() -> impl IntoView {
 
     let do_search = move || {
         let q = search_query.get_untracked().trim().to_string();
-        let has_tag = tag_filter.get_untracked().is_some();
-        // Require at least a query OR an active tag filter before searching.
-        if q.is_empty() && !has_tag {
-            results.set(None);
-            loading.set(false);
-            return;
-        }
         loading.set(true);
         error_msg.set(None);
         let is_fuzzy = fuzzy.get_untracked();
@@ -286,21 +279,14 @@ pub fn SearchView() -> impl IntoView {
                     })
                 }}
 
-                // Empty state — before any search or when query is empty
+                // Empty state — only shown while loading on first render
                 {move || {
-                    if results.get().is_none() && !loading.get() {
-                        let q = search_query.get();
-                        Some(if q.trim().is_empty() {
-                            view! {
-                                <div class="text-center py-16 text-gray-400 dark:text-gray-600">
-                                    <span class="material-symbols-outlined text-5xl mb-3 block">"manage_search"</span>
-                                    <p class="text-lg mb-1">"Search your knowledge base"</p>
-                                    <p class="text-sm">"Type in the search bar to find nodes, or select a tag to browse all nodes with that tag."</p>
-                                </div>
-                            }.into_any()
-                        } else {
-                            view! { <div /> }.into_any()
-                        })
+                    if results.get().is_none() && loading.get() {
+                        Some(view! {
+                            <div class="text-center py-16 text-gray-400 dark:text-gray-600">
+                                <span class="text-sm animate-pulse">"Loading\u{2026}"</span>
+                            </div>
+                        }.into_any())
                     } else {
                         None
                     }

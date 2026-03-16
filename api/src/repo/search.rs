@@ -60,18 +60,14 @@ impl SearchRepo for PgSearchRepo {
         let offset = (page - 1) * per_page;
         let tag_id = query.tag_id.map(|t| t.0);
 
-        // Empty query with a tag filter → list all nodes with that tag.
+        // Empty query → list all nodes (optionally filtered by tag).
         if q.is_empty() {
             return if let Some(tid) = tag_id {
                 self.list_by_tag(tid, &query.node_type, &query.status, page, per_page, offset)
                     .await
             } else {
-                Ok(SearchResponse {
-                    results: vec![],
-                    total: 0,
-                    page,
-                    per_page,
-                })
+                self.list_all(&query.node_type, &query.status, page, per_page, offset)
+                    .await
             };
         }
 
@@ -88,6 +84,64 @@ impl SearchRepo for PgSearchRepo {
 }
 
 impl PgSearchRepo {
+    /// List all nodes with no text or tag filter — used when the search view
+    /// is opened with an empty query and "All tags" selected.
+    async fn list_all(
+        &self,
+        node_type: &Option<common::node::NodeType>,
+        status: &Option<common::node::NodeStatus>,
+        page: u32,
+        per_page: u32,
+        offset: u32,
+    ) -> Result<SearchResponse, EmberTroveError> {
+        let type_filter = node_type.as_ref().map(node_type_to_str);
+        let status_filter = status.as_ref().map(node_status_to_str);
+
+        let count_row = sqlx::query_as::<_, CountRow>(
+            r#"
+            SELECT COUNT(*)::bigint AS total
+            FROM nodes
+            WHERE ($1::text IS NULL OR node_type = $1::node_type)
+              AND ($2::text IS NULL OR status = $2::node_status)
+            "#,
+        )
+        .bind(type_filter)
+        .bind(status_filter)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list all count failed: {e}")))?;
+
+        let rows = sqlx::query_as::<_, SearchRow>(
+            r#"
+            SELECT
+                id,
+                title,
+                slug,
+                NULL::text AS snippet,
+                1.0::float4 AS rank
+            FROM nodes
+            WHERE ($1::text IS NULL OR node_type = $1::node_type)
+              AND ($2::text IS NULL OR status = $2::node_status)
+            ORDER BY updated_at DESC
+            LIMIT $3 OFFSET $4
+            "#,
+        )
+        .bind(type_filter)
+        .bind(status_filter)
+        .bind(per_page as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list all failed: {e}")))?;
+
+        Ok(SearchResponse {
+            results: rows.into_iter().map(SearchRow::into_result).collect(),
+            total: count_row.total as u64,
+            page,
+            per_page,
+        })
+    }
+
     /// List all nodes that carry a specific tag, with no text filter.
     /// Used when the search query is empty but a tag filter is active.
     #[allow(clippy::too_many_arguments)]
