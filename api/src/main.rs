@@ -19,8 +19,8 @@ use auth::{AuthConfig, oidc::OidcClient};
 use config::Config;
 use object_store::s3::S3ObjectStore;
 use repo::{
-    attachment::PgAttachmentRepo, edge::PgEdgeRepo, node::PgNodeRepo, permission::PgPermissionRepo,
-    search::PgSearchRepo, tag::PgTagRepo,
+    attachment::PgAttachmentRepo, edge::PgEdgeRepo, graph::PgGraphRepo, node::PgNodeRepo,
+    permission::PgPermissionRepo, search::PgSearchRepo, tag::PgTagRepo,
 };
 use state::AppState;
 
@@ -114,6 +114,7 @@ async fn main() -> anyhow::Result<()> {
         attachments: Arc::new(PgAttachmentRepo::new(pool.clone())),
         permissions: Arc::new(PgPermissionRepo::new(pool.clone())),
         search: Arc::new(PgSearchRepo::new(pool.clone())),
+        graph: Arc::new(PgGraphRepo::new(pool.clone())),
         object_store,
         oidc,
         cookie_key,

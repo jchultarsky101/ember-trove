@@ -1,7 +1,9 @@
 /// Visual knowledge graph — force-directed SVG node-link diagram.
 ///
 /// Fetches all nodes and edges, runs a Fruchterman-Reingold layout in WASM,
-/// and renders an interactive SVG with pan (drag) and zoom (wheel).
+/// then overlays saved positions from the API.  Nodes are draggable; positions
+/// are persisted to the DB on mouse-up.  The canvas supports pan (drag on
+/// background) and zoom (wheel).
 use std::collections::HashMap;
 
 use leptos::prelude::*;
@@ -12,7 +14,7 @@ use web_sys::{MouseEvent, WheelEvent};
 use common::{edge::Edge, id::NodeId, node::Node};
 
 use crate::{
-    api::{fetch_all_edges, fetch_nodes},
+    api::{fetch_all_edges, fetch_nodes, fetch_positions, save_position},
     app::View,
 };
 
@@ -22,13 +24,15 @@ const H: f64 = 700.0;
 const MARGIN: f64 = 80.0;
 
 /// Fruchterman-Reingold spring layout (200 iterations, O(n²) repulsion).
-fn force_layout(node_ids: &[Uuid], edge_pairs: &[(Uuid, Uuid)]) -> Vec<(Uuid, f64, f64)> {
+fn force_layout(node_ids: &[Uuid], edge_pairs: &[(Uuid, Uuid)]) -> HashMap<Uuid, (f64, f64)> {
     let n = node_ids.len();
     if n == 0 {
-        return vec![];
+        return HashMap::new();
     }
     if n == 1 {
-        return vec![(node_ids[0], W / 2.0, H / 2.0)];
+        let mut m = HashMap::new();
+        m.insert(node_ids[0], (W / 2.0, H / 2.0));
+        return m;
     }
 
     let uw = W - 2.0 * MARGIN;
@@ -96,7 +100,7 @@ fn force_layout(node_ids: &[Uuid], edge_pairs: &[(Uuid, Uuid)]) -> Vec<(Uuid, f6
     node_ids
         .iter()
         .enumerate()
-        .map(|(i, id)| (*id, px[i], py[i]))
+        .map(|(i, id)| (*id, (px[i], py[i])))
         .collect()
 }
 
@@ -108,7 +112,8 @@ pub fn GraphView() -> impl IntoView {
     let error_msg = RwSignal::new(Option::<String>::None);
     let nodes_sig: RwSignal<Vec<Node>> = RwSignal::new(vec![]);
     let edges_sig: RwSignal<Vec<Edge>> = RwSignal::new(vec![]);
-    let positions: RwSignal<Vec<(Uuid, f64, f64)>> = RwSignal::new(vec![]);
+    // Reactive positions map — updated live during drag so edges follow.
+    let positions: RwSignal<HashMap<Uuid, (f64, f64)>> = RwSignal::new(HashMap::new());
 
     // Pan/zoom state
     let pan_x = RwSignal::new(0.0_f64);
@@ -118,7 +123,12 @@ pub fn GraphView() -> impl IntoView {
     let last_mx = RwSignal::new(0.0_f64);
     let last_my = RwSignal::new(0.0_f64);
 
-    // Fetch nodes + edges once on mount, then compute layout
+    // Drag state
+    let drag_node: RwSignal<Option<Uuid>> = RwSignal::new(None);
+    // Offset = (mouse_svg_x - node_x) at drag-start, so the grab point stays fixed.
+    let drag_offset: RwSignal<(f64, f64)> = RwSignal::new((0.0, 0.0));
+
+    // Fetch nodes + edges once on mount, run FR layout, then override with saved positions.
     Effect::new(move |_| {
         spawn_local(async move {
             match fetch_nodes().await {
@@ -131,7 +141,17 @@ pub fn GraphView() -> impl IntoView {
                     let node_ids: Vec<Uuid> = nodes.iter().map(|n| n.id.0).collect();
                     let edge_pairs: Vec<(Uuid, Uuid)> =
                         edges.iter().map(|e| (e.source_id.0, e.target_id.0)).collect();
-                    let layout = force_layout(&node_ids, &edge_pairs);
+
+                    // 1. Run FR layout as the baseline.
+                    let mut layout = force_layout(&node_ids, &edge_pairs);
+
+                    // 2. Override with any saved positions from the API.
+                    if let Ok(saved) = fetch_positions().await {
+                        for pos in saved {
+                            layout.insert(pos.node_id.0, (pos.x, pos.y));
+                        }
+                    }
+
                     positions.set(layout);
                     nodes_sig.set(nodes);
                     edges_sig.set(edges);
@@ -172,62 +192,14 @@ pub fn GraphView() -> impl IntoView {
                     .into_any();
                 }
                 let edges = edges_sig.get();
-                let pos_map: HashMap<Uuid, (f64, f64)> = positions
-                    .get()
-                    .into_iter()
-                    .map(|(id, x, y)| (id, (x, y)))
-                    .collect();
 
-                // Build static edge SVG elements
-                let edge_svgs: Vec<_> = edges
-                    .iter()
-                    .filter_map(|edge| {
-                        let (x1, y1) = pos_map.get(&edge.source_id.0).copied()?;
-                        let (x2, y2) = pos_map.get(&edge.target_id.0).copied()?;
-                        let mid_x = (x1 + x2) / 2.0;
-                        let mid_y = (y1 + y2) / 2.0;
-                        let lbl = edge.label.clone();
-                        Some(
-                            view! {
-                                <g>
-                                    <line
-                                        x1=format!("{x1:.1}")
-                                        y1=format!("{y1:.1}")
-                                        x2=format!("{x2:.1}")
-                                        y2=format!("{y2:.1}")
-                                        stroke="#94a3b8"
-                                        attr:stroke-width="1.5"
-                                        attr:stroke-opacity="0.6"
-                                    />
-                                    {lbl.map(|l| {
-                                        view! {
-                                            <text
-                                                x=format!("{mid_x:.1}")
-                                                y=format!("{mid_y:.1}")
-                                                attr:text-anchor="middle"
-                                                attr:font-size="10"
-                                                fill="#94a3b8"
-                                                dy="-4"
-                                            >
-                                                {l}
-                                            </text>
-                                        }
-                                    })}
-                                </g>
-                            }
-                            .into_any(),
-                        )
-                    })
-                    .collect();
-
-                // Build static node SVG elements
+                // Build node SVG elements — each with its own drag handler.
+                // Node positions are read reactively inside each node's closure
+                // so only the moved node re-renders, not the whole list.
                 let node_svgs: Vec<_> = nodes
                     .iter()
                     .map(|node| {
-                        let (nx, ny) = pos_map
-                            .get(&node.id.0)
-                            .copied()
-                            .unwrap_or((W / 2.0, H / 2.0));
+                        let id = node.id.0;
                         let node_id: NodeId = node.id;
                         let title = node.title.clone();
                         let display: String = if title.chars().count() > 14 {
@@ -236,18 +208,52 @@ pub fn GraphView() -> impl IntoView {
                         } else {
                             title
                         };
+
                         view! {
                             <g
-                                style="cursor: pointer;"
+                                style="cursor: grab;"
                                 on:click=move |ev: MouseEvent| {
-                                    ev.stop_propagation();
-                                    current_view.set(View::NodeDetail(node_id));
+                                    // Only fire click when not dragging.
+                                    if drag_node.get_untracked().is_none() {
+                                        ev.stop_propagation();
+                                        current_view.set(View::NodeDetail(node_id));
+                                    }
                                 }
-                                on:mousedown=|ev: MouseEvent| ev.stop_propagation()
+                                on:mousedown=move |ev: MouseEvent| {
+                                    ev.stop_propagation();
+                                    ev.prevent_default();
+                                    let (nx, ny) = positions
+                                        .with_untracked(|m| m.get(&id).copied().unwrap_or((0.0, 0.0)));
+                                    // Convert viewport coords to SVG canvas coords.
+                                    let mx = (ev.client_x() as f64 - pan_x.get_untracked())
+                                        / zoom.get_untracked();
+                                    let my = (ev.client_y() as f64 - pan_y.get_untracked())
+                                        / zoom.get_untracked();
+                                    drag_offset.set((mx - nx, my - ny));
+                                    drag_node.set(Some(id));
+                                }
                             >
                                 <circle
-                                    cx=format!("{nx:.1}")
-                                    cy=format!("{ny:.1}")
+                                    cx=move || {
+                                        format!(
+                                            "{:.1}",
+                                            positions
+                                                .get()
+                                                .get(&id)
+                                                .map(|p| p.0)
+                                                .unwrap_or(W / 2.0),
+                                        )
+                                    }
+                                    cy=move || {
+                                        format!(
+                                            "{:.1}",
+                                            positions
+                                                .get()
+                                                .get(&id)
+                                                .map(|p| p.1)
+                                                .unwrap_or(H / 2.0),
+                                        )
+                                    }
                                     r="28"
                                     fill="#f59e0b"
                                     attr:fill-opacity="0.15"
@@ -255,8 +261,26 @@ pub fn GraphView() -> impl IntoView {
                                     attr:stroke-width="2"
                                 />
                                 <text
-                                    x=format!("{nx:.1}")
-                                    y=format!("{:.1}", ny + 5.0)
+                                    x=move || {
+                                        format!(
+                                            "{:.1}",
+                                            positions
+                                                .get()
+                                                .get(&id)
+                                                .map(|p| p.0)
+                                                .unwrap_or(W / 2.0),
+                                        )
+                                    }
+                                    y=move || {
+                                        format!(
+                                            "{:.1}",
+                                            positions
+                                                .get()
+                                                .get(&id)
+                                                .map(|p| p.1 + 5.0)
+                                                .unwrap_or(H / 2.0 + 5.0),
+                                        )
+                                    }
                                     attr:text-anchor="middle"
                                     attr:font-size="11"
                                     attr:font-weight="500"
@@ -270,19 +294,117 @@ pub fn GraphView() -> impl IntoView {
                     })
                     .collect();
 
+                // Build edge SVG elements — read positions reactively so edges
+                // follow dragged nodes in real time.
+                let edge_svgs: Vec<_> = edges
+                    .iter()
+                    .map(|edge| {
+                        let src = edge.source_id.0;
+                        let tgt = edge.target_id.0;
+                        let lbl = edge.label.clone();
+                        view! {
+                            <g>
+                                <line
+                                    x1=move || {
+                                        format!(
+                                            "{:.1}",
+                                            positions.get().get(&src).map(|p| p.0).unwrap_or(0.0),
+                                        )
+                                    }
+                                    y1=move || {
+                                        format!(
+                                            "{:.1}",
+                                            positions.get().get(&src).map(|p| p.1).unwrap_or(0.0),
+                                        )
+                                    }
+                                    x2=move || {
+                                        format!(
+                                            "{:.1}",
+                                            positions.get().get(&tgt).map(|p| p.0).unwrap_or(0.0),
+                                        )
+                                    }
+                                    y2=move || {
+                                        format!(
+                                            "{:.1}",
+                                            positions.get().get(&tgt).map(|p| p.1).unwrap_or(0.0),
+                                        )
+                                    }
+                                    stroke="#94a3b8"
+                                    attr:stroke-width="1.5"
+                                    attr:stroke-opacity="0.6"
+                                />
+                                {lbl.map(|l| {
+                                    view! {
+                                        <text
+                                            x=move || {
+                                                format!(
+                                                    "{:.1}",
+                                                    {
+                                                        let pos = positions.get();
+                                                        let x1 = pos.get(&src).map(|p| p.0).unwrap_or(0.0);
+                                                        let x2 = pos.get(&tgt).map(|p| p.0).unwrap_or(0.0);
+                                                        (x1 + x2) / 2.0
+                                                    },
+                                                )
+                                            }
+                                            y=move || {
+                                                format!(
+                                                    "{:.1}",
+                                                    {
+                                                        let pos = positions.get();
+                                                        let y1 = pos.get(&src).map(|p| p.1).unwrap_or(0.0);
+                                                        let y2 = pos.get(&tgt).map(|p| p.1).unwrap_or(0.0);
+                                                        (y1 + y2) / 2.0
+                                                    },
+                                                )
+                                            }
+                                            attr:text-anchor="middle"
+                                            attr:font-size="10"
+                                            fill="#94a3b8"
+                                            dy="-4"
+                                        >
+                                            {l}
+                                        </text>
+                                    }
+                                })}
+                            </g>
+                        }
+                        .into_any()
+                    })
+                    .collect();
+
                 view! {
                     <svg
                         class="w-full h-full"
                         style=move || {
-                            if panning.get() { "cursor: grabbing;" } else { "cursor: grab;" }
+                            if drag_node.get().is_some() || panning.get() {
+                                "cursor: grabbing;"
+                            } else {
+                                "cursor: default;"
+                            }
                         }
                         on:mousedown=move |ev: MouseEvent| {
+                            // Only start panning when clicking the canvas background.
                             panning.set(true);
                             last_mx.set(ev.client_x() as f64);
                             last_my.set(ev.client_y() as f64);
                         }
                         on:mousemove=move |ev: MouseEvent| {
-                            if panning.get_untracked() {
+                            if let Some(nid) = drag_node.get_untracked() {
+                                // Dragging a node.
+                                ev.prevent_default();
+                                let mx = (ev.client_x() as f64 - pan_x.get_untracked())
+                                    / zoom.get_untracked();
+                                let my = (ev.client_y() as f64 - pan_y.get_untracked())
+                                    / zoom.get_untracked();
+                                let (ox, oy) = drag_offset.get_untracked();
+                                let new_x = (mx - ox).clamp(MARGIN, W - MARGIN);
+                                let new_y = (my - oy).clamp(MARGIN, H - MARGIN);
+                                positions.update(|map| {
+                                    map.insert(nid, (new_x, new_y));
+                                });
+                            } else if panning.get_untracked() {
+                                // Panning the canvas.
                                 let mx = ev.client_x() as f64;
                                 let my = ev.client_y() as f64;
                                 pan_x.update(|p| *p += mx - last_mx.get_untracked());
@@ -291,10 +413,27 @@ pub fn GraphView() -> impl IntoView {
                                 last_my.set(my);
                             }
                         }
-                        on:mouseup=move |_: MouseEvent| {
+                        on:mouseup=move |_ev: MouseEvent| {
+                            if let Some(nid) = drag_node.get_untracked() {
+                                let (x, y) = positions
+                                    .with_untracked(|m| m.get(&nid).copied().unwrap_or((0.0, 0.0)));
+                                spawn_local(async move {
+                                    let _ = save_position(nid, x, y).await;
+                                });
+                                drag_node.set(None);
+                            }
                             panning.set(false);
                         }
                         on:mouseleave=move |_: MouseEvent| {
+                            // Cancel drag/pan when cursor leaves SVG.
+                            if let Some(nid) = drag_node.get_untracked() {
+                                let (x, y) = positions
+                                    .with_untracked(|m| m.get(&nid).copied().unwrap_or((0.0, 0.0)));
+                                spawn_local(async move {
+                                    let _ = save_position(nid, x, y).await;
+                                });
+                                drag_node.set(None);
+                            }
                             panning.set(false);
                         }
                         on:wheel=move |ev: WheelEvent| {
