@@ -116,6 +116,13 @@ ember-trove/
   The first use inside `view!` moves the String; a second use (e.g. in `title=`) will fail to compile.
 - **Clippy `too_many_arguments`**: Private helper fns with ≥8 args trigger this. Annotate with
   `#[allow(clippy::too_many_arguments)]` when a params struct would be excessive.
+- **SVG `attr:` prefix bug**: Leptos 0.8 writes `attr:foo=val` as `setAttribute("attr:foo", val)`
+  (keeps the prefix!) for SVG elements. **Rule**: use `style="foo: val"` for ALL SVG presentation
+  attributes (stroke-width, fill-opacity, text-anchor, font-size, marker-end, paint-order, etc.).
+  Regular named attributes without hyphens (`stroke`, `fill`, `d`, `cx`, `cy`) work fine without `attr:`.
+- **Unknown SVG elements (`<marker>`, `<defs>` content)**: Not in Leptos's element list. Create via
+  `web_sys::Document::create_element_ns(Some("http://www.w3.org/2000/svg"), "marker")` and
+  `set_attribute`. Inject after first render with `spawn_local(async { TimeoutFuture::new(50).await; inject(); })`.
 
 ## Browser Testing (mcp__Claude_in_Chrome)
 
