@@ -1,5 +1,7 @@
 use leptos::prelude::*;
 
+use common::tag::Tag;
+
 use crate::{
     app::View,
     auth::{AuthState, AuthStatus},
@@ -20,10 +22,14 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
         });
     };
 
+    let tag_filter =
+        use_context::<RwSignal<Option<Tag>>>().expect("tag_filter signal must be provided");
+
     view! {
         <nav class="flex-1 overflow-y-auto px-2 py-4 space-y-1">
             // Search — top of sidebar, always first
-            // Expanded: inline SearchBar; Collapsed: icon navigates to Search view
+            // Expanded: inline SearchBar + "Browse by tag" shortcut
+            // Collapsed: icon navigates to Search view
             {move || {
                 if collapsed.get() {
                     view! {
@@ -37,6 +43,20 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                     view! {
                         <div class="px-1 mb-1">
                             <SearchBar />
+                            // Shortcut: jump to Search view filtered by tag (no text needed)
+                            <button
+                                class="w-full text-left mt-1 px-2 py-1 text-xs
+                                    text-blue-500 dark:text-blue-400
+                                    hover:text-blue-700 dark:hover:text-blue-300
+                                    transition-colors"
+                                on:click=move |_| {
+                                    tag_filter.set(None);
+                                    current_view.set(View::Search);
+                                }
+                                title="Open full search / browse by tag"
+                            >
+                                "\u{1f3f7}\u{fe0f} Browse by tag \u{2192}"
+                            </button>
                         </div>
                     }.into_any()
                 }
