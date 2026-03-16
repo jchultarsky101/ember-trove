@@ -127,6 +127,9 @@ pub fn GraphView() -> impl IntoView {
     let drag_node: RwSignal<Option<Uuid>> = RwSignal::new(None);
     // Offset = (mouse_svg_x - node_x) at drag-start, so the grab point stays fixed.
     let drag_offset: RwSignal<(f64, f64)> = RwSignal::new((0.0, 0.0));
+    // Set to true as soon as mousemove fires during a node drag; cleared on mousedown.
+    // Used to suppress the click event that fires after mouseup when the user dragged.
+    let did_drag = RwSignal::new(false);
 
     // Fetch nodes + edges once on mount, run FR layout, then override with saved positions.
     Effect::new(move |_| {
@@ -213,15 +216,19 @@ pub fn GraphView() -> impl IntoView {
                             <g
                                 style="cursor: grab;"
                                 on:click=move |ev: MouseEvent| {
-                                    // Only fire click when not dragging.
-                                    if drag_node.get_untracked().is_none() {
+                                    // Suppress click if the mousedown→mouseup was a drag.
+                                    if did_drag.get_untracked() {
+                                        did_drag.set(false);
                                         ev.stop_propagation();
-                                        current_view.set(View::NodeDetail(node_id));
+                                        return;
                                     }
+                                    ev.stop_propagation();
+                                    current_view.set(View::NodeDetail(node_id));
                                 }
                                 on:mousedown=move |ev: MouseEvent| {
                                     ev.stop_propagation();
                                     ev.prevent_default();
+                                    did_drag.set(false);
                                     let (nx, ny) = positions
                                         .with_untracked(|m| m.get(&id).copied().unwrap_or((0.0, 0.0)));
                                     // Convert viewport coords to SVG canvas coords.
@@ -384,15 +391,22 @@ pub fn GraphView() -> impl IntoView {
                             }
                         }
                         on:mousedown=move |ev: MouseEvent| {
-                            // Only start panning when clicking the canvas background.
-                            panning.set(true);
-                            last_mx.set(ev.client_x() as f64);
-                            last_my.set(ev.client_y() as f64);
+                            // Only start panning when no node drag is active.
+                            // Leptos event delegation delivers both the node's and the
+                            // SVG's mousedown handlers; the guard here ensures that a
+                            // click on a node (which sets drag_node first) never also
+                            // starts a pan.
+                            if drag_node.get_untracked().is_none() {
+                                panning.set(true);
+                                last_mx.set(ev.client_x() as f64);
+                                last_my.set(ev.client_y() as f64);
+                            }
                         }
                         on:mousemove=move |ev: MouseEvent| {
                             if let Some(nid) = drag_node.get_untracked() {
                                 // Dragging a node.
                                 ev.prevent_default();
+                                did_drag.set(true);
                                 let mx = (ev.client_x() as f64 - pan_x.get_untracked())
                                     / zoom.get_untracked();
                                 let my = (ev.client_y() as f64 - pan_y.get_untracked())
