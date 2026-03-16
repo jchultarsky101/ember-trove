@@ -109,11 +109,24 @@ ember-trove/
 - **SearchBar suppress on Search view**: When `current_view == View::Search`, return early in
   `trigger_search` to suppress the dropdown — but still call `search_query.set(...)` first so the
   `SearchView` `Effect` fires and auto-searches.
+- **Context signal type**: Carry full DTOs (e.g. `RwSignal<Option<Tag>>`) in context rather than
+  just IDs — avoids extra fetches and lets any child render name/colour without a lookup.
+- **move closure + String ownership**: In `map()` closures, clone String fields into named
+  variables *before* the `view!` macro (e.g. `let name = tag.name.clone(); let title = format!("…{name}");`).
+  The first use inside `view!` moves the String; a second use (e.g. in `title=`) will fail to compile.
+- **Clippy `too_many_arguments`**: Private helper fns with ≥8 args trigger this. Annotate with
+  `#[allow(clippy::too_many_arguments)]` when a params struct would be excessive.
 
 ## Browser Testing (mcp__Claude_in_Chrome)
 
 - **Checkbox clicks**: Coordinate-based clicks miss small checkboxes. Use `mcp__Claude_in_Chrome__find`
   to locate by description, then `left_click` via the returned `ref`.
+- **`<select>` dropdowns**: Coordinate clicks don't open native selects. Use
+  `mcp__Claude_in_Chrome__find` to get the `ref`, then `mcp__Claude_in_Chrome__form_input` with
+  the option's value string to select an option reliably.
+- **API signature grep before changing**: When adding a parameter to a shared API function
+  (e.g. `search_nodes()`), grep all UI source files for the old call-site count before committing —
+  missed callers cause a compile failure on the next check.
 
 ## Implementation Phases
 
