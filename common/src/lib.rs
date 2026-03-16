@@ -2,6 +2,7 @@ pub mod attachment;
 pub mod auth;
 pub mod edge;
 pub mod error;
+pub mod graph;
 pub mod id;
 pub mod node;
 pub mod permission;
