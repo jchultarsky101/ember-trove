@@ -461,13 +461,17 @@ pub async fn save_position(node_id: uuid::Uuid, x: f64, y: f64) -> Result<(), Ui
 
 // ── Search ──────────────────────────────────────────────────────────────
 
-/// Search nodes. `status` is an optional filter (e.g. `Some("published")`).
-/// `tag_id` is an optional UUID to restrict results to nodes carrying that tag.
+/// Search nodes.
+///
+/// - `status`: optional filter (`Some("published")` etc.)
+/// - `tag_ids`: zero or more tag UUIDs to filter by
+/// - `tag_op`: `"or"` (default) or `"and"` — how to combine multiple tags
 pub async fn search_nodes(
     q: &str,
     fuzzy: bool,
     status: Option<&str>,
-    tag_id: Option<uuid::Uuid>,
+    tag_ids: &[uuid::Uuid],
+    tag_op: &str,
     page: u32,
     per_page: u32,
 ) -> Result<SearchResponse, UiError> {
@@ -479,8 +483,13 @@ pub async fn search_nodes(
     if let Some(s) = status {
         url.push_str(&format!("&status={}", js_sys::encode_uri_component(s)));
     }
-    if let Some(tid) = tag_id {
-        url.push_str(&format!("&tag_id={tid}"));
+    if !tag_ids.is_empty() {
+        let ids_str = tag_ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        url.push_str(&format!("&tag_ids={ids_str}&tag_op={tag_op}"));
     }
     let resp = Request::get(&url)
         .send()

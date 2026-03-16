@@ -5,22 +5,26 @@ use crate::app::View;
 
 /// Full-page search results view.
 ///
-/// The query comes from the shared `search_query` context signal written by the
-/// sidebar `SearchBar` — there is no duplicate input here. Results auto-update
-/// whenever the sidebar query changes. The Fuzzy and Published checkboxes let
-/// the user refine results without re-typing the query.
+/// Tag filtering is managed locally: `tag_filters` holds zero or more `Tag`
+/// values; `tag_op_and` toggles between OR (default) and AND semantics.
+/// The AND/OR toggle only appears once two or more tags are selected.
 ///
-/// A tag picker lets the user restrict results to a single tag. The selection
-/// is stored in the global `tag_filter` context so it is shared with NodeList.
+/// The query comes from the shared `search_query` context written by the
+/// sidebar `SearchBar`.
 #[component]
 pub fn SearchView() -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
-    // Shared with SearchBar — sidebar is the single query input.
     let search_query =
         use_context::<RwSignal<String>>().expect("search_query signal must be provided");
-    // Shared with NodeList — global active tag filter.
-    let tag_filter =
+    // Initialise from global single-tag context (set by NodeList chip clicks),
+    // then manage locally — no reactive subscription to the global signal.
+    let global_tag_filter =
         use_context::<RwSignal<Option<Tag>>>().expect("tag_filter signal must be provided");
+    let init_tags: Vec<Tag> = global_tag_filter.get_untracked().into_iter().collect();
+
+    let tag_filters: RwSignal<Vec<Tag>> = RwSignal::new(init_tags);
+    // false = OR (default), true = AND
+    let tag_op_and = RwSignal::new(false);
 
     let fuzzy = RwSignal::new(false);
     let published_only = RwSignal::new(false);
@@ -28,12 +32,9 @@ pub fn SearchView() -> impl IntoView {
     let error_msg = RwSignal::new(Option::<String>::None);
     let results: RwSignal<Option<SearchResponse>> = RwSignal::new(None);
     let loading = RwSignal::new(false);
-    // Monotonic counter: each new call increments this; async tasks check it
-    // before writing results so stale responses from earlier keystrokes are
-    // discarded (prevents race conditions when the user types quickly).
     let search_version = RwSignal::new(0u32);
 
-    // Fetch all tags once so the picker can show names.
+    // Fetch all tags once for the picker.
     let all_tags: LocalResource<Vec<Tag>> = LocalResource::new(|| async {
         crate::api::fetch_tags().await.unwrap_or_default()
     });
@@ -48,18 +49,22 @@ pub fn SearchView() -> impl IntoView {
         } else {
             None
         };
-        let tag_id = tag_filter.get_untracked().map(|t| t.id.0);
+        let tag_ids: Vec<uuid::Uuid> = tag_filters
+            .get_untracked()
+            .iter()
+            .map(|t| t.id.0)
+            .collect();
+        let tag_op = if tag_op_and.get_untracked() { "and" } else { "or" };
         let current_page = page.get_untracked();
         search_version.update(|v| *v += 1);
         let version = search_version.get_untracked();
 
         wasm_bindgen_futures::spawn_local(async move {
-            // 300 ms debounce — discard if a newer call arrived during the wait.
             gloo_timers::future::TimeoutFuture::new(300).await;
             if search_version.get_untracked() != version {
                 return;
             }
-            match crate::api::search_nodes(&q, is_fuzzy, status, tag_id, current_page, 20).await {
+            match crate::api::search_nodes(&q, is_fuzzy, status, &tag_ids, tag_op, current_page, 20).await {
                 Ok(resp) => {
                     if search_version.get_untracked() == version {
                         results.set(Some(resp));
@@ -77,12 +82,13 @@ pub fn SearchView() -> impl IntoView {
         });
     };
 
-    // Auto-search when query, options, or tag filter changes.
+    // Auto-search when query, options, or tag filters change.
     Effect::new(move |_| {
-        let _q = search_query.get(); // subscribe
+        let _q = search_query.get();
         let _f = fuzzy.get();
         let _p = published_only.get();
-        let _t = tag_filter.get(); // subscribe to tag changes
+        let _t = tag_filters.get();
+        let _o = tag_op_and.get();
         page.set(1);
         do_search();
     });
@@ -94,76 +100,102 @@ pub fn SearchView() -> impl IntoView {
 
     view! {
         <div class="flex flex-col h-full">
-            // Compact filter bar — no duplicate search input
-            <div class="flex items-center gap-3 px-6 py-3 border-b border-gray-200 dark:border-gray-800
+            // Filter bar
+            <div class="flex items-center gap-2 px-6 py-3 border-b border-gray-200 dark:border-gray-800
                 bg-white dark:bg-gray-900 flex-wrap">
                 <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100 shrink-0">"Search"</h1>
 
-                // Tag picker — shows all tags; selecting one sets the global tag_filter
-                <div class="flex items-center gap-1.5">
-                    <Suspense fallback=|| ()>
-                        {move || all_tags.get().map(|tags| {
-                            let active_id = tag_filter.get().map(|t| t.id);
-                            view! {
-                                // Active tag chip with × to clear
-                                {active_id.map(|_| {
-                                    let tag = tag_filter.get().unwrap();
-                                    let name = tag.name.clone();
-                                    let color = tag.color.clone();
-                                    view! {
-                                        <button
-                                            class="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full
-                                                text-white hover:opacity-80 transition-opacity shrink-0"
-                                            style=format!("background-color: {color}")
-                                            on:click=move |_| tag_filter.set(None)
-                                            title="Clear tag filter"
-                                        >
-                                            {name}
-                                            " \u{00d7}"
-                                        </button>
-                                    }
-                                })}
+                // AND/OR toggle — only when 2+ tags selected
+                {move || {
+                    if tag_filters.get().len() >= 2 {
+                        let label = if tag_op_and.get() { "AND" } else { "OR" };
+                        Some(view! {
+                            <button
+                                class="px-2 py-0.5 text-xs font-semibold rounded border
+                                    border-blue-400 text-blue-500 dark:text-blue-400
+                                    hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shrink-0"
+                                title="Toggle AND / OR between tags"
+                                on:click=move |_| tag_op_and.update(|v| *v = !*v)
+                            >
+                                {label}
+                            </button>
+                        })
+                    } else {
+                        None
+                    }
+                }}
 
-                                // Dropdown to pick a tag
-                                <select
-                                    class="text-xs rounded-md border border-gray-300 dark:border-gray-600
-                                        bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300
-                                        px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                    on:change=move |ev| {
-                                        let val = event_target_value(&ev);
-                                        if val.is_empty() {
-                                            tag_filter.set(None);
-                                        } else if let Ok(uuid) = val.parse::<uuid::Uuid>() {
-                                            let found = all_tags.get()
-                                                .and_then(|ts| ts.into_iter().find(|t| t.id.0 == uuid));
-                                            tag_filter.set(found);
-                                        }
+                // Active tag chips
+                <Suspense fallback=|| ()>
+                    {move || all_tags.get().map(|_tags| {
+                        let chips = tag_filters.get();
+                        chips.into_iter().map(|tag| {
+                            let name = tag.name.clone();
+                            let color = tag.color.clone();
+                            let tag_id = tag.id;
+                            view! {
+                                <button
+                                    class="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full
+                                        text-white hover:opacity-80 transition-opacity shrink-0"
+                                    style=format!("background-color: {color}")
+                                    on:click=move |_| {
+                                        tag_filters.update(|v| v.retain(|t| t.id != tag_id));
                                     }
-                                    // Controlled: value tracks the active tag_filter
-                                    prop:value=move || {
-                                        tag_filter.get()
-                                            .map(|t| t.id.0.to_string())
-                                            .unwrap_or_default()
-                                    }
+                                    title="Remove tag filter"
                                 >
-                                    <option value="">"All tags"</option>
-                                    {tags.into_iter().map(|tag| {
-                                        let id_str = tag.id.0.to_string();
-                                        let is_selected = active_id.map(|a| a == tag.id).unwrap_or(false);
-                                        view! {
-                                            <option
-                                                value=id_str
-                                                prop:selected=is_selected
-                                            >
-                                                {tag.name}
-                                            </option>
-                                        }
-                                    }).collect::<Vec<_>>()}
-                                </select>
+                                    {name}
+                                    " \u{00d7}"
+                                </button>
                             }
-                        })}
-                    </Suspense>
-                </div>
+                        }).collect::<Vec<_>>()
+                    })}
+                </Suspense>
+
+                // Tag picker dropdown — shows only tags not yet selected
+                <Suspense fallback=|| ()>
+                    {move || all_tags.get().map(|tags| {
+                        let active_ids: Vec<_> = tag_filters.get().iter().map(|t| t.id).collect();
+                        let available: Vec<Tag> = tags
+                            .into_iter()
+                            .filter(|t| !active_ids.contains(&t.id))
+                            .collect();
+
+                        view! {
+                            <select
+                                class="text-xs rounded-md border border-gray-300 dark:border-gray-600
+                                    bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300
+                                    px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                on:change=move |ev| {
+                                    let val = event_target_value(&ev);
+                                    if !val.is_empty()
+                                        && let Ok(uid) = val.parse::<uuid::Uuid>()
+                                    {
+                                        // Find the Tag from the full list via another read.
+                                        let found = all_tags.get()
+                                            .and_then(|ts| ts.into_iter().find(|t| t.id.0 == uid));
+                                        if let Some(tag) = found {
+                                            tag_filters.update(|v| {
+                                                if !v.iter().any(|t| t.id == tag.id) {
+                                                    v.push(tag);
+                                                }
+                                            });
+                                        }
+                                    }
+                                }
+                                // Always reset to placeholder after selection
+                                prop:value=""
+                            >
+                                <option value="">"+ Add tag filter"</option>
+                                {available.into_iter().map(|tag| {
+                                    let id_str = tag.id.0.to_string();
+                                    view! {
+                                        <option value=id_str>{tag.name}</option>
+                                    }
+                                }).collect::<Vec<_>>()}
+                            </select>
+                        }
+                    })}
+                </Suspense>
 
                 <div class="flex items-center gap-3 ml-auto">
                     {move || loading.get().then_some(view! {
@@ -221,7 +253,7 @@ pub fn SearchView() -> impl IntoView {
                                 view! {
                                     <div class="text-center py-12 text-gray-400 dark:text-gray-600">
                                         <span class="material-symbols-outlined text-4xl mb-2 block">"search_off"</span>
-                                        <p>"No results found. Try different keywords or enable fuzzy search."</p>
+                                        <p>"No results found. Try different keywords, tags, or enable fuzzy search."</p>
                                     </div>
                                 }.into_any()
                             } else {
@@ -279,7 +311,7 @@ pub fn SearchView() -> impl IntoView {
                     })
                 }}
 
-                // Empty state — only shown while loading on first render
+                // Loading state on first render
                 {move || {
                     if results.get().is_none() && loading.get() {
                         Some(view! {

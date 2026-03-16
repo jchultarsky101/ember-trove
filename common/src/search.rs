@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::id::{NodeId, TagId};
+use crate::id::NodeId;
 use crate::node::{NodeStatus, NodeType};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -11,8 +11,10 @@ pub struct SearchQuery {
     pub node_type: Option<NodeType>,
     /// When set, only nodes with this status are returned.
     pub status: Option<NodeStatus>,
-    /// When set, only nodes that carry this tag are returned.
-    pub tag_id: Option<TagId>,
+    /// Comma-separated tag UUIDs. All listed tags are applied as a filter.
+    pub tag_ids: Option<String>,
+    /// How to combine multiple tags: `"or"` (default) or `"and"`.
+    pub tag_op: Option<String>,
     pub page: Option<u32>,
     pub per_page: Option<u32>,
 }
