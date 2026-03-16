@@ -1,4 +1,4 @@
-use common::id::{NodeId, TagId};
+use common::{id::NodeId, tag::Tag};
 use leptos::prelude::*;
 
 use crate::{
@@ -81,8 +81,8 @@ pub fn App() -> impl IntoView {
     let refresh = RwSignal::new(0u32);
     provide_context(refresh);
 
-    // Tag filter — set to Some(tag_id) to filter NodeList by tag.
-    let tag_filter: RwSignal<Option<TagId>> = RwSignal::new(None);
+    // Tag filter — set to Some(tag) to filter NodeList/SearchView by that tag.
+    let tag_filter: RwSignal<Option<Tag>> = RwSignal::new(None);
     provide_context(tag_filter);
 
     // Shared search query — written by SearchBar, read by SearchView.
