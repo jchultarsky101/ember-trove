@@ -4,6 +4,13 @@
 /// then overlays saved positions from the API.  Nodes are draggable; positions
 /// are persisted to the DB on mouse-up.  The canvas supports pan (drag on
 /// background) and zoom (wheel).
+///
+/// SVG presentation attributes (stroke-width, fill-opacity, etc.) are set via
+/// the `style` attribute because Leptos 0.8 writes `attr:` prefixes literally
+/// into the DOM for SVG elements rather than calling `setAttribute`.
+///
+/// Arrowhead `<marker>` elements are injected imperatively via `web_sys` after
+/// first render, since `<marker>` is not a known Leptos element.
 use std::collections::HashMap;
 
 use leptos::prelude::*;
@@ -11,7 +18,11 @@ use uuid::Uuid;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{MouseEvent, WheelEvent};
 
-use common::{edge::Edge, id::NodeId, node::Node};
+use common::{
+    edge::{Edge, EdgeType},
+    id::NodeId,
+    node::Node,
+};
 
 use crate::{
     api::{fetch_all_edges, fetch_nodes, fetch_positions, save_position},
@@ -22,6 +33,95 @@ use crate::{
 const W: f64 = 1000.0;
 const H: f64 = 700.0;
 const MARGIN: f64 = 80.0;
+const NODE_R: f64 = 28.0;
+/// Arrow tip lands NODE_R + 4 px from the target centre.
+const ARROW_OFFSET: f64 = NODE_R + 4.0;
+
+// ── Edge-type helpers ──────────────────────────────────────────────────────
+
+fn edge_color(et: &EdgeType) -> &'static str {
+    match et {
+        EdgeType::References  => "#3b82f6",
+        EdgeType::Contains    => "#22c55e",
+        EdgeType::RelatedTo   => "#a855f7",
+        EdgeType::DependsOn   => "#f97316",
+        EdgeType::DerivedFrom => "#ec4899",
+    }
+}
+
+fn edge_label(et: &EdgeType) -> &'static str {
+    match et {
+        EdgeType::References  => "references",
+        EdgeType::Contains    => "contains",
+        EdgeType::RelatedTo   => "related to",
+        EdgeType::DependsOn   => "depends on",
+        EdgeType::DerivedFrom => "derived from",
+    }
+}
+
+fn edge_marker_id(et: &EdgeType) -> &'static str {
+    match et {
+        EdgeType::References  => "arrow-references",
+        EdgeType::Contains    => "arrow-contains",
+        EdgeType::RelatedTo   => "arrow-related-to",
+        EdgeType::DependsOn   => "arrow-depends-on",
+        EdgeType::DerivedFrom => "arrow-derived-from",
+    }
+}
+
+// ── SVG marker injection ───────────────────────────────────────────────────
+
+/// Inject arrowhead `<marker>` elements into the graph SVG's `<defs>`.
+///
+/// Leptos 0.8 writes `attr:foo` prefixes literally into the DOM (via
+/// `setAttribute("attr:foo", val)`) for SVG elements it does not recognise
+/// (such as `<marker>`).  Creating them with `web_sys` and the correct SVG
+/// namespace avoids this issue.
+fn inject_svg_markers() {
+    let Some(win) = web_sys::window() else { return };
+    let Some(doc) = win.document() else { return };
+    let Some(svg) = doc.get_element_by_id("graph-svg") else { return };
+    // Guard: don't double-inject.
+    if svg.query_selector("marker").ok().flatten().is_some() {
+        return;
+    }
+
+    let ns = "http://www.w3.org/2000/svg";
+    let Ok(defs) = doc.create_element_ns(Some(ns), "defs") else { return };
+
+    const ARROWS: &[(&str, &str)] = &[
+        ("arrow-references",  "#3b82f6"),
+        ("arrow-contains",    "#22c55e"),
+        ("arrow-related-to",  "#a855f7"),
+        ("arrow-depends-on",  "#f97316"),
+        ("arrow-derived-from","#ec4899"),
+    ];
+
+    for (id, color) in ARROWS {
+        let Ok(marker) = doc.create_element_ns(Some(ns), "marker") else { continue };
+        let _ = marker.set_attribute("id", id);
+        let _ = marker.set_attribute("markerWidth", "8");
+        let _ = marker.set_attribute("markerHeight", "6");
+        let _ = marker.set_attribute("refX", "6");
+        let _ = marker.set_attribute("refY", "3");
+        let _ = marker.set_attribute("orient", "auto");
+
+        let Ok(path) = doc.create_element_ns(Some(ns), "path") else { continue };
+        let _ = path.set_attribute("d", "M 0 0 L 6 3 L 0 6 Z");
+        let _ = path.set_attribute("fill", color);
+        let _ = marker.append_child(&path);
+        let _ = defs.append_child(&marker);
+    }
+
+    // Insert as first child so markers precede all drawing elements.
+    if let Some(first) = svg.first_child() {
+        let _ = svg.insert_before(&defs, Some(&first));
+    } else {
+        let _ = svg.append_child(&defs);
+    }
+}
+
+// ── Layout ─────────────────────────────────────────────────────────────────
 
 /// Fruchterman-Reingold spring layout (200 iterations, O(n²) repulsion).
 fn force_layout(node_ids: &[Uuid], edge_pairs: &[(Uuid, Uuid)]) -> HashMap<Uuid, (f64, f64)> {
@@ -51,7 +151,6 @@ fn force_layout(node_ids: &[Uuid], edge_pairs: &[(Uuid, Uuid)]) -> HashMap<Uuid,
         let mut disp_x = vec![0.0_f64; n];
         let mut disp_y = vec![0.0_f64; n];
 
-        // Repulsion (symmetric, O(n²/2))
         for i in 0..n {
             for j in (i + 1)..n {
                 let ddx = px[i] - px[j];
@@ -67,7 +166,6 @@ fn force_layout(node_ids: &[Uuid], edge_pairs: &[(Uuid, Uuid)]) -> HashMap<Uuid,
             }
         }
 
-        // Attraction along edges
         for (src, tgt) in edge_pairs {
             let si = node_ids.iter().position(|id| id == src);
             let ti = node_ids.iter().position(|id| id == tgt);
@@ -85,7 +183,6 @@ fn force_layout(node_ids: &[Uuid], edge_pairs: &[(Uuid, Uuid)]) -> HashMap<Uuid,
             }
         }
 
-        // Apply displacement with cooling temperature
         let temp = 200.0_f64 * (1.0 - iter as f64 / 200.0).max(0.01);
         for i in 0..n {
             let mag = (disp_x[i] * disp_x[i] + disp_y[i] * disp_y[i])
@@ -104,6 +201,8 @@ fn force_layout(node_ids: &[Uuid], edge_pairs: &[(Uuid, Uuid)]) -> HashMap<Uuid,
         .collect()
 }
 
+// ── Component ──────────────────────────────────────────────────────────────
+
 #[component]
 pub fn GraphView() -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
@@ -112,7 +211,6 @@ pub fn GraphView() -> impl IntoView {
     let error_msg = RwSignal::new(Option::<String>::None);
     let nodes_sig: RwSignal<Vec<Node>> = RwSignal::new(vec![]);
     let edges_sig: RwSignal<Vec<Edge>> = RwSignal::new(vec![]);
-    // Reactive positions map — updated live during drag so edges follow.
     let positions: RwSignal<HashMap<Uuid, (f64, f64)>> = RwSignal::new(HashMap::new());
 
     // Pan/zoom state
@@ -125,13 +223,9 @@ pub fn GraphView() -> impl IntoView {
 
     // Drag state
     let drag_node: RwSignal<Option<Uuid>> = RwSignal::new(None);
-    // Offset = (mouse_svg_x - node_x) at drag-start, so the grab point stays fixed.
     let drag_offset: RwSignal<(f64, f64)> = RwSignal::new((0.0, 0.0));
-    // Set to true as soon as mousemove fires during a node drag; cleared on mousedown.
-    // Used to suppress the click event that fires after mouseup when the user dragged.
     let did_drag = RwSignal::new(false);
 
-    // Fetch nodes + edges once on mount, run FR layout, then override with saved positions.
     Effect::new(move |_| {
         spawn_local(async move {
             match fetch_nodes().await {
@@ -145,10 +239,8 @@ pub fn GraphView() -> impl IntoView {
                     let edge_pairs: Vec<(Uuid, Uuid)> =
                         edges.iter().map(|e| (e.source_id.0, e.target_id.0)).collect();
 
-                    // 1. Run FR layout as the baseline.
                     let mut layout = force_layout(&node_ids, &edge_pairs);
 
-                    // 2. Override with any saved positions from the API.
                     if let Ok(saved) = fetch_positions().await {
                         for pos in saved {
                             layout.insert(pos.node_id.0, (pos.x, pos.y));
@@ -159,6 +251,13 @@ pub fn GraphView() -> impl IntoView {
                     nodes_sig.set(nodes);
                     edges_sig.set(edges);
                     loading.set(false);
+
+                    // Defer marker injection to the next tick so Leptos has
+                    // finished rendering the SVG element into the DOM.
+                    spawn_local(async {
+                        gloo_timers::future::TimeoutFuture::new(50).await;
+                        inject_svg_markers();
+                    });
                 }
             }
         });
@@ -170,7 +269,7 @@ pub fn GraphView() -> impl IntoView {
                 if loading.get() {
                     return view! {
                         <div class="flex items-center justify-center h-full text-gray-400 dark:text-gray-600">
-                            <span class="text-sm">"Loading graph…"</span>
+                            <span class="text-sm">"Loading graph\u{2026}"</span>
                         </div>
                     }
                     .into_any();
@@ -196,18 +295,95 @@ pub fn GraphView() -> impl IntoView {
                 }
                 let edges = edges_sig.get();
 
-                // Build node SVG elements — each with its own drag handler.
-                // Node positions are read reactively inside each node's closure
-                // so only the moved node re-renders, not the whole list.
+                // ── Edge SVGs ───────────────────────────────────────────────
+                // Coloured by edge type, with directional arrowheads and a
+                // tooltip showing the type label (and custom label if present).
+                // SVG presentation attributes are set via `style` because
+                // Leptos 0.8 writes `attr:` prefixes literally for SVG elements.
+                let edge_svgs: Vec<_> = edges
+                    .iter()
+                    .map(|edge| {
+                        let src = edge.source_id.0;
+                        let tgt = edge.target_id.0;
+                        let color = edge_color(&edge.edge_type);
+                        let marker_id = edge_marker_id(&edge.edge_type);
+                        let type_str = edge_label(&edge.edge_type);
+                        let tooltip_text = match &edge.label {
+                            Some(l) => format!("{type_str}: {l}"),
+                            None => type_str.to_string(),
+                        };
+                        let mid_label = edge.label.clone()
+                            .unwrap_or_else(|| type_str.to_string());
+                        // Static styles — no reactive closure needed.
+                        let path_style = format!(
+                            "stroke: {color}; stroke-width: 1.5; stroke-opacity: 0.75; \
+                             fill: none; marker-end: url(#{marker_id});"
+                        );
+                        let label_style = format!(
+                            "font-size: 9px; font-style: italic; fill: {color}; \
+                             pointer-events: none; text-anchor: middle;"
+                        );
+
+                        // Shortened path: starts at source circle boundary, ends
+                        // just before target circle so the arrowhead is visible.
+                        let d = move || {
+                            let pos = positions.get();
+                            let (x1, y1) = pos.get(&src).copied().unwrap_or((0.0, 0.0));
+                            let (x2, y2) = pos.get(&tgt).copied().unwrap_or((0.0, 0.0));
+                            let dx = x2 - x1;
+                            let dy = y2 - y1;
+                            let len = (dx * dx + dy * dy).sqrt();
+                            if len < NODE_R + ARROW_OFFSET + 2.0 {
+                                return String::new();
+                            }
+                            let ux = dx / len;
+                            let uy = dy / len;
+                            format!(
+                                "M {:.1} {:.1} L {:.1} {:.1}",
+                                x1 + ux * NODE_R,
+                                y1 + uy * NODE_R,
+                                x2 - ux * ARROW_OFFSET,
+                                y2 - uy * ARROW_OFFSET,
+                            )
+                        };
+                        let mid_x = move || {
+                            let pos = positions.get();
+                            let x1 = pos.get(&src).map(|p| p.0).unwrap_or(0.0);
+                            let x2 = pos.get(&tgt).map(|p| p.0).unwrap_or(0.0);
+                            format!("{:.1}", (x1 + x2) / 2.0)
+                        };
+                        let mid_y = move || {
+                            let pos = positions.get();
+                            let y1 = pos.get(&src).map(|p| p.1).unwrap_or(0.0);
+                            let y2 = pos.get(&tgt).map(|p| p.1).unwrap_or(0.0);
+                            format!("{:.1}", (y1 + y2) / 2.0 - 5.0)
+                        };
+
+                        view! {
+                            <g>
+                                <title>{tooltip_text}</title>
+                                <path d=d style=path_style />
+                                <text x=mid_x y=mid_y style=label_style>
+                                    {mid_label}
+                                </text>
+                            </g>
+                        }
+                        .into_any()
+                    })
+                    .collect();
+
+                // ── Node SVGs ───────────────────────────────────────────────
+                // White-halo text (paint-order: stroke fill) via `style` for
+                // contrast against edges; font-size reduced to 10 px.
                 let node_svgs: Vec<_> = nodes
                     .iter()
                     .map(|node| {
                         let id = node.id.0;
                         let node_id: NodeId = node.id;
                         let title = node.title.clone();
-                        let display: String = if title.chars().count() > 14 {
-                            let s: String = title.chars().take(14).collect();
-                            format!("{s}…")
+                        let display: String = if title.chars().count() > 16 {
+                            let s: String = title.chars().take(16).collect();
+                            format!("{s}\u{2026}")
                         } else {
                             title
                         };
@@ -216,7 +392,6 @@ pub fn GraphView() -> impl IntoView {
                             <g
                                 style="cursor: grab;"
                                 on:click=move |ev: MouseEvent| {
-                                    // Suppress click if the mousedown→mouseup was a drag.
                                     if did_drag.get_untracked() {
                                         did_drag.set(false);
                                         ev.stop_propagation();
@@ -231,7 +406,6 @@ pub fn GraphView() -> impl IntoView {
                                     did_drag.set(false);
                                     let (nx, ny) = positions
                                         .with_untracked(|m| m.get(&id).copied().unwrap_or((0.0, 0.0)));
-                                    // Convert viewport coords to SVG canvas coords.
                                     let mx = (ev.client_x() as f64 - pan_x.get_untracked())
                                         / zoom.get_untracked();
                                     let my = (ev.client_y() as f64 - pan_y.get_untracked())
@@ -241,57 +415,17 @@ pub fn GraphView() -> impl IntoView {
                                 }
                             >
                                 <circle
-                                    cx=move || {
-                                        format!(
-                                            "{:.1}",
-                                            positions
-                                                .get()
-                                                .get(&id)
-                                                .map(|p| p.0)
-                                                .unwrap_or(W / 2.0),
-                                        )
-                                    }
-                                    cy=move || {
-                                        format!(
-                                            "{:.1}",
-                                            positions
-                                                .get()
-                                                .get(&id)
-                                                .map(|p| p.1)
-                                                .unwrap_or(H / 2.0),
-                                        )
-                                    }
+                                    cx=move || format!("{:.1}", positions.get().get(&id).map(|p| p.0).unwrap_or(W / 2.0))
+                                    cy=move || format!("{:.1}", positions.get().get(&id).map(|p| p.1).unwrap_or(H / 2.0))
                                     r="28"
-                                    fill="#f59e0b"
-                                    attr:fill-opacity="0.15"
-                                    stroke="#f59e0b"
-                                    attr:stroke-width="2"
+                                    style="fill: #f59e0b; fill-opacity: 0.15; stroke: #f59e0b; stroke-width: 2px;"
                                 />
                                 <text
-                                    x=move || {
-                                        format!(
-                                            "{:.1}",
-                                            positions
-                                                .get()
-                                                .get(&id)
-                                                .map(|p| p.0)
-                                                .unwrap_or(W / 2.0),
-                                        )
-                                    }
-                                    y=move || {
-                                        format!(
-                                            "{:.1}",
-                                            positions
-                                                .get()
-                                                .get(&id)
-                                                .map(|p| p.1 + 5.0)
-                                                .unwrap_or(H / 2.0 + 5.0),
-                                        )
-                                    }
-                                    attr:text-anchor="middle"
-                                    attr:font-size="11"
-                                    attr:font-weight="500"
-                                    fill="#374151"
+                                    x=move || format!("{:.1}", positions.get().get(&id).map(|p| p.0).unwrap_or(W / 2.0))
+                                    y=move || format!("{:.1}", positions.get().get(&id).map(|p| p.1 + 5.0).unwrap_or(H / 2.0 + 5.0))
+                                    style="text-anchor: middle; font-size: 10px; font-weight: 600; \
+                                           fill: #111827; stroke: white; stroke-width: 3px; \
+                                           paint-order: stroke fill; pointer-events: none;"
                                 >
                                     {display}
                                 </text>
@@ -301,101 +435,21 @@ pub fn GraphView() -> impl IntoView {
                     })
                     .collect();
 
-                // Build edge SVG elements — read positions reactively so edges
-                // follow dragged nodes in real time.
-                let edge_svgs: Vec<_> = edges
-                    .iter()
-                    .map(|edge| {
-                        let src = edge.source_id.0;
-                        let tgt = edge.target_id.0;
-                        let lbl = edge.label.clone();
-                        view! {
-                            <g>
-                                <line
-                                    x1=move || {
-                                        format!(
-                                            "{:.1}",
-                                            positions.get().get(&src).map(|p| p.0).unwrap_or(0.0),
-                                        )
-                                    }
-                                    y1=move || {
-                                        format!(
-                                            "{:.1}",
-                                            positions.get().get(&src).map(|p| p.1).unwrap_or(0.0),
-                                        )
-                                    }
-                                    x2=move || {
-                                        format!(
-                                            "{:.1}",
-                                            positions.get().get(&tgt).map(|p| p.0).unwrap_or(0.0),
-                                        )
-                                    }
-                                    y2=move || {
-                                        format!(
-                                            "{:.1}",
-                                            positions.get().get(&tgt).map(|p| p.1).unwrap_or(0.0),
-                                        )
-                                    }
-                                    stroke="#94a3b8"
-                                    attr:stroke-width="1.5"
-                                    attr:stroke-opacity="0.6"
-                                />
-                                {lbl.map(|l| {
-                                    view! {
-                                        <text
-                                            x=move || {
-                                                format!(
-                                                    "{:.1}",
-                                                    {
-                                                        let pos = positions.get();
-                                                        let x1 = pos.get(&src).map(|p| p.0).unwrap_or(0.0);
-                                                        let x2 = pos.get(&tgt).map(|p| p.0).unwrap_or(0.0);
-                                                        (x1 + x2) / 2.0
-                                                    },
-                                                )
-                                            }
-                                            y=move || {
-                                                format!(
-                                                    "{:.1}",
-                                                    {
-                                                        let pos = positions.get();
-                                                        let y1 = pos.get(&src).map(|p| p.1).unwrap_or(0.0);
-                                                        let y2 = pos.get(&tgt).map(|p| p.1).unwrap_or(0.0);
-                                                        (y1 + y2) / 2.0
-                                                    },
-                                                )
-                                            }
-                                            attr:text-anchor="middle"
-                                            attr:font-size="10"
-                                            fill="#94a3b8"
-                                            dy="-4"
-                                        >
-                                            {l}
-                                        </text>
-                                    }
-                                })}
-                            </g>
-                        }
-                        .into_any()
-                    })
-                    .collect();
+                // Cursor style for the SVG.
+                let svg_cursor = move || {
+                    if drag_node.get().is_some() || panning.get() {
+                        "cursor: grabbing;"
+                    } else {
+                        "cursor: default;"
+                    }
+                };
 
                 view! {
                     <svg
+                        id="graph-svg"
                         class="w-full h-full"
-                        style=move || {
-                            if drag_node.get().is_some() || panning.get() {
-                                "cursor: grabbing;"
-                            } else {
-                                "cursor: default;"
-                            }
-                        }
+                        style=svg_cursor
                         on:mousedown=move |ev: MouseEvent| {
-                            // Only start panning when no node drag is active.
-                            // Leptos event delegation delivers both the node's and the
-                            // SVG's mousedown handlers; the guard here ensures that a
-                            // click on a node (which sets drag_node first) never also
-                            // starts a pan.
                             if drag_node.get_untracked().is_none() {
                                 panning.set(true);
                                 last_mx.set(ev.client_x() as f64);
@@ -404,7 +458,6 @@ pub fn GraphView() -> impl IntoView {
                         }
                         on:mousemove=move |ev: MouseEvent| {
                             if let Some(nid) = drag_node.get_untracked() {
-                                // Dragging a node.
                                 ev.prevent_default();
                                 did_drag.set(true);
                                 let mx = (ev.client_x() as f64 - pan_x.get_untracked())
@@ -414,11 +467,8 @@ pub fn GraphView() -> impl IntoView {
                                 let (ox, oy) = drag_offset.get_untracked();
                                 let new_x = (mx - ox).clamp(MARGIN, W - MARGIN);
                                 let new_y = (my - oy).clamp(MARGIN, H - MARGIN);
-                                positions.update(|map| {
-                                    map.insert(nid, (new_x, new_y));
-                                });
+                                positions.update(|map| { map.insert(nid, (new_x, new_y)); });
                             } else if panning.get_untracked() {
-                                // Panning the canvas.
                                 let mx = ev.client_x() as f64;
                                 let my = ev.client_y() as f64;
                                 pan_x.update(|p| *p += mx - last_mx.get_untracked());
@@ -431,21 +481,16 @@ pub fn GraphView() -> impl IntoView {
                             if let Some(nid) = drag_node.get_untracked() {
                                 let (x, y) = positions
                                     .with_untracked(|m| m.get(&nid).copied().unwrap_or((0.0, 0.0)));
-                                spawn_local(async move {
-                                    let _ = save_position(nid, x, y).await;
-                                });
+                                spawn_local(async move { let _ = save_position(nid, x, y).await; });
                                 drag_node.set(None);
                             }
                             panning.set(false);
                         }
                         on:mouseleave=move |_: MouseEvent| {
-                            // Cancel drag/pan when cursor leaves SVG.
                             if let Some(nid) = drag_node.get_untracked() {
                                 let (x, y) = positions
                                     .with_untracked(|m| m.get(&nid).copied().unwrap_or((0.0, 0.0)));
-                                spawn_local(async move {
-                                    let _ = save_position(nid, x, y).await;
-                                });
+                                spawn_local(async move { let _ = save_position(nid, x, y).await; });
                                 drag_node.set(None);
                             }
                             panning.set(false);
@@ -456,14 +501,10 @@ pub fn GraphView() -> impl IntoView {
                             zoom.update(|z| *z = (*z * factor).clamp(0.1, 8.0));
                         }
                     >
-                        <g transform=move || {
-                            format!(
-                                "translate({:.1},{:.1}) scale({:.3})",
-                                pan_x.get(),
-                                pan_y.get(),
-                                zoom.get(),
-                            )
-                        }>
+                        <g transform=move || format!(
+                            "translate({:.1},{:.1}) scale({:.3})",
+                            pan_x.get(), pan_y.get(), zoom.get(),
+                        )>
                             {edge_svgs}
                             {node_svgs}
                         </g>
