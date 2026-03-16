@@ -55,7 +55,21 @@ pub async fn fetch_me() -> Result<UserInfo, UiError> {
         .send()
         .await
         .map_err(|e| UiError::Network(e.to_string()))?;
-    parse_json(resp).await
+    // Do NOT use parse_json here — parse_json retries via refresh+reload on
+    // 401, which would loop infinitely because fetch_me IS the auth check.
+    // A plain 401 here just means "not logged in"; AuthGate handles the redirect.
+    if resp.ok() {
+        resp.json::<UserInfo>()
+            .await
+            .map_err(|e| UiError::Parse(e.to_string()))
+    } else {
+        let status = resp.status();
+        let text = resp
+            .text()
+            .await
+            .unwrap_or_else(|_| "unknown error".to_string());
+        Err(UiError::api(status, text))
+    }
 }
 
 #[derive(Deserialize)]
