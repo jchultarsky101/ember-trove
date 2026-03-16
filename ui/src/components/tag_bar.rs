@@ -1,5 +1,5 @@
-use common::id::{NodeId, TagId};
-use common::tag::CreateTagRequest;
+use common::id::NodeId;
+use common::tag::{CreateTagRequest, Tag};
 use leptos::prelude::*;
 
 use crate::app::View;
@@ -12,7 +12,7 @@ use crate::app::View;
 pub fn TagBar(node_id: NodeId) -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
     let tag_filter =
-        use_context::<RwSignal<Option<TagId>>>().unwrap_or_else(|| RwSignal::new(None));
+        use_context::<RwSignal<Option<Tag>>>().unwrap_or_else(|| RwSignal::new(None));
     let refresh_tags = RwSignal::new(0u32);
     let input_value = RwSignal::new(String::new());
     let show_input = RwSignal::new(false);
@@ -88,6 +88,7 @@ pub fn TagBar(node_id: NodeId) -> impl IntoView {
                             Ok(tags) => {
                                 view! {
                                     {tags.into_iter().map(|tag| {
+                                        let tag_for_filter = tag.clone();
                                         let tag_id = tag.id;
                                         let color = tag.color.clone();
                                         view! {
@@ -100,7 +101,7 @@ pub fn TagBar(node_id: NodeId) -> impl IntoView {
                                                     class="hover:opacity-70 mr-0.5"
                                                     title="Filter nodes by this tag"
                                                     on:click=move |_| {
-                                                        tag_filter.set(Some(tag_id));
+                                                        tag_filter.set(Some(tag_for_filter.clone()));
                                                         current_view.set(View::NodeList);
                                                     }
                                                 >

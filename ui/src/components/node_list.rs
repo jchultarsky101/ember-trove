@@ -1,4 +1,4 @@
-use common::{id::TagId, node::Node};
+use common::{node::Node, tag::Tag};
 use leptos::prelude::*;
 
 use crate::app::View;
@@ -40,7 +40,7 @@ pub fn NodeList() -> impl IntoView {
     let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
     // tag_filter: provided by App; None = no filter
     let tag_filter =
-        use_context::<RwSignal<Option<TagId>>>().unwrap_or_else(|| RwSignal::new(None));
+        use_context::<RwSignal<Option<Tag>>>().unwrap_or_else(|| RwSignal::new(None));
 
     // None = "All", Some("draft") | Some("published") | Some("archived")
     let status_filter: RwSignal<Option<String>> = RwSignal::new(None);
@@ -50,7 +50,7 @@ pub fn NodeList() -> impl IntoView {
         let status = status_filter.get();
         let tag = tag_filter.get();
         async move {
-            crate::api::fetch_nodes_filtered(status.as_deref(), tag.map(|t| t.0)).await
+            crate::api::fetch_nodes_filtered(status.as_deref(), tag.map(|t| t.id.0)).await
         }
     });
 
@@ -59,18 +59,23 @@ pub fn NodeList() -> impl IntoView {
             <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
                 <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100">"Nodes"</h1>
                 <div class="flex items-center gap-2">
-                    // Active tag-filter badge with dismiss
-                    {move || tag_filter.get().map(|_| view! {
-                        <button
-                            class="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full
-                                bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300
-                                hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
-                            on:click=move |_| tag_filter.set(None)
-                            title="Clear tag filter"
-                        >
-                            <span class="material-symbols-outlined" style="font-size:12px;">"label"</span>
-                            "\u{00d7} tag"
-                        </button>
+                    // Active tag-filter badge: shows tag name + colour + × to clear
+                    {move || tag_filter.get().map(|tag| {
+                        let name = tag.name.clone();
+                        let color = tag.color.clone();
+                        view! {
+                            <button
+                                class="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full text-white
+                                    transition-colors hover:opacity-80"
+                                style=format!("background-color: {color}")
+                                on:click=move |_| tag_filter.set(None)
+                                title="Clear tag filter"
+                            >
+                                <span class="material-symbols-outlined" style="font-size:11px;">"label"</span>
+                                {name}
+                                " \u{00d7}"
+                            </button>
+                        }
                     })}
                     <button
                         class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
@@ -149,6 +154,10 @@ pub fn NodeList() -> impl IntoView {
 
 #[component]
 fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
+    // Access the global tag_filter so clicking a tag chip sets it.
+    let tag_filter =
+        use_context::<RwSignal<Option<Tag>>>().unwrap_or_else(|| RwSignal::new(None));
+
     view! {
         <ul class="divide-y divide-gray-200 dark:divide-gray-800">
             {nodes.into_iter().map(|node| {
@@ -180,10 +189,27 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
                                     <span class=format!("px-2 py-0.5 text-xs rounded-full {status_class}")>
                                         {status}
                                     </span>
-                                    {tags.into_iter().map(|tag| view! {
-                                        <span class="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
-                                            {tag.name}
-                                        </span>
+                                    // Clickable tag chips — click sets tag filter without
+                                    // navigating away (NodeList is already visible).
+                                    {tags.into_iter().map(|tag| {
+                                        let tag_for_filter = tag.clone();
+                                        let color = tag.color.clone();
+                                        let name = tag.name.clone();
+                                        let title = format!("Filter by tag: {name}");
+                                        view! {
+                                            <button
+                                                class="px-2 py-0.5 text-xs rounded-full text-white
+                                                    hover:opacity-80 transition-opacity"
+                                                style=format!("background-color: {color}")
+                                                title=title
+                                                on:click=move |ev| {
+                                                    ev.stop_propagation();
+                                                    tag_filter.set(Some(tag_for_filter.clone()));
+                                                }
+                                            >
+                                                {name}
+                                            </button>
+                                        }
                                     }).collect::<Vec<_>>()}
                                 </div>
                                 {node.body.as_deref().and_then(body_preview).map(|preview| view! {

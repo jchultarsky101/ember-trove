@@ -68,12 +68,13 @@ impl SearchRepo for PgSearchRepo {
         let per_page = query.per_page.unwrap_or(20).min(100);
         let offset = (page - 1) * per_page;
         let fuzzy = query.fuzzy.unwrap_or(false);
+        let tag_id = query.tag_id.map(|t| t.0);
 
         if fuzzy {
-            self.fuzzy_search(q, &query.node_type, &query.status, page, per_page, offset)
+            self.fuzzy_search(q, &query.node_type, &query.status, tag_id, page, per_page, offset)
                 .await
         } else {
-            self.fulltext_search(q, &query.node_type, &query.status, page, per_page, offset)
+            self.fulltext_search(q, &query.node_type, &query.status, tag_id, page, per_page, offset)
                 .await
         }
     }
@@ -82,11 +83,13 @@ impl SearchRepo for PgSearchRepo {
 impl PgSearchRepo {
     /// PostgreSQL full-text search using `search_vec` tsvector column with
     /// `websearch_to_tsquery` for natural-language queries.
+    #[allow(clippy::too_many_arguments)]
     async fn fulltext_search(
         &self,
         q: &str,
         node_type: &Option<common::node::NodeType>,
         status: &Option<common::node::NodeStatus>,
+        tag_id: Option<Uuid>,
         page: u32,
         per_page: u32,
         offset: u32,
@@ -102,11 +105,15 @@ impl PgSearchRepo {
             WHERE search_vec @@ websearch_to_tsquery('english', $1)
               AND ($2::text IS NULL OR node_type = $2::node_type)
               AND ($3::text IS NULL OR status = $3::node_status)
+              AND ($4::uuid IS NULL OR id IN (
+                  SELECT node_id FROM node_tags WHERE tag_id = $4
+              ))
             "#,
         )
         .bind(q)
         .bind(type_filter)
         .bind(status_filter)
+        .bind(tag_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("search count failed: {e}")))?;
@@ -129,13 +136,17 @@ impl PgSearchRepo {
             WHERE search_vec @@ websearch_to_tsquery('english', $1)
               AND ($2::text IS NULL OR node_type = $2::node_type)
               AND ($3::text IS NULL OR status = $3::node_status)
+              AND ($4::uuid IS NULL OR id IN (
+                  SELECT node_id FROM node_tags WHERE tag_id = $4
+              ))
             ORDER BY rank DESC, updated_at DESC
-            LIMIT $4 OFFSET $5
+            LIMIT $5 OFFSET $6
             "#,
         )
         .bind(q)
         .bind(type_filter)
         .bind(status_filter)
+        .bind(tag_id)
         .bind(per_page as i64)
         .bind(offset as i64)
         .fetch_all(&self.pool)
@@ -152,11 +163,13 @@ impl PgSearchRepo {
 
     /// Fuzzy trigram search using pg_trgm's `similarity()` function on the
     /// title column, falling back to `ILIKE` on the body.
+    #[allow(clippy::too_many_arguments)]
     async fn fuzzy_search(
         &self,
         q: &str,
         node_type: &Option<common::node::NodeType>,
         status: &Option<common::node::NodeStatus>,
+        tag_id: Option<Uuid>,
         page: u32,
         per_page: u32,
         offset: u32,
@@ -173,12 +186,16 @@ impl PgSearchRepo {
             WHERE (similarity(title, $1) > 0.1 OR body ILIKE $2)
               AND ($3::text IS NULL OR node_type = $3::node_type)
               AND ($4::text IS NULL OR status = $4::node_status)
+              AND ($5::uuid IS NULL OR id IN (
+                  SELECT node_id FROM node_tags WHERE tag_id = $5
+              ))
             "#,
         )
         .bind(q)
         .bind(&like_pattern)
         .bind(type_filter)
         .bind(status_filter)
+        .bind(tag_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("fuzzy count failed: {e}")))?;
@@ -200,14 +217,18 @@ impl PgSearchRepo {
             WHERE (similarity(title, $1) > 0.1 OR body ILIKE $2)
               AND ($3::text IS NULL OR node_type = $3::node_type)
               AND ($4::text IS NULL OR status = $4::node_status)
+              AND ($5::uuid IS NULL OR id IN (
+                  SELECT node_id FROM node_tags WHERE tag_id = $5
+              ))
             ORDER BY rank DESC, updated_at DESC
-            LIMIT $5 OFFSET $6
+            LIMIT $6 OFFSET $7
             "#,
         )
         .bind(q)
         .bind(&like_pattern)
         .bind(type_filter)
         .bind(status_filter)
+        .bind(tag_id)
         .bind(per_page as i64)
         .bind(offset as i64)
         .fetch_all(&self.pool)

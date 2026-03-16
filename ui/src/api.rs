@@ -418,10 +418,12 @@ pub async fn revoke_permission(
 // ── Search ──────────────────────────────────────────────────────────────
 
 /// Search nodes. `status` is an optional filter (e.g. `Some("published")`).
+/// `tag_id` is an optional UUID to restrict results to nodes carrying that tag.
 pub async fn search_nodes(
     q: &str,
     fuzzy: bool,
     status: Option<&str>,
+    tag_id: Option<uuid::Uuid>,
     page: u32,
     per_page: u32,
 ) -> Result<SearchResponse, UiError> {
@@ -432,6 +434,9 @@ pub async fn search_nodes(
     );
     if let Some(s) = status {
         url.push_str(&format!("&status={}", js_sys::encode_uri_component(s)));
+    }
+    if let Some(tid) = tag_id {
+        url.push_str(&format!("&tag_id={tid}"));
     }
     let resp = Request::get(&url)
         .send()
