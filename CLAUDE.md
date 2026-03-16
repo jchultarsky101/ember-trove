@@ -123,6 +123,16 @@ ember-trove/
 - **Unknown SVG elements (`<marker>`, `<defs>` content)**: Not in Leptos's element list. Create via
   `web_sys::Document::create_element_ns(Some("http://www.w3.org/2000/svg"), "marker")` and
   `set_attribute`. Inject after first render with `spawn_local(async { TimeoutFuture::new(50).await; inject(); })`.
+- **Event delegation: `stop_propagation()` ineffective between Leptos handlers**: All Leptos
+  handlers are registered at the document root. `ev.stop_propagation()` inside a child's handler
+  does NOT prevent a parent's co-registered Leptos handler from firing. **Fix:** use a signal
+  guard in the outer handler that is set by the inner handler (inner handlers fire first in
+  bubbling order). Example: SVG pan guard `if drag_node.get_untracked().is_none()`.
+- **Drag-vs-click disambiguation**: Use `RwSignal<bool> did_drag` — set `true` in `on:mousemove`
+  during drag, check+clear in `on:click` to suppress the post-mouseup click event.
+- **SVG marker re-injection guard**: In `spawn_local` marker injectors, check
+  `svg.query_selector("defs marker").is_ok_and(|m| m.is_none())` before inserting — reactive
+  signals can re-fire and duplicate markers if unguarded.
 
 ## Browser Testing (mcp__Claude_in_Chrome)
 
@@ -134,6 +144,16 @@ ember-trove/
 - **API signature grep before changing**: When adding a parameter to a shared API function
   (e.g. `search_nodes()`), grep all UI source files for the old call-site count before committing —
   missed callers cause a compile failure on the next check.
+
+## PostgreSQL / Axum Patterns
+
+- **`Query<T>` + `Vec<Uuid>`**: `axum::extract::Query` uses `serde_urlencoded` which cannot
+  deserialize repeated query params into `Vec<T>`. Use `Option<String>` (comma-separated UUIDs)
+  and parse server-side with a helper (`s.split(',').filter_map(|v| v.parse().ok()).collect()`).
+- **Static AND/OR tag SQL**: Avoid dynamic query building by using
+  `array_length($n::uuid[], 1) IS NULL` as a bypass guard (empty array → skip filter) combined
+  with `HAVING (NOT $and_mode) OR COUNT(DISTINCT tag_id) = array_length($n::uuid[], 1)` to
+  switch AND/OR logic — all in a single static parameterised query.
 
 ## Implementation Phases
 
