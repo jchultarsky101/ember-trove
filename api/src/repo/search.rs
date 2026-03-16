@@ -55,20 +55,27 @@ struct CountRow {
 impl SearchRepo for PgSearchRepo {
     async fn search(&self, query: &SearchQuery) -> Result<SearchResponse, EmberTroveError> {
         let q = query.q.trim();
-        if q.is_empty() {
-            return Ok(SearchResponse {
-                results: vec![],
-                total: 0,
-                page: 1,
-                per_page: query.per_page.unwrap_or(20),
-            });
-        }
-
         let page = query.page.unwrap_or(1).max(1);
         let per_page = query.per_page.unwrap_or(20).min(100);
         let offset = (page - 1) * per_page;
-        let fuzzy = query.fuzzy.unwrap_or(false);
         let tag_id = query.tag_id.map(|t| t.0);
+
+        // Empty query with a tag filter → list all nodes with that tag.
+        if q.is_empty() {
+            return if let Some(tid) = tag_id {
+                self.list_by_tag(tid, &query.node_type, &query.status, page, per_page, offset)
+                    .await
+            } else {
+                Ok(SearchResponse {
+                    results: vec![],
+                    total: 0,
+                    page,
+                    per_page,
+                })
+            };
+        }
+
+        let fuzzy = query.fuzzy.unwrap_or(false);
 
         if fuzzy {
             self.fuzzy_search(q, &query.node_type, &query.status, tag_id, page, per_page, offset)
@@ -81,6 +88,70 @@ impl SearchRepo for PgSearchRepo {
 }
 
 impl PgSearchRepo {
+    /// List all nodes that carry a specific tag, with no text filter.
+    /// Used when the search query is empty but a tag filter is active.
+    #[allow(clippy::too_many_arguments)]
+    async fn list_by_tag(
+        &self,
+        tag_id: Uuid,
+        node_type: &Option<common::node::NodeType>,
+        status: &Option<common::node::NodeStatus>,
+        page: u32,
+        per_page: u32,
+        offset: u32,
+    ) -> Result<SearchResponse, EmberTroveError> {
+        let type_filter = node_type.as_ref().map(node_type_to_str);
+        let status_filter = status.as_ref().map(node_status_to_str);
+
+        let count_row = sqlx::query_as::<_, CountRow>(
+            r#"
+            SELECT COUNT(*)::bigint AS total
+            FROM nodes
+            WHERE id IN (SELECT node_id FROM node_tags WHERE tag_id = $1)
+              AND ($2::text IS NULL OR node_type = $2::node_type)
+              AND ($3::text IS NULL OR status = $3::node_status)
+            "#,
+        )
+        .bind(tag_id)
+        .bind(type_filter)
+        .bind(status_filter)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("tag list count failed: {e}")))?;
+
+        let rows = sqlx::query_as::<_, SearchRow>(
+            r#"
+            SELECT
+                id,
+                title,
+                slug,
+                NULL::text AS snippet,
+                1.0::float4 AS rank
+            FROM nodes
+            WHERE id IN (SELECT node_id FROM node_tags WHERE tag_id = $1)
+              AND ($2::text IS NULL OR node_type = $2::node_type)
+              AND ($3::text IS NULL OR status = $3::node_status)
+            ORDER BY updated_at DESC
+            LIMIT $4 OFFSET $5
+            "#,
+        )
+        .bind(tag_id)
+        .bind(type_filter)
+        .bind(status_filter)
+        .bind(per_page as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("tag list failed: {e}")))?;
+
+        Ok(SearchResponse {
+            results: rows.into_iter().map(SearchRow::into_result).collect(),
+            total: count_row.total as u64,
+            page,
+            per_page,
+        })
+    }
+
     /// PostgreSQL full-text search using `search_vec` tsvector column with
     /// `websearch_to_tsquery` for natural-language queries.
     #[allow(clippy::too_many_arguments)]
