@@ -65,11 +65,24 @@ ember-trove/
 
 ## Git Flow
 
-- Persistent branches: `main` and `develop` only.
+Follows standard Git Flow. `v1.0.0` is the first production tag on `main`.
+
+| Branch type | Pattern              | Branched from | Merges into          | Notes                              |
+|-------------|----------------------|---------------|----------------------|------------------------------------|
+| Feature     | `feature/jc/<name>`  | `develop`     | `develop`            | `--no-ff`; worktree per feature    |
+| Release     | `release/<version>`  | `develop`     | `main` + `develop`   | tag on `main` after merge          |
+| Hotfix      | `hotfix/<name>`      | `main`        | `main` + `develop`   | tag bump on `main` after merge     |
+
+- Persistent branches: `main` (production) and `develop` (integration).
 - Features: `feature/jc/...` branched from `develop`, worked in
   `.claude/worktrees/<name>/`, merged back with `--no-ff`, worktree + branch
   deleted after merge.
-- **Current state**: All 8 phases complete. `develop` is the active branch.
+- Releases: `release/<semver>` branched from `develop`; after QA, merge into
+  `main` (`--no-ff`), tag (`v<semver>`), merge back into `develop`, delete branch.
+- Hotfixes: `hotfix/<name>` branched from `main`; after fix, merge into `main`
+  (`--no-ff`), tag patch bump, merge back into `develop`, delete branch.
+- **Never commit directly to `main` or `develop`** — all changes via branches.
+- **Current state**: v1.0.0 released. `develop` is the active integration branch.
 
 ## Environment Quirks
 
@@ -97,6 +110,15 @@ ember-trove/
   the shell immediately. Never delete the current session's worktree directory.
 - **Docker single-service rebuild**: `docker compose -f deploy/docker-compose.yml build <svc> && docker compose -f deploy/docker-compose.yml up -d <svc>` — rebuilds one container without restarting others.
 - **Verify merge state first**: At session start, run `git log --oneline -5` on `develop` to confirm what's already merged before re-doing work in a worktree.
+- **Port conflict: stale Trunk process**: Before testing via Docker stack on port 8003, check
+  `lsof -i :8003` — a leftover `trunk` dev-server process silently intercepts requests and returns
+  404 before Docker can respond. Kill it with `kill <pid>` first.
+- **`docker compose up -d` won't recreate unchanged-config containers**: If only an image was
+  rebuilt (not the compose config), the container stays on the old image. Use
+  `docker compose up -d --force-recreate <svc>` after rebuilding to guarantee the new image runs.
+- **`grep`/`tail`/`head`/`rg` not available in Bash tool**: These standard utilities are missing
+  or aliased away. Use Grep tool for content search; use Read tool with `offset`/`limit` instead
+  of `tail`/`head`; pipe through `python3 -c` for JSON parsing instead of `jq`.
 
 ## Leptos Patterns
 
@@ -144,12 +166,20 @@ ember-trove/
 - **API signature grep before changing**: When adding a parameter to a shared API function
   (e.g. `search_nodes()`), grep all UI source files for the old call-site count before committing —
   missed callers cause a compile failure on the next check.
+- **Small toolbar buttons**: Coordinate clicks on small icon buttons (pencil, trash) often miss.
+  Use `mcp__Claude_in_Chrome__find` with a natural-language query (e.g. `"edit pencil button"`) and
+  `left_click` via the returned `ref` for reliability.
+- **Tool timeouts (~5 min)**: `computer`, `find`, and `javascript_tool` can time out if the
+  browser extension is busy. Wait for the timeout to resolve then retry — the tab remains valid.
+  Fall back to `open "<url>"` via Bash to navigate if `navigate` also hangs.
 
 ## PostgreSQL / Axum Patterns
 
 - **`Query<T>` + `Vec<Uuid>`**: `axum::extract::Query` uses `serde_urlencoded` which cannot
   deserialize repeated query params into `Vec<T>`. Use `Option<String>` (comma-separated UUIDs)
   and parse server-side with a helper (`s.split(',').filter_map(|v| v.parse().ok()).collect()`).
+- **`node_type` serde variants are lowercase**: `NodeType` serializes as `"article"`, `"project"`,
+  `"area"`, `"resource"`, `"reference"` — not PascalCase. Use lowercase in curl/test payloads.
 - **Static AND/OR tag SQL**: Avoid dynamic query building by using
   `array_length($n::uuid[], 1) IS NULL` as a bypass guard (empty array → skip filter) combined
   with `HAVING (NOT $and_mode) OR COUNT(DISTINCT tag_id) = array_length($n::uuid[], 1)` to

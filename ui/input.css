@@ -81,6 +81,23 @@
 .dark .prose td { color: #d1d5db; }
 .dark .prose strong { color: #f9fafb; }
 
+/* ── Wiki-links ───────────────────────────────────────────────────────────── */
+.wikilink {
+  color: #60a5fa; /* blue-400 */
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  cursor: pointer;
+}
+.wikilink:hover {
+  color: #93c5fd; /* blue-300 */
+  text-decoration-style: solid;
+}
+.wikilink-unresolved {
+  color: #9ca3af; /* gray-400 */
+  text-decoration: line-through;
+  cursor: default;
+}
+
 /* Material Symbols */
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;

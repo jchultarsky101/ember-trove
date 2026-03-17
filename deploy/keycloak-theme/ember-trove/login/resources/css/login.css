@@ -1,0 +1,460 @@
+/* ── Ember Trove — Keycloak Login Theme ──────────────────────────────────────
+ * CSS-only override of the default keycloak login theme.
+ * Palette mirrors ui/input.css and Tailwind gray/blue scale.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Fonts ─────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+/* ── PatternFly variable overrides ─────────────────────────────────────────── */
+/* These must be set on :root to win against PF4's own :root declarations */
+:root {
+  /* Form control */
+  --pf-c-form-control--BackgroundColor: #1f2937;
+  --pf-c-form-control--Color: #f3f4f6;
+  --pf-c-form-control--BorderBottomColor: #374151;
+  --pf-c-form-control--hover--BorderBottomColor: #2563eb;
+  --pf-c-form-control--focus--BorderBottomColor: #2563eb;
+
+  /* Primary button */
+  --pf-c-button--m-primary--BackgroundColor: #2563eb;
+  --pf-c-button--m-primary--hover--BackgroundColor: #1d4ed8;
+  --pf-c-button--m-primary--focus--BackgroundColor: #1d4ed8;
+  --pf-c-button--m-primary--active--BackgroundColor: #1e40af;
+  --pf-c-button--m-primary--Color: #ffffff;
+  --pf-c-button--BorderRadius: 0.5rem;
+
+  /* Control button (eye toggle) — kill PF4's white bg and border */
+  --pf-c-button--m-control--BackgroundColor: transparent;
+  --pf-c-button--m-control--BorderWidth: 0;
+  --pf-c-button--m-control--BorderColor: transparent;
+  --pf-c-button--m-control--after--BorderColor: transparent;
+  --pf-c-button--m-control--hover--BackgroundColor: transparent;
+  --pf-global--BackgroundColor--100: #1f2937;
+}
+
+/* ── Reset / base ──────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #f3f4f6; /* gray-100 */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+
+  /* ── Background: subtle dot-grid + ember glow ── */
+  background-color: #030712; /* gray-950 */
+  background-image:
+    /* dot grid */
+    radial-gradient(circle, #ffffff0d 1px, transparent 1px),
+    /* ember glow from bottom centre */
+    radial-gradient(ellipse 90% 55% at 50% 105%, rgba(194, 65, 12, 0.22) 0%, transparent 70%),
+    /* cool blue accent top-right */
+    radial-gradient(ellipse 60% 40% at 90% -5%, rgba(37, 99, 235, 0.12) 0%, transparent 60%);
+  background-size: 28px 28px, 100% 100%, 100% 100%;
+}
+
+/* ── Page layout ───────────────────────────────────────────────────────────── */
+.login-pf-page,
+#kc-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem 1rem;
+}
+
+/* ── Header / realm name ───────────────────────────────────────────────────── */
+#kc-header,
+#kc-header-wrapper {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+#kc-header-wrapper {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #f9fafb; /* gray-50 */
+}
+
+/* ── Login card ────────────────────────────────────────────────────────────── */
+#kc-content,
+#kc-container-wrapper,
+.card-pf,
+.login-pf-card {
+  background-color: rgba(17, 24, 39, 0.9); /* gray-900 + slight transparency */
+  border: 1px solid #1f2937; /* gray-800 */
+  border-radius: 0.75rem;
+  padding: 2rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(255,255,255,0.03) inset;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* ── Page title ────────────────────────────────────────────────────────────── */
+#kc-page-title,
+.kc-page-title,
+h1.kc-page-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #f9fafb;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+/* ── Form groups / labels ──────────────────────────────────────────────────── */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+label,
+.control-label,
+.pf-c-form__label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #9ca3af; /* gray-400 */
+  margin-bottom: 0.375rem;
+}
+
+/* ── Inputs (target both PatternFly and generic classes) ───────────────────── */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+.form-control,
+.pf-c-form-control {
+  width: 100%;
+  padding: 0.5rem 0.75rem !important;
+  background-color: #1f2937 !important; /* gray-800 */
+  border: 1px solid #374151 !important; /* gray-700 */
+  border-radius: 0.5rem !important;
+  color: #f3f4f6 !important;            /* gray-100 — light text on dark field */
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-size: 0.875rem !important;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  appearance: none;
+  -webkit-appearance: none;
+  /* Kill PF4's bottom-border-only style */
+  border-bottom: 1px solid #374151 !important;
+  box-shadow: none !important;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+.form-control:focus,
+.pf-c-form-control:focus {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25) !important;
+  outline: none !important;
+}
+
+input[type="text"]::placeholder,
+input[type="password"]::placeholder,
+.pf-c-form-control::placeholder {
+  color: #4b5563 !important; /* gray-600 */
+}
+
+/* ── Password input group ───────────────────────────────────────────────────── */
+/* The group wrapper must share the input's background so rounded corners don't
+   reveal a contrasting colour behind the seam between input and eye-button.   */
+.kc-password-toggle,
+.pf-c-input-group {
+  display: flex;
+  background-color: #1f2937 !important; /* same as input — kills the light bleed */
+  border: 1px solid #374151 !important;
+  border-radius: 0.5rem !important;
+  overflow: hidden;                      /* clips child corners cleanly */
+}
+
+/* Input inside the group: remove its own border (group owns it), square right */
+.pf-c-input-group .pf-c-form-control,
+.pf-c-input-group input[type="password"],
+.pf-c-input-group input[type="text"] {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  flex: 1;
+}
+
+.pf-c-input-group .pf-c-form-control:focus,
+.pf-c-input-group input[type="password"]:focus,
+.pf-c-input-group input[type="text"]:focus {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Give the focus ring to the group instead */
+.pf-c-input-group:focus-within {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25) !important;
+}
+
+/* Eye-button: no own border (group owns it), flush corners */
+.kc-password-toggle .kc-form-password-visibility-btn,
+.pf-c-button.pf-m-control {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-width: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  color: #6b7280 !important;
+  cursor: pointer;
+  padding: 0 0.75rem !important;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.pf-c-button.pf-m-control:focus,
+.pf-c-button.pf-m-control:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* PF4 renders the button border via ::after — remove it entirely */
+.pf-c-button.pf-m-control::after {
+  content: none !important;
+  border: none !important;
+  display: none !important;
+}
+.pf-c-button.pf-m-control::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* The Font Awesome <i> icon inside the button */
+.pf-c-button.pf-m-control i,
+.pf-c-button.pf-m-control i::before,
+.pf-c-button.pf-m-control i::after {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+.pf-c-button.pf-m-control:hover {
+  background: rgba(255,255,255,0.05) !important;
+  background-color: rgba(255,255,255,0.05) !important;
+  color: #d1d5db !important;
+}
+
+/* ── "Remember me" checkbox ────────────────────────────────────────────────── */
+.checkbox label,
+#rememberMe ~ label,
+.pf-c-check__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+input[type="checkbox"],
+.pf-c-check__input {
+  accent-color: #2563eb;
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+/* ── Forgot password / form options row ─────────────────────────────────────── */
+#kc-form-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  font-size: 0.8125rem;
+}
+
+#kc-form-options a,
+a {
+  color: #60a5fa; /* blue-400 */
+  text-decoration: none;
+}
+
+#kc-form-options a:hover,
+a:hover {
+  color: #93c5fd; /* blue-300 */
+  text-decoration: underline;
+}
+
+/* ── Primary submit button ──────────────────────────────────────────────────── */
+#kc-form-buttons {
+  margin-top: 1.25rem;
+}
+
+input[type="submit"],
+.btn-primary,
+button[type="submit"],
+.pf-c-button.pf-m-primary {
+  width: 100%;
+  padding: 0.5625rem 1rem !important;
+  background-color: #2563eb !important; /* blue-600 */
+  border: 1px solid #1d4ed8 !important; /* blue-700 */
+  border-radius: 0.5rem !important;
+  color: #ffffff !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.15s, box-shadow 0.15s;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+input[type="submit"]:hover,
+.btn-primary:hover,
+button[type="submit"]:hover,
+.pf-c-button.pf-m-primary:hover {
+  background-color: #1d4ed8 !important; /* blue-700 */
+}
+
+input[type="submit"]:focus,
+.btn-primary:focus,
+.pf-c-button.pf-m-primary:focus {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.4) !important;
+}
+
+input[type="submit"]:disabled,
+.btn-primary:disabled,
+.pf-c-button.pf-m-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Alert / flash messages ─────────────────────────────────────────────────── */
+.alert,
+.pf-c-alert,
+#kc-info-message,
+#kc-error-message {
+  border-radius: 0.5rem !important;
+  padding: 0.75rem 1rem !important;
+  font-size: 0.8125rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.alert-error,
+.pf-c-alert.pf-m-danger,
+#kc-error-message {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  color: #fca5a5 !important; /* red-300 */
+}
+
+.alert-success,
+.pf-c-alert.pf-m-success {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+  border: 1px solid rgba(34, 197, 94, 0.3) !important;
+  color: #86efac !important; /* green-300 */
+}
+
+.alert-warning,
+.pf-c-alert.pf-m-warning {
+  background-color: rgba(234, 179, 8, 0.1) !important;
+  border: 1px solid rgba(234, 179, 8, 0.3) !important;
+  color: #fde047 !important; /* yellow-300 */
+}
+
+.alert-info,
+.pf-c-alert.pf-m-info,
+#kc-info-message {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+  border: 1px solid rgba(59, 130, 246, 0.3) !important;
+  color: #93c5fd !important; /* blue-300 */
+}
+
+/* ── Social login providers ─────────────────────────────────────────────────── */
+#kc-social-providers {
+  margin-top: 1rem;
+}
+
+#kc-social-providers ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#kc-social-providers li a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 0.5rem;
+  color: #d1d5db;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+
+#kc-social-providers li a:hover {
+  background-color: #374151;
+  color: #f3f4f6;
+  text-decoration: none;
+}
+
+/* ── Registration link ───────────────────────────────────────────────────────── */
+#kc-registration,
+#kc-registration-container {
+  text-align: center;
+  margin-top: 1.25rem;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+/* ── Locale selector ─────────────────────────────────────────────────────────── */
+#kc-locale {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+}
+
+#kc-locale select,
+#kc-locale .dropdown {
+  background-color: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 0.375rem;
+  color: #9ca3af;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* ── Required field indicator ────────────────────────────────────────────────── */
+.required,
+.field-required,
+.pf-c-form__label-required {
+  color: #f87171; /* red-400 */
+  margin-left: 0.25rem;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  #kc-content,
+  #kc-container-wrapper,
+  .card-pf,
+  .login-pf-card {
+    padding: 1.5rem 1rem;
+    border-radius: 0.5rem;
+  }
+}
