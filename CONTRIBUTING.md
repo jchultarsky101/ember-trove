@@ -29,6 +29,8 @@ export DATABASE_URL=postgres://ember_trove:ember_trove_dev@localhost/ember_trove
 sqlx migrate run --source migrations/
 ```
 
+See [README.md](README.md) for the full step-by-step local development guide, including Keycloak setup.
+
 ---
 
 ## Guardrails (see CLAUDE.md)
@@ -47,16 +49,91 @@ cargo test
 
 ## Git Flow
 
-| Branch type | Pattern                  | Notes                               |
-|-------------|--------------------------|-------------------------------------|
-| Stable      | `main`                   | Tagged releases only                |
-| Integration | `develop`                | Merged features land here           |
-| Feature     | `feature/jc/<name>`      | Branch from `develop`; short-lived  |
-| Fix         | `fix/jc/<name>`          | Branch from `develop`               |
-| Release     | `release/x.y.z`          | Bump version, update CHANGELOG      |
+This project follows [Git Flow](https://nvie.com/posts/a-successful-git-branching-model/).
+`v1.0.0` is the first production tag on `main`.
 
-- Merge features back to `develop` with `--no-ff`.
+| Branch type | Pattern              | Branched from | Merges into       | Notes                                      |
+|-------------|----------------------|---------------|-------------------|--------------------------------------------|
+| Feature     | `feature/jc/<name>`  | `develop`     | `develop`         | `--no-ff`; delete branch + worktree after  |
+| Release     | `release/<semver>`   | `develop`     | `main` + `develop`| Tag `v<semver>` on `main` after merge      |
+| Hotfix      | `hotfix/<name>`      | `main`        | `main` + `develop`| Tag patch bump on `main` after merge       |
+
+### Rules
+
+- **Never commit directly to `main` or `develop`** — all changes must go through a branch.
+- **Feature branches**: branch from `develop`, merge back to `develop` with `--no-ff`, then delete.
+- **Release branches**: bump version in `Cargo.toml`, update `CHANGELOG.md`, merge into `main` (tag) and back into `develop`, then delete.
+- **Hotfix branches**: branch from the tagged commit on `main`, fix, merge into `main` (tag patch bump) and back into `develop`, then delete.
 - Never force-push `main` or `develop`.
+
+### Example: shipping a feature
+
+```bash
+# 1. Branch from develop
+git checkout develop
+git pull origin develop
+git checkout -b feature/jc/my-feature
+
+# 2. Work, commit, push
+git add <files>
+git commit -m "feat(api): add my feature"
+
+# 3. Merge back to develop (no fast-forward)
+git checkout develop
+git merge --no-ff feature/jc/my-feature -m "chore: merge feature/jc/my-feature into develop"
+
+# 4. Clean up
+git branch -d feature/jc/my-feature
+git push origin develop
+```
+
+### Example: cutting a release
+
+```bash
+# 1. Branch from develop
+git checkout develop
+git checkout -b release/1.1.0
+
+# 2. Bump version, update CHANGELOG.md, commit
+git commit -am "chore(release): prepare v1.1.0"
+
+# 3. Merge into main and tag
+git checkout main
+git merge --no-ff release/1.1.0 -m "chore: merge release/1.1.0 into main"
+git tag -a v1.1.0 -m "v1.1.0"
+
+# 4. Merge back into develop
+git checkout develop
+git merge --no-ff release/1.1.0 -m "chore: merge release/1.1.0 back into develop"
+
+# 5. Clean up and push
+git branch -d release/1.1.0
+git push origin main develop --tags
+```
+
+### Example: applying a hotfix
+
+```bash
+# 1. Branch from main at the tagged release
+git checkout main
+git checkout -b hotfix/fix-auth-cookie
+
+# 2. Fix, commit
+git commit -am "fix(auth): correct cookie expiry calculation"
+
+# 3. Merge into main and tag
+git checkout main
+git merge --no-ff hotfix/fix-auth-cookie -m "chore: merge hotfix/fix-auth-cookie into main"
+git tag -a v1.0.1 -m "v1.0.1"
+
+# 4. Merge back into develop
+git checkout develop
+git merge --no-ff hotfix/fix-auth-cookie -m "chore: merge hotfix/fix-auth-cookie into develop"
+
+# 5. Clean up and push
+git branch -d hotfix/fix-auth-cookie
+git push origin main develop --tags
+```
 
 ---
 
@@ -66,7 +143,7 @@ cargo test
 - [ ] Clippy clean (`cargo clippy -- -D warnings`)
 - [ ] Formatted (`cargo fmt`)
 - [ ] CHANGELOG.md updated under `[Unreleased]`
-- [ ] New environment variables documented in README
+- [ ] New environment variables documented in README.md
 
 ---
 
