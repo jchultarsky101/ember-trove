@@ -5,6 +5,7 @@ use crate::{
     auth::{AuthState, AuthStatus},
     components::{
         admin_view::AdminView, dark_mode_toggle::DarkModeToggle, graph_view::GraphView,
+        modals::create_node::CreateNodeModal,
         node_editor::NodeEditor,
         node_list::NodeList, node_view::NodeView, search_view::SearchView, sidebar::Sidebar,
         tag_manager::TagManager,
@@ -17,6 +18,7 @@ pub type SidebarCollapsed = RwSignal<bool>;
 #[component]
 pub fn Layout(auth_state: AuthState) -> impl IntoView {
     let collapsed: SidebarCollapsed = RwSignal::new(false);
+    let show_capture: RwSignal<bool> = RwSignal::new(false);
 
     view! {
         <AuthGate auth_state=auth_state>
@@ -56,6 +58,29 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                     <ViewSwitch />
                 </main>
             </div>
+
+            // Floating Action Button — always on top, bottom-right
+            <button
+                class="fixed bottom-6 right-6 z-30
+                       w-14 h-14 rounded-full shadow-lg
+                       bg-gradient-to-br from-amber-500 to-orange-600
+                       hover:from-amber-400 hover:to-orange-500
+                       text-white flex items-center justify-center
+                       hover:shadow-xl hover:scale-105
+                       transition-all duration-150 cursor-pointer"
+                title="Quick capture (new node)"
+                on:click=move |_| show_capture.set(true)
+            >
+                <span class="material-symbols-outlined" style="font-size: 28px; font-weight: 300;">
+                    "add"
+                </span>
+            </button>
+
+            // Quick-capture modal
+            <CreateNodeModal
+                show=show_capture.read_only()
+                on_close=Callback::new(move |_| show_capture.set(false))
+            />
         </AuthGate>
     }
 }
