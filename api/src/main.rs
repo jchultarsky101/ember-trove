@@ -1,6 +1,7 @@
 // Phase 1 skeleton — stub items will be used as later phases are implemented.
 #![allow(dead_code)]
 
+mod admin;
 mod auth;
 mod config;
 mod error;
@@ -15,6 +16,7 @@ use axum_extra::extract::cookie::Key;
 use sqlx::postgres::PgPoolOptions;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+use admin::KeycloakAdminClient;
 use auth::{AuthConfig, oidc::OidcClient};
 use config::Config;
 use object_store::s3::S3ObjectStore;
@@ -107,6 +109,28 @@ async fn main() -> anyhow::Result<()> {
             Arc::new(object_store::NullObjectStore)
         };
 
+    // Keycloak Admin client — optional; enabled when admin credentials are in the environment.
+    let keycloak_admin = if let (Some(user), Some(password)) = (
+        config.keycloak_admin_user.as_deref(),
+        config.keycloak_admin_password.as_deref(),
+    ) {
+        if let Some((base, realm)) = config.keycloak_base_and_realm() {
+            tracing::info!("Keycloak admin client enabled (realm: {realm})");
+            Some(Arc::new(KeycloakAdminClient::new(
+                base,
+                realm,
+                user.to_string(),
+                password.to_string(),
+            )))
+        } else {
+            tracing::warn!("KEYCLOAK_ADMIN_USER/PASSWORD set but OIDC_ISSUER missing — admin API disabled");
+            None
+        }
+    } else {
+        tracing::info!("Keycloak admin credentials not set — /admin/* endpoints disabled");
+        None
+    };
+
     let state = AppState {
         nodes: Arc::new(PgNodeRepo::new(pool.clone())),
         edges: Arc::new(PgEdgeRepo::new(pool.clone())),
@@ -117,6 +141,7 @@ async fn main() -> anyhow::Result<()> {
         graph: Arc::new(PgGraphRepo::new(pool.clone())),
         object_store,
         oidc,
+        keycloak_admin,
         cookie_key,
         auth,
         config: config.clone(),

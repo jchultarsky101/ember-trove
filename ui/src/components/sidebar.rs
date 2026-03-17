@@ -79,6 +79,24 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                 on_click=move || current_view.set(View::Graph)
                 collapsed=collapsed
             />
+            {move || {
+                if let AuthStatus::Authenticated(ref u) = auth_state.get()
+                    && u.roles.contains(&"admin".to_string())
+                {
+                    Some(view! {
+                        <div>
+                            <div class="border-t border-gray-200 dark:border-gray-700 my-3" />
+                            <SidebarLink
+                                icon="admin_panel_settings" label="Admin"
+                                on_click=move || current_view.set(View::Admin)
+                                collapsed=collapsed
+                            />
+                        </div>
+                    }.into_any())
+                } else {
+                    None
+                }
+            }}
         </nav>
         // User / logout section
         <div class="px-2 py-3 border-t border-gray-200 dark:border-gray-800">

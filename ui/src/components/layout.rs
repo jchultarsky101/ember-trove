@@ -4,7 +4,8 @@ use crate::{
     app::View,
     auth::{AuthState, AuthStatus},
     components::{
-        dark_mode_toggle::DarkModeToggle, graph_view::GraphView, node_editor::NodeEditor,
+        admin_view::AdminView, dark_mode_toggle::DarkModeToggle, graph_view::GraphView,
+        node_editor::NodeEditor,
         node_list::NodeList, node_view::NodeView, search_view::SearchView, sidebar::Sidebar,
         tag_manager::TagManager,
     },
@@ -114,6 +115,7 @@ fn ViewSwitch() -> impl IntoView {
         View::TagManager => view! { <TagManager /> }.into_any(),
         View::Graph => view! { <GraphView /> }.into_any(),
         View::Search => view! { <SearchView /> }.into_any(),
+        View::Admin => view! { <AdminView /> }.into_any(),
     }
 }
 
