@@ -29,6 +29,9 @@ pub struct Config {
     /// browser redirects point to the externally reachable host instead of an
     /// internal Docker hostname.
     pub oidc_external_url: Option<String>,
+    // Keycloak Admin API credentials — optional; enables /admin/* endpoints when set.
+    pub keycloak_admin_user: Option<String>,
+    pub keycloak_admin_password: Option<String>,
     // Cookie encryption key (128 hex chars → 64 bytes, required by cookie::Key)
     pub cookie_key: String,
     // URLs
@@ -67,12 +70,32 @@ impl Config {
             oidc_client_id: env::var("OIDC_CLIENT_ID").ok(),
             oidc_client_secret: env::var("OIDC_CLIENT_SECRET").ok(),
             oidc_external_url: env::var("OIDC_EXTERNAL_URL").ok(),
+            keycloak_admin_user: env::var("KEYCLOAK_ADMIN_USER").ok(),
+            keycloak_admin_password: env::var("KEYCLOAK_ADMIN_PASSWORD").ok(),
             cookie_key,
             frontend_url: require("FRONTEND_URL")?,
             api_external_url: require("API_EXTERNAL_URL")?,
             host: env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
             port,
         })
+    }
+}
+
+impl Config {
+    /// Derive `(base_url, realm)` from `OIDC_ISSUER`.
+    ///
+    /// Given `http://keycloak:8080/realms/ember-trove` returns
+    /// `("http://keycloak:8080", "ember-trove")`.
+    pub fn keycloak_base_and_realm(&self) -> Option<(String, String)> {
+        let issuer = self.oidc_issuer.as_deref()?;
+        let idx = issuer.find("/realms/")?;
+        let base = issuer[..idx].to_string();
+        let realm = issuer[idx + "/realms/".len()..].to_string();
+        if realm.is_empty() {
+            None
+        } else {
+            Some((base, realm))
+        }
     }
 }
 

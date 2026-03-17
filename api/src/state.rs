@@ -4,6 +4,7 @@ use axum_extra::extract::cookie::Key;
 use sqlx::PgPool;
 
 use crate::{
+    admin::KeycloakAdminClient,
     auth::{AuthConfig, oidc::OidcClient},
     config::Config,
     object_store::ObjectStore,
@@ -25,6 +26,9 @@ pub struct AppState {
     pub graph: Arc<dyn GraphRepo>,
     pub object_store: Arc<dyn ObjectStore>,
     pub oidc: Option<Arc<OidcClient>>,
+    /// Keycloak Admin client — `None` when `KEYCLOAK_ADMIN_USER` / `KEYCLOAK_ADMIN_PASSWORD`
+    /// are not set in the environment.
+    pub keycloak_admin: Option<Arc<KeycloakAdminClient>>,
     pub cookie_key: Key,
     pub auth: AuthConfig,
     pub config: Config,

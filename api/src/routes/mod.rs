@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod attachments;
 pub mod auth;
 pub mod edges;
@@ -51,6 +52,7 @@ pub fn build_router(state: AppState) -> Router {
         .nest("/attachments", attachments::router())
         .nest("/search", search::router())
         .nest("/graph", graph::router())
+        .nest("/admin", admin::router())
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
     // Public routes — no auth required.

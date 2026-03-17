@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod attachment;
 pub mod auth;
 pub mod edge;

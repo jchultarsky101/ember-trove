@@ -36,6 +36,7 @@ pub enum View {
     TagManager,
     Graph,
     Search,
+    Admin,
 }
 
 // ── App root ───────────────────────────────────────────────────────────────
