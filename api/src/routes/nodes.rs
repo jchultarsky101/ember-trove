@@ -10,18 +10,19 @@ use common::{
     auth::AuthClaims,
     edge::EdgeWithTitles,
     id::{NodeId, PermissionId, TagId},
-    node::{CreateNodeRequest, Node, NodeListParams, NodeListResponse, UpdateNodeRequest},
+    node::{CreateNodeRequest, Node, NodeListParams, NodeListResponse, NodeTitleEntry, UpdateNodeRequest},
     permission::{GrantPermissionRequest, Permission},
     tag::Tag,
 };
 use garde::Validate;
 use uuid::Uuid;
 
-use crate::{error::ApiError, state::AppState};
+use crate::{error::ApiError, state::AppState, wikilink::parse_wikilink_titles};
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_nodes).post(create_node))
+        .route("/titles", get(list_titles))
         .route("/slug/{slug}", get(get_node_by_slug))
         .route("/{id}", get(get_node).put(update_node).delete(delete_node))
         .route("/{id}/neighbors", get(neighbors))
@@ -58,6 +59,13 @@ async fn list_nodes(
     }))
 }
 
+async fn list_titles(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<NodeTitleEntry>>, ApiError> {
+    let titles = state.nodes.list_titles().await?;
+    Ok(Json(titles))
+}
+
 async fn create_node(
     State(state): State<AppState>,
     Extension(claims): Extension<AuthClaims>,
@@ -66,6 +74,7 @@ async fn create_node(
     req.validate()
         .map_err(|e| ApiError::Validation(e.to_string()))?;
     let node = state.nodes.create(&claims.sub, req).await?;
+    sync_wikilinks(&state, node.id, node.body.as_deref().unwrap_or("")).await?;
     Ok((StatusCode::CREATED, Json(node)))
 }
 
@@ -92,7 +101,25 @@ async fn update_node(
     Json(req): Json<UpdateNodeRequest>,
 ) -> Result<Json<Node>, ApiError> {
     let node = state.nodes.update(NodeId(id), req).await?;
+    sync_wikilinks(&state, node.id, node.body.as_deref().unwrap_or("")).await?;
     Ok(Json(node))
+}
+
+/// Resolve wiki-link titles in `body` to node IDs and sync `wiki_link` edges.
+async fn sync_wikilinks(
+    state: &AppState,
+    source_id: NodeId,
+    body: &str,
+) -> Result<(), ApiError> {
+    let titles = parse_wikilink_titles(body);
+    let mut target_ids = Vec::new();
+    for title in &titles {
+        if let Some(id) = state.nodes.find_id_by_title(title).await? {
+            target_ids.push(id);
+        }
+    }
+    state.edges.sync_wikilinks(source_id, &target_ids).await?;
+    Ok(())
 }
 
 async fn delete_node(

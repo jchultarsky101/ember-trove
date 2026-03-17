@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use common::{
     EmberTroveError,
     id::{NodeId, TagId},
-    node::{CreateNodeRequest, Node, NodeListParams, NodeStatus, NodeType, UpdateNodeRequest},
+    node::{CreateNodeRequest, Node, NodeListParams, NodeStatus, NodeType, NodeTitleEntry, UpdateNodeRequest},
     slug::slugify,
     tag::Tag,
 };
@@ -29,6 +29,14 @@ pub trait NodeRepo: Send + Sync {
     async fn neighbors(&self, id: NodeId) -> Result<Vec<Node>, EmberTroveError>;
 
     async fn backlinks(&self, id: NodeId) -> Result<Vec<Node>, EmberTroveError>;
+
+    /// Return all nodes as lightweight title entries, ordered by title.
+    /// Used for wiki-link autocomplete and resolution.
+    async fn list_titles(&self) -> Result<Vec<NodeTitleEntry>, EmberTroveError>;
+
+    /// Find a node's ID by exact title (case-insensitive). Returns `None` if no
+    /// node with that title exists.
+    async fn find_id_by_title(&self, title: &str) -> Result<Option<NodeId>, EmberTroveError>;
 }
 
 pub struct PgNodeRepo {
@@ -420,5 +428,47 @@ impl NodeRepo for PgNodeRepo {
         .map_err(|e| EmberTroveError::Internal(format!("backlinks query failed: {e}")))?;
 
         rows.into_iter().map(NodeRow::into_node).collect()
+    }
+
+    async fn list_titles(&self) -> Result<Vec<NodeTitleEntry>, EmberTroveError> {
+        #[derive(sqlx::FromRow)]
+        struct TitleRow {
+            id: Uuid,
+            title: String,
+            slug: String,
+        }
+
+        let rows = sqlx::query_as::<_, TitleRow>(
+            "SELECT id, title, slug FROM nodes ORDER BY title",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list_titles failed: {e}")))?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| NodeTitleEntry {
+                id: NodeId(r.id),
+                title: r.title,
+                slug: r.slug,
+            })
+            .collect())
+    }
+
+    async fn find_id_by_title(&self, title: &str) -> Result<Option<NodeId>, EmberTroveError> {
+        #[derive(sqlx::FromRow)]
+        struct IdRow {
+            id: Uuid,
+        }
+
+        let row = sqlx::query_as::<_, IdRow>(
+            "SELECT id FROM nodes WHERE LOWER(title) = LOWER($1) LIMIT 1",
+        )
+        .bind(title)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("find_id_by_title failed: {e}")))?;
+
+        Ok(row.map(|r| NodeId(r.id)))
     }
 }

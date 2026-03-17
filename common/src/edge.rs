@@ -12,6 +12,8 @@ pub enum EdgeType {
     RelatedTo,
     DependsOn,
     DerivedFrom,
+    /// Automatically created from `[[node title]]` wiki-link syntax in node bodies.
+    WikiLink,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

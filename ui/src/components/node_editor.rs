@@ -1,18 +1,31 @@
+use std::collections::HashMap;
+
 use common::{
     id::NodeId,
-    node::{CreateNodeRequest, NodeStatus, NodeType, UpdateNodeRequest},
+    node::{CreateNodeRequest, NodeStatus, NodeType, NodeTitleEntry, UpdateNodeRequest},
 };
 use leptos::prelude::*;
 use pulldown_cmark::{Options, Parser, html};
 
 use crate::app::View;
+use crate::wikilink::preprocess_wikilinks;
 
-fn render_markdown(source: &str) -> String {
+fn render_markdown(source: &str, title_map: &HashMap<String, NodeId>) -> String {
+    let preprocessed = preprocess_wikilinks(source, title_map);
     let opts = Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES | Options::ENABLE_TASKLISTS;
-    let parser = Parser::new_ext(source, opts);
+    let parser = Parser::new_ext(&preprocessed, opts);
     let mut html_out = String::new();
     html::push_html(&mut html_out, parser);
-    ammonia::clean(&html_out)
+    ammonia::Builder::new()
+        .add_tag_attributes("a", &["class", "data-node-id"])
+        .add_tags(&["span"])
+        .add_tag_attributes("span", &["class"])
+        .clean(&html_out)
+        .to_string()
+}
+
+fn build_title_map(entries: &[NodeTitleEntry]) -> HashMap<String, NodeId> {
+    entries.iter().map(|e| (e.title.clone(), e.id)).collect()
 }
 
 fn parse_status(s: &str) -> NodeStatus {
@@ -21,6 +34,24 @@ fn parse_status(s: &str) -> NodeStatus {
         "archived" => NodeStatus::Archived,
         _ => NodeStatus::Draft,
     }
+}
+
+/// Return the partial wiki-link query being typed at the cursor, if any.
+///
+/// Looks backwards from `cursor` for an unclosed `[[`. Returns the text
+/// typed after `[[` up to the cursor, or `None` if the cursor is not inside
+/// an open wiki-link context.
+fn wikilink_query_at(text: &str, cursor: usize) -> Option<String> {
+    let before = &text[..cursor.min(text.len())];
+    // Find the last `[[` that has not been closed.
+    let open = before.rfind("[[")?;
+    let after_open = &before[open + 2..];
+    // If there's already a closing `]]` or a newline between `[[` and cursor,
+    // we are not in a wiki-link context.
+    if after_open.contains("]]") || after_open.contains('\n') {
+        return None;
+    }
+    Some(after_open.to_string())
 }
 
 #[component]
@@ -34,6 +65,14 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     let status = RwSignal::new("draft".to_string());
     let saving = RwSignal::new(false);
     let error_msg = RwSignal::new(Option::<String>::None);
+
+    // Wiki-link autocomplete state.
+    let wikilink_query = RwSignal::new(Option::<String>::None);
+    let textarea_ref = NodeRef::<leptos::html::Textarea>::new();
+
+    // Fetch all node titles for wiki-link autocomplete and preview.
+    let titles_resource =
+        LocalResource::new(|| async move { crate::api::fetch_node_titles().await });
 
     // If editing, fetch existing node data.
     if let Some(id) = node {
@@ -57,7 +96,6 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
 
         wasm_bindgen_futures::spawn_local(async move {
             let result = if let Some(id) = node {
-                // Update existing node.
                 let req = UpdateNodeRequest {
                     title: Some(t),
                     body: Some(b),
@@ -66,7 +104,6 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                 };
                 crate::api::update_node(id, &req).await
             } else {
-                // Create new node.
                 let nt = match nt_str.as_str() {
                     "project" => NodeType::Project,
                     "area" => NodeType::Area,
@@ -97,7 +134,55 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
         });
     };
 
-    let preview_html = move || render_markdown(&body.get());
+    // Detect [[query at cursor on every keystroke.
+    let on_body_input = move |ev: leptos::ev::Event| {
+        let val = event_target_value(&ev);
+        body.set(val.clone());
+
+        let query = textarea_ref
+            .get()
+            .and_then(|el| el.selection_start().ok().flatten())
+            .and_then(|cursor| wikilink_query_at(&val, cursor as usize));
+        wikilink_query.set(query);
+    };
+
+    // Insert the selected title at the cursor, replacing the open [[query.
+    let on_select_title = move |selected: String| {
+        wikilink_query.set(None);
+        let current = body.get_untracked();
+        let cursor = textarea_ref
+            .get()
+            .and_then(|el| el.selection_start().ok().flatten())
+            .unwrap_or(0) as usize;
+        let before = &current[..cursor.min(current.len())];
+        if let Some(open_pos) = before.rfind("[[") {
+            let new_val = format!(
+                "[[{}]]{}",
+                selected,
+                &current[cursor..],
+            );
+            let prefix = &current[..open_pos];
+            let new_val = format!("{prefix}{new_val}");
+            let new_cursor = open_pos + 2 + selected.len() + 2;
+            body.set(new_val.clone());
+            // Defer cursor placement until after Leptos re-renders the textarea.
+            if let Some(el) = textarea_ref.get() {
+                el.set_value(&new_val);
+                let _ = el.set_selection_start(Some(new_cursor as u32));
+                let _ = el.set_selection_end(Some(new_cursor as u32));
+                let _ = el.focus();
+            }
+        }
+    };
+
+    let preview_html = move || {
+        let title_map = titles_resource
+            .get()
+            .and_then(|r| r.ok())
+            .map(|entries| build_title_map(&entries))
+            .unwrap_or_default();
+        render_markdown(&body.get(), &title_map)
+    };
 
     view! {
         <div class="flex flex-col h-full">
@@ -120,7 +205,6 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                     />
                 </div>
                 <div class="flex items-center gap-2">
-                    // Node type picker
                     <select
                         class="text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300
                             rounded-lg px-2 py-1.5 focus:outline-none"
@@ -133,7 +217,6 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         <option value="resource">"Resource"</option>
                         <option value="reference">"Reference"</option>
                     </select>
-                    // Status picker
                     <select
                         class="text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300
                             rounded-lg px-2 py-1.5 focus:outline-none"
@@ -173,14 +256,69 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
             })}
             // Split editor + preview
             <div class="flex flex-1 divide-x divide-gray-200 dark:divide-gray-700 min-h-0">
-                <div class="flex-1 flex flex-col">
+                // Editor pane (relative so the autocomplete dropdown can be positioned)
+                <div class="flex-1 flex flex-col relative">
                     <textarea
+                        node_ref=textarea_ref
                         class="flex-1 p-4 font-mono text-sm resize-none bg-transparent
                             text-gray-900 dark:text-gray-100 focus:outline-none"
-                        placeholder="Write in Markdown..."
+                        placeholder="Write in Markdown… use [[Node Title]] to link nodes"
                         prop:value=move || body.get()
-                        on:input=move |ev| body.set(event_target_value(&ev))
+                        on:input=on_body_input
+                        // Close dropdown on Escape
+                        on:keydown=move |ev: leptos::ev::KeyboardEvent| {
+                            if ev.key() == "Escape" {
+                                wikilink_query.set(None);
+                            }
+                        }
                     />
+                    // Wiki-link autocomplete dropdown
+                    {move || {
+                        let query = wikilink_query.get()?;
+                        let entries = titles_resource.get().and_then(|r| r.ok()).unwrap_or_default();
+                        let q_lower = query.to_lowercase();
+                        let matches: Vec<String> = entries
+                            .iter()
+                            .filter(|e| e.title.to_lowercase().contains(&q_lower))
+                            .take(8)
+                            .map(|e| e.title.clone())
+                            .collect();
+                        if matches.is_empty() {
+                            return None;
+                        }
+                        Some(view! {
+                            <div class="absolute bottom-4 left-4 z-50 w-72
+                                bg-white dark:bg-gray-900
+                                border border-gray-200 dark:border-gray-700
+                                rounded-lg shadow-xl overflow-hidden">
+                                <div class="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-100 dark:border-gray-800">
+                                    "Link to node — " {query.clone()}
+                                </div>
+                                {matches.into_iter().map(|t| {
+                                    let t_clone = t.clone();
+                                    let select = on_select_title;
+                                    view! {
+                                        <button
+                                            type="button"
+                                            class="w-full text-left px-3 py-2 text-sm
+                                                text-gray-800 dark:text-gray-200
+                                                hover:bg-blue-50 dark:hover:bg-blue-900/30
+                                                hover:text-blue-700 dark:hover:text-blue-300
+                                                transition-colors"
+                                            on:click=move |ev| {
+                                                ev.prevent_default();
+                                                ev.stop_propagation();
+                                                select(t_clone.clone());
+                                            }
+                                        >
+                                            <span class="material-symbols-outlined text-xs mr-1 align-middle">"link"</span>
+                                            {t.clone()}
+                                        </button>
+                                    }
+                                }).collect_view()}
+                            </div>
+                        })
+                    }}
                 </div>
                 <div class="flex-1 overflow-auto p-6">
                     <div class="prose max-w-none dark:prose-invert" inner_html=preview_html />
