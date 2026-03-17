@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use common::edge::{CreateEdgeRequest, EdgeType, EdgeWithTitles};
 use common::id::NodeId;
+use common::node::NodeTitleEntry;
 use leptos::{html::Input, prelude::*};
 use pulldown_cmark::{Options, Parser, html};
 
@@ -7,13 +10,30 @@ use crate::app::View;
 use crate::components::attachment_panel::AttachmentPanel;
 use crate::components::permission_dialog::PermissionPanel;
 use crate::components::tag_bar::TagBar;
+use crate::wikilink::preprocess_wikilinks;
 
-fn render_markdown(source: &str) -> String {
+/// Render markdown with wiki-link resolution.
+///
+/// `[[title]]` and `[[title|display]]` are first replaced with HTML anchors
+/// (resolved) or `<span>` tags (unresolved) by `preprocess_wikilinks`, then
+/// the result is passed through pulldown-cmark. Ammonia is configured to
+/// preserve the `class` and `data-node-id` attributes added by the preprocessor.
+fn render_markdown(source: &str, title_map: &HashMap<String, NodeId>) -> String {
+    let preprocessed = preprocess_wikilinks(source, title_map);
     let opts = Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES | Options::ENABLE_TASKLISTS;
-    let parser = Parser::new_ext(source, opts);
+    let parser = Parser::new_ext(&preprocessed, opts);
     let mut html_out = String::new();
     html::push_html(&mut html_out, parser);
-    ammonia::clean(&html_out)
+    ammonia::Builder::new()
+        .add_tag_attributes("a", &["class", "data-node-id"])
+        .add_tags(&["span"])
+        .add_tag_attributes("span", &["class"])
+        .clean(&html_out)
+        .to_string()
+}
+
+fn build_title_map(entries: &[NodeTitleEntry]) -> HashMap<String, NodeId> {
+    entries.iter().map(|e| (e.title.clone(), e.id)).collect()
 }
 
 #[component]
@@ -25,6 +45,9 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
         let id = id;
         async move { crate::api::fetch_node(id).await }
     });
+
+    // Fetch all node titles for wiki-link resolution.
+    let titles = LocalResource::new(|| async move { crate::api::fetch_node_titles().await });
 
     let deleting = RwSignal::new(false);
 
@@ -48,10 +71,37 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                 node.get().map(|result| {
                     match result {
                         Ok(n) => {
-                            let body_html = render_markdown(n.body.as_deref().unwrap_or(""));
+                            // Build title → NodeId map from fetched titles (empty map if not
+                            // yet loaded — wiki-links will render as unresolved on first paint
+                            // and resolve on the next reactive tick).
+                            let title_map = titles
+                                .get()
+                                .and_then(|r| r.ok())
+                                .map(|entries| build_title_map(&entries))
+                                .unwrap_or_default();
+                            let body_html = render_markdown(n.body.as_deref().unwrap_or(""), &title_map);
                             let node_type = format!("{:?}", n.node_type).to_lowercase();
                             let status = format!("{:?}", n.status).to_lowercase();
                             let edit_id = n.id;
+
+                            // Click delegation: intercept clicks on `.wikilink` anchors and
+                            // navigate in-app instead of following the href.
+                            let handle_wikilink_click = move |ev: leptos::ev::MouseEvent| {
+                                use wasm_bindgen::JsCast;
+                                if let Some(link) = ev
+                                    .target()
+                                    .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
+                                    .and_then(|el| el.closest(".wikilink").ok())
+                                    .flatten()
+                                {
+                                    ev.prevent_default();
+                                    if let Some(raw) = link.get_attribute("data-node-id")
+                                        && let Ok(id) = raw.parse::<uuid::Uuid>() {
+                                        current_view.set(View::NodeDetail(NodeId(id)));
+                                    }
+                                }
+                            };
+
                             view! {
                                 <div class="flex flex-col h-full">
                                     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
@@ -101,7 +151,11 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         <TagBar node_id=id />
                                     </div>
                                     <div class="flex-1 overflow-auto p-6">
-                                        <div class="prose max-w-2xl dark:prose-invert" inner_html=body_html />
+                                        <div
+                                            class="prose max-w-2xl dark:prose-invert"
+                                            inner_html=body_html
+                                            on:click=handle_wikilink_click
+                                        />
                                         <EdgePanel node_id=id />
                                         <BacklinksPanel node_id=id />
                                         <AttachmentPanel node_id=id />

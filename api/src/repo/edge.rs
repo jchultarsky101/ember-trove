@@ -7,6 +7,7 @@ use common::{
 };
 use sqlx::PgPool;
 use uuid::Uuid;
+use std::collections::HashSet;
 
 #[async_trait]
 pub trait EdgeRepo: Send + Sync {
@@ -18,6 +19,13 @@ pub trait EdgeRepo: Send + Sync {
         node_id: NodeId,
     ) -> Result<Vec<EdgeWithTitles>, EmberTroveError>;
     async fn list_all(&self) -> Result<Vec<Edge>, EmberTroveError>;
+    /// Atomically replace all `wiki_link` edges outgoing from `source_id` with
+    /// edges to the given `target_ids`. Self-loop targets are silently skipped.
+    async fn sync_wikilinks(
+        &self,
+        source_id: NodeId,
+        target_ids: &[NodeId],
+    ) -> Result<(), EmberTroveError>;
 }
 
 pub struct PgEdgeRepo {
@@ -88,6 +96,7 @@ fn parse_edge_type(s: &str) -> Result<EdgeType, EmberTroveError> {
         "related_to" => Ok(EdgeType::RelatedTo),
         "depends_on" => Ok(EdgeType::DependsOn),
         "derived_from" => Ok(EdgeType::DerivedFrom),
+        "wiki_link" => Ok(EdgeType::WikiLink),
         other => Err(EmberTroveError::Internal(format!(
             "unknown edge_type: {other}"
         ))),
@@ -101,6 +110,7 @@ fn edge_type_to_str(t: &EdgeType) -> &'static str {
         EdgeType::RelatedTo => "related_to",
         EdgeType::DependsOn => "depends_on",
         EdgeType::DerivedFrom => "derived_from",
+        EdgeType::WikiLink => "wiki_link",
     }
 }
 
@@ -220,5 +230,54 @@ impl EdgeRepo for PgEdgeRepo {
         .map_err(|e| EmberTroveError::Internal(format!("list all edges failed: {e}")))?;
 
         rows.into_iter().map(EdgeRow::into_edge).collect()
+    }
+
+    async fn sync_wikilinks(
+        &self,
+        source_id: NodeId,
+        target_ids: &[NodeId],
+    ) -> Result<(), EmberTroveError> {
+        // Deduplicate and remove self-loops.
+        let targets: HashSet<Uuid> = target_ids
+            .iter()
+            .map(|id| id.0)
+            .filter(|&id| id != source_id.0)
+            .collect();
+
+        let mut tx = self.pool.begin().await.map_err(|e| {
+            EmberTroveError::Internal(format!("begin transaction failed: {e}"))
+        })?;
+
+        // Remove all existing wiki_link edges from this source node.
+        sqlx::query(
+            "DELETE FROM edges WHERE source_id = $1 AND edge_type = 'wiki_link'::edge_type",
+        )
+        .bind(source_id.0)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("delete wiki_link edges failed: {e}")))?;
+
+        // Insert one edge per resolved target.
+        for target in targets {
+            sqlx::query(
+                r#"
+                INSERT INTO edges (source_id, target_id, edge_type, label)
+                VALUES ($1, $2, 'wiki_link'::edge_type, NULL)
+                "#,
+            )
+            .bind(source_id.0)
+            .bind(target)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| {
+                EmberTroveError::Internal(format!("insert wiki_link edge failed: {e}"))
+            })?;
+        }
+
+        tx.commit().await.map_err(|e| {
+            EmberTroveError::Internal(format!("commit wiki_link sync failed: {e}"))
+        })?;
+
+        Ok(())
     }
 }

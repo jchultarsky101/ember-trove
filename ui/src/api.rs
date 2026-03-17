@@ -5,7 +5,7 @@ use common::{
     auth::UserInfo,
     edge::{CreateEdgeRequest, Edge, EdgeWithTitles},
     id::{AttachmentId, EdgeId, NodeId, TagId},
-    node::{CreateNodeRequest, Node, NodeListResponse, UpdateNodeRequest},
+    node::{CreateNodeRequest, Node, NodeListResponse, NodeTitleEntry, UpdateNodeRequest},
     search::SearchResponse,
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
 };
@@ -191,6 +191,14 @@ pub async fn delete_node(id: NodeId) -> Result<(), UiError> {
             .unwrap_or_else(|_| "unknown error".to_string());
         Err(UiError::api(status, text))
     }
+}
+
+pub async fn fetch_node_titles() -> Result<Vec<NodeTitleEntry>, UiError> {
+    let resp = Request::get(&api_url("/nodes/titles"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
 }
 
 // ── Edges ───────────────────────────────────────────────────────────────

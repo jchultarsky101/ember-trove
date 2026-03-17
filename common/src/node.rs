@@ -76,6 +76,14 @@ pub struct NodeListParams {
     pub per_page: Option<u32>,
 }
 
+/// Lightweight title entry used for wiki-link autocomplete and resolution.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct NodeTitleEntry {
+    pub id: NodeId,
+    pub title: String,
+    pub slug: String,
+}
+
 /// Paginated response for node list queries.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct NodeListResponse {

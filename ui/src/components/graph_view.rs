@@ -46,6 +46,7 @@ fn edge_color(et: &EdgeType) -> &'static str {
         EdgeType::RelatedTo   => "#a855f7",
         EdgeType::DependsOn   => "#f97316",
         EdgeType::DerivedFrom => "#ec4899",
+        EdgeType::WikiLink    => "#60a5fa",
     }
 }
 
@@ -56,6 +57,7 @@ fn edge_label(et: &EdgeType) -> &'static str {
         EdgeType::RelatedTo   => "related to",
         EdgeType::DependsOn   => "depends on",
         EdgeType::DerivedFrom => "derived from",
+        EdgeType::WikiLink    => "wiki link",
     }
 }
 
@@ -66,6 +68,7 @@ fn edge_marker_id(et: &EdgeType) -> &'static str {
         EdgeType::RelatedTo   => "arrow-related-to",
         EdgeType::DependsOn   => "arrow-depends-on",
         EdgeType::DerivedFrom => "arrow-derived-from",
+        EdgeType::WikiLink    => "arrow-wiki-link",
     }
 }
 
@@ -95,6 +98,7 @@ fn inject_svg_markers() {
         ("arrow-related-to",  "#a855f7"),
         ("arrow-depends-on",  "#f97316"),
         ("arrow-derived-from","#ec4899"),
+        ("arrow-wiki-link",   "#60a5fa"),
     ];
 
     for (id, color) in ARROWS {

@@ -9,6 +9,7 @@ mod object_store;
 mod repo;
 mod routes;
 mod state;
+mod wikilink;
 
 use std::sync::Arc;
 
