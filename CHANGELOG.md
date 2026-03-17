@@ -10,6 +10,33 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.1.0] - 2026-03-17
+
+### Added
+
+- **Wiki-links**: `[[Node Title]]` and `[[Node Title|display]]` syntax in node bodies.
+  - Parser (`api/src/wikilink.rs`) extracts titles with no regex dependency.
+  - `sync_wikilinks()` on `EdgeRepo` — on create/update, deletes stale `wiki_link` edges and
+    inserts new ones resolved by title (case-insensitive).
+  - `GET /api/nodes/titles` endpoint returns all node title+id pairs for UI resolution.
+  - `migrations/003_wikilink_edge_type.sql`: `ALTER TYPE edge_type ADD VALUE 'wiki_link'`.
+  - UI: `[[` triggers autocomplete dropdown in the Markdown editor (filtered, keyboard-friendly).
+  - UI: resolved links render as blue dotted-underline anchors; click navigates in-app.
+  - UI: unresolved links render as gray strikethrough `<span>`.
+  - Graph view: `WikiLink` edges shown in blue-400 with arrowhead markers.
+- **Keycloak login theme**: CSS-only dark theme matching app palette (gray-950 bg, gray-900 card,
+  blue-600 accent, Inter font). Mounted as a Docker volume; CSS edits are live without restart.
+- **CI/CD pipeline** (`.github/workflows/ci.yml`): cargo check + clippy + test on push to
+  `main`/`develop` and all PRs; separate wasm32 job for the UI crate.
+- **Release workflow** (`.github/workflows/release.yml`): cargo-dist cross-platform binary releases
+  triggered by version tags (`v*`). `dist-workspace.toml` excludes the WASM UI crate.
+- **User management UI**: admin view with user table, create-user form, two-click delete, inline
+  role editor. Backend routes guarded by `admin` JWT role.
+- **Keycloak admin client** (`api/src/admin/keycloak.rs`): fetches admin token via
+  `client_credentials`, caches with 30 s buffer.
+
+---
+
 ## [1.0.0] - 2026-03-17
 
 ### Added
