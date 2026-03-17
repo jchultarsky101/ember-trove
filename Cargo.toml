@@ -37,6 +37,13 @@ tower-http = { version = "0.6", features = ["cors", "trace"] }
 utoipa            = { version = "5", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 
+# Auth / JWT
+jsonwebtoken = "9"
+reqwest      = { version = "0.12", features = ["json"] }
+axum-extra   = { version = "0.10", features = ["cookie-private"] }
+urlencoding  = "2"
+hex          = "0.4"
+
 # Common domain types
 uuid   = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }

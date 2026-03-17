@@ -1,13 +1,11 @@
+#![allow(dead_code)]
 /// Modal for creating a new node (title, type).
 ///
 /// Phase 1 stub — Phase 3 wires the API call.
 use leptos::prelude::*;
 
 #[component]
-pub fn CreateNodeModal(
-    #[prop(into)] show: Signal<bool>,
-    on_close: Callback<()>,
-) -> impl IntoView {
+pub fn CreateNodeModal(#[prop(into)] show: Signal<bool>, on_close: Callback<()>) -> impl IntoView {
     view! {
         <Show when=move || show.get()>
             <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

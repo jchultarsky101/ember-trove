@@ -1,25 +1,35 @@
 # ── Stage 1: build WASM + static assets ──────────────────────────────────────
-FROM rust:1.82-slim-bookworm AS builder
+FROM rust:latest AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config libssl-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install cargo-binstall, then use it to download the pre-built trunk binary
+# (avoids compiling trunk from source, saving 10+ minutes in CI)
+RUN curl -L --proto '=https' --tlsv1.2 -sSf \
+    https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh \
+    | bash \
+    && cargo binstall -y trunk
+
 RUN rustup target add wasm32-unknown-unknown
-RUN cargo install trunk
 
 WORKDIR /build
 
-# Cache workspace deps
+# Pre-fetch workspace dependencies before copying real source so Docker
+# layer cache is reused when only application code changes.
 COPY Cargo.toml Cargo.lock ./
 COPY common/Cargo.toml ./common/Cargo.toml
+COPY api/Cargo.toml    ./api/Cargo.toml
 COPY ui/Cargo.toml     ./ui/Cargo.toml
 
-RUN mkdir -p common/src ui/src \
+RUN mkdir -p common/src api/src ui/src \
     && echo "" > common/src/lib.rs \
-    && echo "fn main(){}" > ui/src/main.rs
+    && echo "fn main(){}" > api/src/main.rs \
+    && echo "fn main(){}" > ui/src/main.rs \
+    && cargo fetch
 
-# Build real UI
+# Copy real source and build
 COPY common/ ./common/
 COPY ui/     ./ui/
 
@@ -29,9 +39,10 @@ RUN trunk build --release
 # ── Stage 2: nginx static serving ─────────────────────────────────────────────
 FROM nginx:alpine
 
-COPY --from=builder /build/dist /usr/share/nginx/html
+# trunk outputs to dist/ relative to the ui crate directory
+COPY --from=builder /build/ui/dist /usr/share/nginx/html
 
-# Serve index.html for all routes (SPA fallback)
+# SPA fallback + compression + long-lived asset caching
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

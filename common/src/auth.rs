@@ -18,7 +18,7 @@ pub struct AuthClaims {
 }
 
 /// Public user information returned by `GET /auth/me`.
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct UserInfo {
     pub sub: String,
     pub email: Option<String>,

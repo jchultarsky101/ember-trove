@@ -1,7 +1,7 @@
 /// Standalone permission routes (mirrors nested routes on nodes).
 ///
 /// Phase 1 stub — full implementation in Phase 7.
-use axum::{http::StatusCode, Router};
+use axum::{Router, http::StatusCode};
 
 use crate::state::AppState;
 

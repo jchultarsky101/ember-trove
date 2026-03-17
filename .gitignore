@@ -1,6 +1,8 @@
 /target
 /dist
+ui/dist/
 /.sqlx
+.claude/
 *.env
 .env.*
 !.env.example

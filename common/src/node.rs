@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::id::{NodeId, TagId};
+use crate::tag::Tag;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -33,7 +34,7 @@ pub struct Node {
     pub body: Option<String>,
     pub metadata: serde_json::Value,
     pub status: NodeStatus,
-    pub tags: Vec<TagId>,
+    pub tags: Vec<Tag>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -73,4 +74,14 @@ pub struct NodeListParams {
     pub owner_id: Option<String>,
     pub page: Option<u32>,
     pub per_page: Option<u32>,
+}
+
+/// Paginated response for node list queries.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct NodeListResponse {
+    pub nodes: Vec<Node>,
+    pub total: u64,
+    pub page: u32,
+    pub per_page: u32,
+    pub has_more: bool,
 }

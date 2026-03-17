@@ -1,7 +1,7 @@
 [package]
 name    = "api"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 common             = { path = "../common" }
@@ -22,6 +22,14 @@ utoipa-swagger-ui  = { workspace = true }
 uuid               = { workspace = true }
 chrono             = { workspace = true }
 garde              = { workspace = true }
+jsonwebtoken       = { workspace = true }
+reqwest            = { workspace = true }
+axum-extra         = { workspace = true }
+urlencoding        = { workspace = true }
+hex                = { workspace = true }
+
+# S3-compatible object storage (MinIO / AWS S3)
+aws-sdk-s3 = "1"
 
 sqlx = { version = "0.8", features = [
     "runtime-tokio-native-tls",
