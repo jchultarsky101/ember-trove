@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 /// Confirmation dialog for destructive deletes.
 use leptos::prelude::*;
 

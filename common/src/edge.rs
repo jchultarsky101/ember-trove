@@ -24,6 +24,19 @@ pub struct Edge {
     pub created_at: DateTime<Utc>,
 }
 
+/// Edge enriched with source and target node titles — returned by the node-scoped edge list.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct EdgeWithTitles {
+    pub id: EdgeId,
+    pub source_id: NodeId,
+    pub source_title: String,
+    pub target_id: NodeId,
+    pub target_title: String,
+    pub edge_type: EdgeType,
+    pub label: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateEdgeRequest {
     pub source_id: NodeId,

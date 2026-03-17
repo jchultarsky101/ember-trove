@@ -4,8 +4,10 @@ metadata:
   name: ember-trove
   namespace: ember-trove
   annotations:
+    # Allow large file uploads (attachments)
     nginx.ingress.kubernetes.io/proxy-body-size: "100m"
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    # No rewrite — the API already mounts its router at /api, so the full
+    # path must be forwarded as-is (e.g. /api/nodes → /api/nodes).
 spec:
   ingressClassName: nginx
   tls:
@@ -16,17 +18,17 @@ spec:
     - host: ember-trove.example.com
       http:
         paths:
-          # API traffic: /api/* → strip prefix → api service
-          - path: /api(/|$)(.*)
-            pathType: ImplementationSpecific
+          # API traffic: /api/* forwarded unchanged to the API service
+          - path: /api
+            pathType: Prefix
             backend:
               service:
                 name: ember-trove-api
                 port:
                   number: 3003
-          # All other traffic → UI (SPA)
-          - path: /()(.*)
-            pathType: ImplementationSpecific
+          # All other traffic → UI nginx (serves index.html SPA fallback)
+          - path: /
+            pathType: Prefix
             backend:
               service:
                 name: ember-trove-ui

@@ -1,6 +1,7 @@
 // Phase 1 skeleton — stub items will be used as later phases are implemented.
 #![allow(dead_code)]
 
+mod admin;
 mod auth;
 mod config;
 mod error;
@@ -11,15 +12,17 @@ mod state;
 
 use std::sync::Arc;
 
+use axum_extra::extract::cookie::Key;
 use sqlx::postgres::PgPoolOptions;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use auth::AuthConfig;
+use admin::KeycloakAdminClient;
+use auth::{AuthConfig, oidc::OidcClient};
 use config::Config;
 use object_store::s3::S3ObjectStore;
 use repo::{
-    attachment::PgAttachmentRepo, edge::PgEdgeRepo, node::PgNodeRepo,
-    permission::PgPermissionRepo, tag::PgTagRepo,
+    attachment::PgAttachmentRepo, edge::PgEdgeRepo, graph::PgGraphRepo, node::PgNodeRepo,
+    permission::PgPermissionRepo, search::PgSearchRepo, tag::PgTagRepo,
 };
 use state::AppState;
 
@@ -27,8 +30,7 @@ use state::AppState;
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -42,17 +44,92 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("database connection pool established");
 
-    // Phase 1: OIDC + S3 are stubs; use empty strings until Phase 2/6 wire them up.
+    // Run pending migrations on startup.
+    sqlx::migrate!("../migrations")
+        .run(&pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("database migration failed: {e}"))?;
+    tracing::info!("database migrations complete");
+
+    // OIDC discovery — fetch endpoints and JWKS from Keycloak (optional for Phase 1 dev).
+    let oidc = if let (Some(issuer), Some(client_id), Some(client_secret)) =
+        (&config.oidc_issuer, &config.oidc_client_id, &config.oidc_client_secret)
+    {
+        let mut client =
+            OidcClient::discover(issuer, client_id.clone(), client_secret.clone()).await?;
+
+        // When running behind Docker the internal authorization_endpoint URL
+        // (e.g. http://keycloak:8080/...) is unreachable from the browser.
+        // OIDC_EXTERNAL_URL lets operators supply the browser-facing base URL
+        // (e.g. http://localhost:8180) so that the login redirect works.
+        if let Some(ref ext) = config.oidc_external_url {
+            if let Some(path_start) = client.authorization_endpoint.find("/realms") {
+                client.authorization_endpoint =
+                    format!("{}{}", ext.trim_end_matches('/'), &client.authorization_endpoint[path_start..]);
+            }
+        }
+
+        Some(Arc::new(client))
+    } else {
+        tracing::warn!("OIDC not configured — auth endpoints will be disabled");
+        None
+    };
+
     let auth = AuthConfig {
         issuer: config.oidc_issuer.clone().unwrap_or_default(),
         client_id: config.oidc_client_id.clone().unwrap_or_default(),
         client_secret: config.oidc_client_secret.clone().unwrap_or_default(),
+        frontend_url: config.frontend_url.clone(),
+        api_external_url: config.api_external_url.clone(),
     };
 
-    let object_store = Arc::new(S3ObjectStore::new(
-        config.s3_bucket.clone().unwrap_or_default(),
-        config.s3_endpoint.clone().unwrap_or_default(),
-    ));
+    // Derive cookie encryption key from hex-encoded COOKIE_KEY.
+    let key_bytes = hex::decode(&config.cookie_key)
+        .map_err(|e| anyhow::anyhow!("COOKIE_KEY is not valid hex: {e}"))?;
+    let cookie_key = Key::from(&key_bytes);
+
+    let object_store: Arc<dyn object_store::ObjectStore> =
+        if let (Some(bucket), Some(access_key), Some(secret_key)) = (
+            config.s3_bucket.as_deref(),
+            config.s3_access_key.as_deref(),
+            config.s3_secret_key.as_deref(),
+        ) {
+            Arc::new(
+                S3ObjectStore::new(
+                    bucket,
+                    &config.s3_region,
+                    access_key,
+                    secret_key,
+                    config.s3_endpoint.as_deref(),
+                )
+                .map_err(|e| anyhow::anyhow!("S3 init failed: {e}"))?,
+            )
+        } else {
+            tracing::warn!("S3 not configured — attachment upload/download will be unavailable");
+            Arc::new(object_store::NullObjectStore)
+        };
+
+    // Keycloak Admin client — optional; enabled when admin credentials are in the environment.
+    let keycloak_admin = if let (Some(user), Some(password)) = (
+        config.keycloak_admin_user.as_deref(),
+        config.keycloak_admin_password.as_deref(),
+    ) {
+        if let Some((base, realm)) = config.keycloak_base_and_realm() {
+            tracing::info!("Keycloak admin client enabled (realm: {realm})");
+            Some(Arc::new(KeycloakAdminClient::new(
+                base,
+                realm,
+                user.to_string(),
+                password.to_string(),
+            )))
+        } else {
+            tracing::warn!("KEYCLOAK_ADMIN_USER/PASSWORD set but OIDC_ISSUER missing — admin API disabled");
+            None
+        }
+    } else {
+        tracing::info!("Keycloak admin credentials not set — /admin/* endpoints disabled");
+        None
+    };
 
     let state = AppState {
         nodes: Arc::new(PgNodeRepo::new(pool.clone())),
@@ -60,13 +137,18 @@ async fn main() -> anyhow::Result<()> {
         tags: Arc::new(PgTagRepo::new(pool.clone())),
         attachments: Arc::new(PgAttachmentRepo::new(pool.clone())),
         permissions: Arc::new(PgPermissionRepo::new(pool.clone())),
+        search: Arc::new(PgSearchRepo::new(pool.clone())),
+        graph: Arc::new(PgGraphRepo::new(pool.clone())),
         object_store,
+        oidc,
+        keycloak_admin,
+        cookie_key,
         auth,
         config: config.clone(),
         pool,
     };
 
-    let app = routes::build_router(state);
+    let app = axum::Router::new().nest("/api", routes::build_router(state));
 
     let addr = format!("{}:{}", config.host, config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;

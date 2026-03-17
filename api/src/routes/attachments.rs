@@ -1,15 +1,55 @@
-/// Attachment download route.
-///
-/// Phase 1 stub — full implementation in Phase 6.
-use axum::{http::StatusCode, routing::get, Router};
+use axum::{
+    body::Body,
+    extract::{Path, State},
+    http::{header, StatusCode},
+    response::Response,
+    routing::{delete, get},
+    Router,
+};
+use common::id::AttachmentId;
+use uuid::Uuid;
 
-use crate::state::AppState;
+use crate::{error::ApiError, state::AppState};
 
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/{id}/download", get(download))
-        .route("/{id}", axum::routing::delete(delete_attachment))
+        .route("/{id}", delete(delete_attachment))
 }
 
-async fn download() -> StatusCode { StatusCode::NOT_IMPLEMENTED }
-async fn delete_attachment() -> StatusCode { StatusCode::NOT_IMPLEMENTED }
+/// Stream the attachment bytes directly from S3.
+async fn download(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Response, ApiError> {
+    let attachment = state.attachments.get(AttachmentId(id)).await?;
+    let data = state
+        .object_store
+        .get(&attachment.s3_key)
+        .await
+        .map_err(|e| ApiError::Storage(e.to_string()))?;
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, &attachment.content_type)
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{}\"", attachment.filename),
+        )
+        .header(header::CONTENT_LENGTH, data.len().to_string())
+        .body(Body::from(data))
+        .map_err(|e| ApiError::Internal(format!("response build: {e}")))
+}
+
+/// Delete the attachment record and the corresponding S3 object.
+async fn delete_attachment(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    let s3_key = state.attachments.delete(AttachmentId(id)).await?;
+    // Best-effort S3 delete — log but don't fail the request if S3 is unavailable.
+    if let Err(e) = state.object_store.delete(&s3_key).await {
+        tracing::warn!(s3_key, error = %e, "S3 delete failed after DB record removed");
+    }
+    Ok(StatusCode::NO_CONTENT)
+}

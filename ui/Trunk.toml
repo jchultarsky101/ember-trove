@@ -4,5 +4,8 @@ target = "index.html"
 [serve]
 port = 8003
 
+[[proxy]]
+backend = "http://localhost:3003/api/"
+
 [tools]
 tailwindcss = "4.2.1"

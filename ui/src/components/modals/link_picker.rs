@@ -1,13 +1,11 @@
+#![allow(dead_code)]
 /// Search-and-select modal for linking nodes with a typed edge.
 ///
 /// Phase 1 stub — Phase 4 wires the node search + edge creation.
 use leptos::prelude::*;
 
 #[component]
-pub fn LinkPickerModal(
-    #[prop(into)] show: Signal<bool>,
-    on_close: Callback<()>,
-) -> impl IntoView {
+pub fn LinkPickerModal(#[prop(into)] show: Signal<bool>, on_close: Callback<()>) -> impl IntoView {
     let query = RwSignal::new(String::new());
 
     view! {
