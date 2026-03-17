@@ -65,11 +65,24 @@ ember-trove/
 
 ## Git Flow
 
-- Persistent branches: `main` and `develop` only.
+Follows standard Git Flow. `v1.0.0` is the first production tag on `main`.
+
+| Branch type | Pattern              | Branched from | Merges into          | Notes                              |
+|-------------|----------------------|---------------|----------------------|------------------------------------|
+| Feature     | `feature/jc/<name>`  | `develop`     | `develop`            | `--no-ff`; worktree per feature    |
+| Release     | `release/<version>`  | `develop`     | `main` + `develop`   | tag on `main` after merge          |
+| Hotfix      | `hotfix/<name>`      | `main`        | `main` + `develop`   | tag bump on `main` after merge     |
+
+- Persistent branches: `main` (production) and `develop` (integration).
 - Features: `feature/jc/...` branched from `develop`, worked in
   `.claude/worktrees/<name>/`, merged back with `--no-ff`, worktree + branch
   deleted after merge.
-- **Current state**: All 8 phases complete. `develop` is the active branch.
+- Releases: `release/<semver>` branched from `develop`; after QA, merge into
+  `main` (`--no-ff`), tag (`v<semver>`), merge back into `develop`, delete branch.
+- Hotfixes: `hotfix/<name>` branched from `main`; after fix, merge into `main`
+  (`--no-ff`), tag patch bump, merge back into `develop`, delete branch.
+- **Never commit directly to `main` or `develop`** — all changes via branches.
+- **Current state**: v1.0.0 released. `develop` is the active integration branch.
 
 ## Environment Quirks
 
