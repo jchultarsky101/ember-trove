@@ -246,14 +246,13 @@ Applied 1/migrate initial (Xms)
 The API requires the `ember-trove` bucket to exist before uploading attachments.
 
 ```bash
-docker run --rm -it --network host \
-  minio/mc alias set local http://localhost:9000 ember_trove ember_trove_dev
-
-docker run --rm --network host \
-  minio/mc mb local/ember-trove
+docker exec deploy-minio-1 mc alias set local http://localhost:9000 ember_trove ember_trove_dev
+docker exec deploy-minio-1 mc mb local/ember-trove
 ```
 
-Alternatively, log into the MinIO console at **http://localhost:9001** (credentials: `ember_trove` / `ember_trove_dev`) and create the bucket manually.
+If the bucket already exists you will see `Bucket created successfully. \`local/ember-trove\`` or a `Your previous request to create the named bucket succeeded` error — both are fine.
+
+Alternatively, log into the MinIO console at **http://localhost:9001** (credentials: `ember_trove` / `ember_trove_dev`), navigate to **Buckets → Create Bucket**, and enter `ember-trove`.
 
 ---
 
