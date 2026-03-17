@@ -41,6 +41,8 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
     ports:
       - "8180:8080"
+    volumes:
+      - ./keycloak-theme/ember-trove:/opt/keycloak/themes/ember-trove
 
   api:
     build:
