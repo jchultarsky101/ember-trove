@@ -14,6 +14,52 @@ use crate::components::tag_bar::TagBar;
 use crate::components::toast::{ToastLevel, push_toast};
 use crate::wikilink::preprocess_wikilinks;
 
+// ── Node-type / status icon helpers (mirrors node_list.rs) ──────────────────
+
+fn type_icon_for(nt: &str) -> &'static str {
+    match nt {
+        "project"   => "rocket_launch",
+        "area"      => "category",
+        "resource"  => "bookmarks",
+        "reference" => "menu_book",
+        _           => "description",
+    }
+}
+
+fn type_label_for(nt: &str) -> &'static str {
+    match nt {
+        "project"   => "Project",
+        "area"      => "Area",
+        "resource"  => "Resource",
+        "reference" => "Reference",
+        _           => "Article",
+    }
+}
+
+fn status_icon_for(st: &str) -> &'static str {
+    match st {
+        "published" => "check_circle",
+        "archived"  => "inventory_2",
+        _           => "edit_note",
+    }
+}
+
+fn status_label_for(st: &str) -> &'static str {
+    match st {
+        "published" => "Published",
+        "archived"  => "Archived",
+        _           => "Draft",
+    }
+}
+
+fn status_color_for(st: &str) -> &'static str {
+    match st {
+        "published" => "color: #16a34a;",
+        "archived"  => "color: #d97706;",
+        _           => "color: #a8a29e;",
+    }
+}
+
 /// Render markdown with wiki-link resolution.
 ///
 /// `[[title]]` and `[[title|display]]` are first replaced with HTML anchors
@@ -133,11 +179,22 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                             <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
                                                 {n.title.clone()}
                                             </h1>
-                                            <span class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
-                                                {node_type}
+                                            // Type icon — same encoding as NodeList
+                                            <span
+                                                class="material-symbols-outlined text-stone-400 dark:text-stone-500"
+                                                style="font-size: 18px;"
+                                                title=type_label_for(&node_type)
+                                            >
+                                                {type_icon_for(&node_type)}
                                             </span>
-                                            <span class="px-2 py-0.5 text-xs rounded-full bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400">
-                                                {status}
+                                            // Status icon — semantic colour, same as NodeList
+                                            <span
+                                                class="material-symbols-outlined"
+                                                style=format!("font-size: 18px; {}",
+                                                    status_color_for(&status))
+                                                title=status_label_for(&status)
+                                            >
+                                                {status_icon_for(&status)}
                                             </span>
                                         </div>
                                         <div class="flex items-center gap-1">

@@ -141,6 +141,9 @@ pub fn NodeList() -> impl IntoView {
     let tag_filter =
         use_context::<RwSignal<Option<Tag>>>().unwrap_or_else(|| RwSignal::new(None));
 
+    let node_type_filter =
+        use_context::<RwSignal<Option<String>>>().unwrap_or_else(|| RwSignal::new(None));
+
     let status_filter: RwSignal<Option<String>> = RwSignal::new(None);
     let sort_key = RwSignal::new(SortKey::ModifiedDesc);
     let show_sort_menu = RwSignal::new(false);
@@ -157,7 +160,16 @@ pub fn NodeList() -> impl IntoView {
     view! {
         <div class="flex flex-col h-full">
             <div class="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-800">
-                <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">"Nodes"</h1>
+                <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
+                    {move || match node_type_filter.get().as_deref() {
+                        Some("project")   => "Projects",
+                        Some("area")      => "Areas",
+                        Some("resource")  => "Resources",
+                        Some("reference") => "References",
+                        Some("article") | Some(_) => "Articles",
+                        None              => "All Nodes",
+                    }}
+                </h1>
                 <div class="flex items-center gap-2">
                     // Active tag-filter badge
                     {move || tag_filter.get().map(|tag| {
@@ -311,7 +323,33 @@ pub fn NodeList() -> impl IntoView {
                                     </div>
                                 }.into_any(),
                                 Ok(list) => {
-                                    let sorted = sort_key.get().sort_nodes(list);
+                                    // Client-side type filter applied after fetch.
+                                    let type_f = node_type_filter.get();
+                                    let filtered: Vec<Node> = if let Some(ref nt) = type_f {
+                                        list.into_iter()
+                                            .filter(|n| {
+                                                format!("{:?}", n.node_type).to_lowercase() == *nt
+                                            })
+                                            .collect()
+                                    } else {
+                                        list
+                                    };
+                                    if filtered.is_empty() {
+                                        return view! {
+                                            <div class="flex flex-col items-center justify-center h-full gap-3 p-12">
+                                                <span
+                                                    class="material-symbols-outlined text-stone-300 dark:text-stone-700"
+                                                    style="font-size: 48px;"
+                                                >
+                                                    "description"
+                                                </span>
+                                                <p class="text-stone-400 dark:text-stone-600 text-sm text-center">
+                                                    "No nodes found."
+                                                </p>
+                                            </div>
+                                        }.into_any();
+                                    }
+                                    let sorted = sort_key.get().sort_nodes(filtered);
                                     view! { <NodeCards nodes=sorted current_view=current_view /> }.into_any()
                                 }
                                 Err(e) => view! {
