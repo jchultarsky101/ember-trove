@@ -6,6 +6,7 @@ mod app;
 mod auth;
 mod components;
 mod error;
+mod templates;
 mod wikilink;
 
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
