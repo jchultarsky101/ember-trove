@@ -152,41 +152,32 @@ fn ViewSwitch() -> impl IntoView {
 }
 
 /// Auth gate: spinner → login redirect → render app.
+///
+/// Children are instantiated lazily — only once `AuthStatus::Authenticated`
+/// is confirmed. This prevents unauthenticated API calls (which would trigger
+/// parse_json's 401 → refresh → reload loop) from firing before login.
 #[component]
-fn AuthGate(auth_state: AuthState, children: Children) -> impl IntoView {
-    let app_view = children();
-
-    view! {
-        <div style:display=move || {
-            if matches!(auth_state.get(), AuthStatus::Authenticated(_)) { "none" } else { "" }
-        }>
-            {move || match auth_state.get() {
-                AuthStatus::Loading => view! {
-                    <div class="flex items-center justify-center h-screen bg-stone-50 dark:bg-stone-950">
-                        <div class="text-stone-400 dark:text-stone-500 text-sm">"Loading..."</div>
-                    </div>
-                }.into_any(),
-                AuthStatus::Unauthenticated => {
-                    wasm_bindgen_futures::spawn_local(async {
-                        if let Ok(url) = crate::api::fetch_login_url().await
-                            && let Some(window) = web_sys::window()
-                        {
-                            let _ = window.location().set_href(&url);
-                        }
-                    });
-                    view! {
-                        <div class="flex items-center justify-center h-screen bg-stone-50 dark:bg-stone-950">
-                            <div class="text-stone-400 dark:text-stone-500 text-sm">"Redirecting to login..."</div>
-                        </div>
-                    }.into_any()
+fn AuthGate(auth_state: AuthState, children: ChildrenFn) -> impl IntoView {
+    move || match auth_state.get() {
+        AuthStatus::Loading => view! {
+            <div class="flex items-center justify-center h-screen bg-stone-50 dark:bg-stone-950">
+                <div class="text-stone-400 dark:text-stone-500 text-sm">"Loading..."</div>
+            </div>
+        }.into_any(),
+        AuthStatus::Unauthenticated => {
+            wasm_bindgen_futures::spawn_local(async {
+                if let Ok(url) = crate::api::fetch_login_url().await
+                    && let Some(window) = web_sys::window()
+                {
+                    let _ = window.location().set_href(&url);
                 }
-                AuthStatus::Authenticated(_) => ().into_any(),
-            }}
-        </div>
-        <div style:display=move || {
-            if matches!(auth_state.get(), AuthStatus::Authenticated(_)) { "" } else { "none" }
-        }>
-            {app_view}
-        </div>
+            });
+            view! {
+                <div class="flex items-center justify-center h-screen bg-stone-50 dark:bg-stone-950">
+                    <div class="text-stone-400 dark:text-stone-500 text-sm">"Redirecting to login..."</div>
+                </div>
+            }.into_any()
+        }
+        AuthStatus::Authenticated(_) => children().into_any(),
     }
 }
