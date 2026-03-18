@@ -1,7 +1,5 @@
 use leptos::prelude::*;
 
-use common::tag::Tag;
-
 use crate::{
     app::View,
     auth::{AuthState, AuthStatus},
@@ -22,8 +20,6 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
         });
     };
 
-    let tag_filter =
-        use_context::<RwSignal<Option<Tag>>>().expect("tag_filter signal must be provided");
     let node_type_filter =
         use_context::<RwSignal<Option<String>>>().expect("node_type_filter signal must be provided");
 
@@ -96,14 +92,6 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
             <SidebarLink
                 icon="label" label="Tags"
                 on_click=move || current_view.set(View::TagManager)
-                collapsed=collapsed
-            />
-            <SidebarLink
-                icon="filter_list" label="Browse by Tag"
-                on_click=move || {
-                    tag_filter.set(None);
-                    current_view.set(View::Search);
-                }
                 collapsed=collapsed
             />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />

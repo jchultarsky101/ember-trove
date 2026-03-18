@@ -1,16 +1,33 @@
-use common::tag::{CreateTagRequest, UpdateTagRequest};
+use common::tag::{CreateTagRequest, Tag, UpdateTagRequest};
 use leptos::prelude::*;
 
+use crate::app::View;
 use crate::components::modals::delete_confirm::DeleteConfirmModal;
 use crate::components::toast::{ToastLevel, push_toast};
 
-/// Full-page tag management: list all tags, create new, edit name/color, delete.
+/// Tag browser + manager.
+///
+/// Primary purpose: list all tags, filterable by a search box. Clicking a tag
+/// navigates to the node list filtered by that tag (browse mode).
+///
+/// Secondary: create new tags, edit name/colour, delete — all as hover actions
+/// so the browse experience stays front-and-centre.
 #[component]
 pub fn TagManager() -> impl IntoView {
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let tag_filter_ctx =
+        use_context::<RwSignal<Option<Tag>>>().expect("tag_filter signal must be provided");
+
     let refresh = RwSignal::new(0u32);
+    let search_q = RwSignal::new(String::new());
+
+    // Create form
     let new_name = RwSignal::new(String::new());
     let new_color = RwSignal::new("#d97706".to_string());
+    let show_create = RwSignal::new(false);
     let error_msg = RwSignal::new(Option::<String>::None);
+
+    // Edit state
     let editing_id = RwSignal::new(Option::<common::id::TagId>::None);
     let edit_name = RwSignal::new(String::new());
     let edit_color = RwSignal::new(String::new());
@@ -38,6 +55,7 @@ pub fn TagManager() -> impl IntoView {
                 Ok(_) => {
                     new_name.set(String::new());
                     new_color.set("#d97706".to_string());
+                    show_create.set(false);
                     refresh.update(|n| *n += 1);
                     push_toast(ToastLevel::Success, format!("Tag \"{name}\" created."));
                 }
@@ -56,7 +74,7 @@ pub fn TagManager() -> impl IntoView {
 
         wasm_bindgen_futures::spawn_local(async move {
             let req = UpdateTagRequest {
-                name: if name.is_empty() { None } else { Some(name.clone()) },
+                name: if name.is_empty() { None } else { Some(name) },
                 color: Some(color),
             };
             match crate::api::update_tag(id, &req).await {
@@ -70,60 +88,111 @@ pub fn TagManager() -> impl IntoView {
         });
     };
 
-    let on_keydown_create = move |ev: web_sys::KeyboardEvent| {
-        if ev.key() == "Enter" {
-            ev.prevent_default();
-            do_create();
-        }
-    };
-
     view! {
         <div class="flex flex-col h-full">
-            <div class="px-6 py-4 border-b border-stone-200 dark:border-stone-800">
+
+            // ── Header ─────────────────────────────────────────────────────────
+            <div class="flex items-center justify-between px-6 py-4
+                        border-b border-stone-200 dark:border-stone-800">
                 <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">"Tags"</h1>
+                <button
+                    class=move || {
+                        let base = "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg \
+                                    font-medium transition-colors";
+                        if show_create.get() {
+                            format!("{base} bg-stone-100 dark:bg-stone-800 \
+                                    text-stone-600 dark:text-stone-400")
+                        } else {
+                            format!("{base} bg-amber-600 hover:bg-amber-700 text-white")
+                        }
+                    }
+                    on:click=move |_| show_create.update(|v| *v = !*v)
+                >
+                    <span class="material-symbols-outlined" style="font-size: 16px;">
+                        {move || if show_create.get() { "close" } else { "add" }}
+                    </span>
+                    {move || if show_create.get() { "Cancel" } else { "New Tag" }}
+                </button>
             </div>
 
-            // Create form
+            // ── Create form (collapsible) ───────────────────────────────────────
+            {move || show_create.get().then(|| view! {
+                <div class="px-6 py-3 border-b border-stone-200 dark:border-stone-800
+                            bg-stone-50 dark:bg-stone-900/50">
+                    <div class="flex items-center gap-2">
+                        <input
+                            type="color"
+                            class="w-8 h-8 rounded cursor-pointer border-0 flex-shrink-0"
+                            prop:value=move || new_color.get()
+                            on:input=move |ev| new_color.set(event_target_value(&ev))
+                        />
+                        <input
+                            type="text"
+                            autofocus
+                            class="flex-1 px-3 py-1.5 text-sm rounded-lg
+                                   border border-stone-300 dark:border-stone-600
+                                   bg-white dark:bg-stone-800
+                                   text-stone-900 dark:text-stone-100
+                                   focus:outline-none focus:ring-2 focus:ring-amber-500
+                                   placeholder-stone-400 dark:placeholder-stone-500"
+                            placeholder="Tag name…"
+                            prop:value=move || new_name.get()
+                            on:input=move |ev| new_name.set(event_target_value(&ev))
+                            on:keydown=move |ev: web_sys::KeyboardEvent| {
+                                if ev.key() == "Enter" { ev.prevent_default(); do_create(); }
+                            }
+                        />
+                        <button
+                            class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white
+                                   text-sm font-medium rounded-lg transition-colors"
+                            on:click=move |_| do_create()
+                        >
+                            "Create"
+                        </button>
+                    </div>
+                    {move || error_msg.get().map(|msg| view! {
+                        <p class="mt-1.5 text-xs text-red-500">{msg}</p>
+                    })}
+                </div>
+            })}
+
+            // ── Search bar ─────────────────────────────────────────────────────
             <div class="px-6 py-3 border-b border-stone-200 dark:border-stone-800">
-                <div class="flex items-center gap-2">
+                <div class="relative">
+                    <span
+                        class="absolute left-2.5 top-1/2 -translate-y-1/2
+                               material-symbols-outlined text-stone-400 dark:text-stone-500
+                               pointer-events-none"
+                        style="font-size: 16px;"
+                    >
+                        "search"
+                    </span>
                     <input
                         type="text"
-                        class="flex-1 px-3 py-1.5 text-sm rounded-lg border border-stone-300 dark:border-stone-600
-                            bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none
-                            focus:ring-1 focus:ring-amber-500"
-                        placeholder="New tag name..."
-                        prop:value=move || new_name.get()
-                        on:input=move |ev| new_name.set(event_target_value(&ev))
-                        on:keydown=on_keydown_create
+                        class="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg
+                               border border-stone-200 dark:border-stone-700
+                               bg-stone-50 dark:bg-stone-800
+                               text-stone-900 dark:text-stone-100
+                               focus:outline-none focus:ring-2 focus:ring-amber-500
+                               placeholder-stone-400 dark:placeholder-stone-500
+                               transition-colors"
+                        placeholder="Filter tags…"
+                        prop:value=move || search_q.get()
+                        on:input=move |ev| search_q.set(event_target_value(&ev))
                     />
-                    <input
-                        type="color"
-                        class="w-8 h-8 rounded cursor-pointer border-0"
-                        prop:value=move || new_color.get()
-                        on:input=move |ev| new_color.set(event_target_value(&ev))
-                    />
-                    <button
-                        class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium
-                            rounded-lg transition-colors"
-                        on:click=move |_| do_create()
-                    >
-                        "Create"
-                    </button>
                 </div>
-                {move || error_msg.get().map(|msg| view! {
-                    <div class="mt-2 text-xs text-red-500">{msg}</div>
-                })}
             </div>
 
-            // Tag list
+            // ── Tag list ───────────────────────────────────────────────────────
             <div class="flex-1 overflow-auto">
                 <Suspense fallback=|| view! {
-                    // Skeleton rows
                     <div class="divide-y divide-stone-100 dark:divide-stone-800">
-                        {(0..4).map(|_| view! {
+                        {(0..5).map(|_| view! {
                             <div class="flex items-center gap-3 px-6 py-3">
-                                <div class="w-4 h-4 rounded-full bg-stone-200 dark:bg-stone-700 animate-pulse flex-shrink-0" />
-                                <div class="h-3.5 rounded bg-stone-200 dark:bg-stone-700 animate-pulse w-28" />
+                                <div class="w-3.5 h-3.5 rounded-full bg-stone-200
+                                            dark:bg-stone-700 animate-pulse flex-shrink-0" />
+                                <div class="h-3.5 rounded bg-stone-200 dark:bg-stone-700
+                                            animate-pulse w-28" />
                             </div>
                         }).collect::<Vec<_>>()}
                     </div>
@@ -131,58 +200,105 @@ pub fn TagManager() -> impl IntoView {
                     {move || {
                         tags.get().map(|result| {
                             match result {
-                                Ok(tag_list) if tag_list.is_empty() => {
-                                    view! {
-                                        <div class="flex flex-col items-center justify-center gap-3 py-16">
-                                            <span
-                                                class="material-symbols-outlined text-stone-300 dark:text-stone-700"
-                                                style="font-size: 48px;"
-                                            >
-                                                "label_off"
-                                            </span>
-                                            <p class="text-sm text-stone-400 dark:text-stone-600">
-                                                "No tags yet. Create one above."
-                                            </p>
-                                        </div>
-                                    }.into_any()
-                                }
+                                Ok(tag_list) if tag_list.is_empty() => view! {
+                                    <div class="flex flex-col items-center justify-center gap-3 py-16">
+                                        <span
+                                            class="material-symbols-outlined
+                                                   text-stone-300 dark:text-stone-700"
+                                            style="font-size: 48px;"
+                                        >
+                                            "label_off"
+                                        </span>
+                                        <p class="text-sm text-stone-400 dark:text-stone-600">
+                                            "No tags yet. Create one above."
+                                        </p>
+                                    </div>
+                                }.into_any(),
+
                                 Ok(tag_list) => {
+                                    let q = search_q.get().to_lowercase();
+                                    let filtered: Vec<Tag> = if q.is_empty() {
+                                        tag_list
+                                    } else {
+                                        tag_list.into_iter()
+                                            .filter(|t| t.name.to_lowercase().contains(&q))
+                                            .collect()
+                                    };
+
+                                    if filtered.is_empty() {
+                                        return view! {
+                                            <div class="flex flex-col items-center justify-center
+                                                        gap-2 py-12">
+                                                <span
+                                                    class="material-symbols-outlined
+                                                           text-stone-300 dark:text-stone-700"
+                                                    style="font-size: 36px;"
+                                                >
+                                                    "search_off"
+                                                </span>
+                                                <p class="text-sm text-stone-400
+                                                          dark:text-stone-600">
+                                                    "No tags match."
+                                                </p>
+                                            </div>
+                                        }.into_any();
+                                    }
+
                                     view! {
                                         <div class="divide-y divide-stone-100 dark:divide-stone-800">
-                                            {tag_list.into_iter().map(|tag| {
-                                                let tag_id = tag.id;
-                                                let name = tag.name.clone();
-                                                let color = tag.color.clone();
+                                            {filtered.into_iter().map(|tag| {
+                                                let tag_id   = tag.id;
+                                                let name     = tag.name.clone();
+                                                let color    = tag.color.clone();
+                                                let tag_clone = tag.clone();
+
                                                 view! {
-                                                    <div class="flex items-center justify-between px-6 py-3 hover:bg-stone-50 dark:hover:bg-stone-900/50 group">
+                                                    <div class="flex items-center justify-between
+                                                                px-6 py-3
+                                                                hover:bg-stone-50
+                                                                dark:hover:bg-stone-900/50 group">
                                                         {move || {
                                                             if editing_id.get() == Some(tag_id) {
-                                                                // Edit mode
+                                                                // ── Edit mode ──────────────────
                                                                 view! {
                                                                     <div class="flex items-center gap-2 flex-1">
                                                                         <input
                                                                             type="color"
-                                                                            class="w-6 h-6 rounded cursor-pointer border-0"
+                                                                            class="w-6 h-6 rounded
+                                                                                   cursor-pointer
+                                                                                   border-0
+                                                                                   flex-shrink-0"
                                                                             prop:value=move || edit_color.get()
                                                                             on:input=move |ev| edit_color.set(event_target_value(&ev))
                                                                         />
                                                                         <input
                                                                             type="text"
-                                                                            class="flex-1 px-2 py-1 text-sm rounded border border-stone-300
-                                                                                dark:border-stone-600 bg-transparent text-stone-900
-                                                                                dark:text-stone-100 focus:outline-none focus:ring-1
-                                                                                focus:ring-amber-500"
+                                                                            class="flex-1 px-2 py-1
+                                                                                   text-sm rounded
+                                                                                   border
+                                                                                   border-stone-300
+                                                                                   dark:border-stone-600
+                                                                                   bg-transparent
+                                                                                   text-stone-900
+                                                                                   dark:text-stone-100
+                                                                                   focus:outline-none
+                                                                                   focus:ring-1
+                                                                                   focus:ring-amber-500"
                                                                             prop:value=move || edit_name.get()
                                                                             on:input=move |ev| edit_name.set(event_target_value(&ev))
                                                                         />
                                                                         <button
-                                                                            class="px-2 py-1 text-xs bg-amber-600 text-white rounded"
+                                                                            class="px-2 py-1 text-xs
+                                                                                   bg-amber-600
+                                                                                   text-white rounded"
                                                                             on:click=on_save_edit
                                                                         >
                                                                             "Save"
                                                                         </button>
                                                                         <button
-                                                                            class="px-2 py-1 text-xs text-stone-500 hover:text-stone-700"
+                                                                            class="px-2 py-1 text-xs
+                                                                                   text-stone-500
+                                                                                   hover:text-stone-700"
                                                                             on:click=move |_| editing_id.set(None)
                                                                         >
                                                                             "Cancel"
@@ -190,41 +306,105 @@ pub fn TagManager() -> impl IntoView {
                                                                     </div>
                                                                 }.into_any()
                                                             } else {
-                                                                // Display mode
-                                                                let display_name = name.clone();
+                                                                // ── Browse / display mode ───────
+                                                                let display_name  = name.clone();
                                                                 let display_color = color.clone();
                                                                 let edit_name_val = name.clone();
-                                                                let edit_color_val = color.clone();
-                                                                let del_name = name.clone();
+                                                                let edit_color_val= color.clone();
+                                                                let del_name      = name.clone();
+                                                                let browse_tag    = tag_clone.clone();
                                                                 view! {
-                                                                    <div class="flex items-center gap-3 flex-1">
+                                                                    // Click whole row → browse
+                                                                    <button
+                                                                        class="flex items-center
+                                                                               gap-3 flex-1
+                                                                               text-left min-w-0"
+                                                                        on:click=move |_| {
+                                                                            tag_filter_ctx.set(Some(browse_tag.clone()));
+                                                                            current_view.set(View::NodeList);
+                                                                        }
+                                                                        title="Browse nodes with this tag"
+                                                                    >
                                                                         <span
-                                                                            class="w-4 h-4 rounded-full flex-shrink-0"
+                                                                            class="w-3.5 h-3.5
+                                                                                   rounded-full
+                                                                                   flex-shrink-0"
                                                                             style:background-color=display_color
                                                                         />
-                                                                        <span class="text-sm text-stone-900 dark:text-stone-100">
+                                                                        <span class="text-sm
+                                                                                    text-stone-900
+                                                                                    dark:text-stone-100
+                                                                                    truncate">
                                                                             {display_name}
                                                                         </span>
-                                                                    </div>
-                                                                    <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        // Browse arrow — appears
+                                                                        // on hover so the intent
+                                                                        // is clear
+                                                                        <span
+                                                                            class="material-symbols-outlined
+                                                                                   text-stone-300
+                                                                                   dark:text-stone-600
+                                                                                   opacity-0
+                                                                                   group-hover:opacity-100
+                                                                                   transition-opacity
+                                                                                   ml-auto flex-shrink-0"
+                                                                            style="font-size: 15px;"
+                                                                        >
+                                                                            "arrow_forward"
+                                                                        </span>
+                                                                    </button>
+
+                                                                    // Edit / delete — subtle,
+                                                                    // visible only on hover
+                                                                    <div class="flex items-center
+                                                                                gap-1 ml-2
+                                                                                opacity-0
+                                                                                group-hover:opacity-100
+                                                                                transition-opacity
+                                                                                flex-shrink-0">
                                                                         <button
-                                                                            class="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
-                                                                            on:click=move |_| {
+                                                                            class="p-1 rounded
+                                                                                   text-stone-400
+                                                                                   hover:text-stone-600
+                                                                                   dark:hover:text-stone-300
+                                                                                   hover:bg-stone-100
+                                                                                   dark:hover:bg-stone-800
+                                                                                   transition-colors"
+                                                                            title="Edit tag"
+                                                                            on:click=move |ev| {
+                                                                                ev.stop_propagation();
                                                                                 editing_id.set(Some(tag_id));
                                                                                 edit_name.set(edit_name_val.clone());
                                                                                 edit_color.set(edit_color_val.clone());
                                                                             }
                                                                         >
-                                                                            "Edit"
+                                                                            <span
+                                                                                class="material-symbols-outlined"
+                                                                                style="font-size: 15px;"
+                                                                            >
+                                                                                "edit"
+                                                                            </span>
                                                                         </button>
                                                                         <button
-                                                                            class="text-xs text-red-400 hover:text-red-600"
-                                                                            on:click=move |_| {
+                                                                            class="p-1 rounded
+                                                                                   text-stone-400
+                                                                                   hover:text-red-500
+                                                                                   hover:bg-red-50
+                                                                                   dark:hover:bg-red-900/20
+                                                                                   transition-colors"
+                                                                            title="Delete tag"
+                                                                            on:click=move |ev| {
+                                                                                ev.stop_propagation();
                                                                                 delete_confirm_id.set(Some(tag_id));
                                                                                 delete_confirm_name.set(del_name.clone());
                                                                             }
                                                                         >
-                                                                            "Delete"
+                                                                            <span
+                                                                                class="material-symbols-outlined"
+                                                                                style="font-size: 15px;"
+                                                                            >
+                                                                                "delete"
+                                                                            </span>
                                                                         </button>
                                                                     </div>
                                                                 }.into_any()
@@ -236,8 +416,11 @@ pub fn TagManager() -> impl IntoView {
                                         </div>
                                     }.into_any()
                                 }
+
                                 Err(e) => view! {
-                                    <div class="p-6 text-red-500 text-sm">{format!("Error: {e}")}</div>
+                                    <div class="p-6 text-red-500 text-sm">
+                                        {format!("Error loading tags: {e}")}
+                                    </div>
                                 }.into_any(),
                             }
                         })
@@ -246,7 +429,7 @@ pub fn TagManager() -> impl IntoView {
             </div>
         </div>
 
-        // Delete confirmation modal — outside the list so it overlays everything
+        // Delete confirmation modal
         <DeleteConfirmModal
             show=Signal::derive(move || delete_confirm_id.get().is_some())
             item_name=Signal::derive(move || delete_confirm_name.get())
