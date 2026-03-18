@@ -1,0 +1,74 @@
+{
+  "realm": "ember-trove",
+  "enabled": true,
+  "sslRequired": "none",
+  "loginTheme": "ember-trove",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": false,
+  "clients": [
+    {
+      "clientId": "ember-trove-api",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "change-me",
+      "redirectUris": [
+        "http://localhost:3003/api/auth/callback",
+        "http://localhost:8003/api/auth/callback"
+      ],
+      "webOrigins": ["*"],
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": ""
+      }
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Ember Trove administrator"
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@example.com",
+      "firstName": "Admin",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Admin2026!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "testuser",
+      "email": "test@example.com",
+      "firstName": "Test",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Ember2026",
+          "temporary": false
+        }
+      ],
+      "realmRoles": []
+    }
+  ]
+}

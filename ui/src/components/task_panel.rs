@@ -5,6 +5,8 @@ use common::{
 };
 use leptos::prelude::*;
 
+use crate::app::TaskRefresh;
+
 fn priority_icon(p: &TaskPriority) -> &'static str {
     match p {
         TaskPriority::High => "keyboard_double_arrow_up",
@@ -72,7 +74,9 @@ fn parse_priority(s: &str) -> TaskPriority {
 
 #[component]
 pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
-    let task_refresh = RwSignal::new(0u32);
+    let task_refresh = use_context::<TaskRefresh>()
+        .expect("TaskRefresh context must be provided")
+        .0;
 
     let tasks_resource = LocalResource::new(move || {
         let _ = task_refresh.get();
