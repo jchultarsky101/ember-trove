@@ -87,23 +87,42 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
         });
     };
 
+    let open = RwSignal::new(false);
+
     view! {
         <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-6">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">"Sharing"</h2>
+            <div class="flex items-center justify-between">
                 <button
-                    class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
-                        dark:hover:text-stone-300 hover:bg-stone-100
-                        dark:hover:bg-stone-800 transition-colors"
-                    on:click=on_toggle_add
-                    title=move || if show_add.get() { "Cancel" } else { "Add permission" }
+                    class="flex items-center gap-1 text-left cursor-pointer"
+                    on:click=move |_| open.update(|v| *v = !*v)
                 >
-                    <span class="material-symbols-outlined" style="font-size: 16px;">
-                        {move || if show_add.get() { "close" } else { "person_add" }}
+                    <span
+                        class="material-symbols-outlined text-stone-400 dark:text-stone-500"
+                        style="font-size: 16px;"
+                    >
+                        {move || if open.get() { "expand_more" } else { "chevron_right" }}
                     </span>
+                    <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                        "Sharing"
+                    </h2>
                 </button>
+                {move || open.get().then(|| view! {
+                    <button
+                        class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                            dark:hover:text-stone-300 hover:bg-stone-100
+                            dark:hover:bg-stone-800 transition-colors"
+                        on:click=on_toggle_add
+                        title=move || if show_add.get() { "Cancel" } else { "Add permission" }
+                    >
+                        <span class="material-symbols-outlined" style="font-size: 16px;">
+                            {move || if show_add.get() { "close" } else { "person_add" }}
+                        </span>
+                    </button>
+                })}
             </div>
 
+            {move || open.get().then(|| view! {
+            <div class="mt-4">
             // Add permission form
             {move || show_add.get().then(|| view! {
                 <div class="mb-4 p-3 bg-stone-50 dark:bg-stone-900 rounded-lg space-y-2">
@@ -289,6 +308,8 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                     })
                 }}
             </Suspense>
+            </div>  // close mt-4
+            })}    // close open.then
         </div>
     }
 }
