@@ -22,6 +22,7 @@ struct OidcDiscovery {
     authorization_endpoint: String,
     token_endpoint: String,
     jwks_uri: String,
+    end_session_endpoint: String,
 }
 
 /// Token response from the OIDC token endpoint.
@@ -75,6 +76,7 @@ impl AudClaim {
 /// OIDC client that handles discovery, code exchange, and JWT validation.
 pub struct OidcClient {
     pub authorization_endpoint: String,
+    pub end_session_endpoint: String,
     token_endpoint: String,
     client_id: String,
     client_secret: String,
@@ -114,6 +116,7 @@ impl OidcClient {
 
         Ok(Self {
             authorization_endpoint: discovery.authorization_endpoint,
+            end_session_endpoint: discovery.end_session_endpoint,
             token_endpoint: discovery.token_endpoint,
             client_id,
             client_secret,
