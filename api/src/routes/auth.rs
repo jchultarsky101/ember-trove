@@ -23,13 +23,13 @@ pub fn public_router() -> Router<AppState> {
         .route("/auth/login", get(login))
         .route("/auth/callback", get(callback))
         .route("/auth/refresh", post(refresh))
+        .route("/auth/logout", post(logout))
 }
 
 /// Protected auth routes (JWT required — layered behind require_auth).
 pub fn protected_router() -> Router<AppState> {
     Router::new()
         .route("/auth/me", get(me))
-        .route("/auth/logout", post(logout))
 }
 
 #[derive(Serialize)]
