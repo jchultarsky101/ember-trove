@@ -4,7 +4,7 @@ use common::{
     EmberTroveError,
     id::{NodeId, TaskId},
     task::{
-        CreateTaskRequest, Task, TaskCounts, TaskPriority, TaskStatus, UpdateTaskRequest,
+        CreateTaskRequest, MyDayTask, Task, TaskCounts, TaskPriority, TaskStatus, UpdateTaskRequest,
     },
 };
 use sqlx::PgPool;
@@ -33,12 +33,12 @@ pub trait TaskRepo: Send + Sync {
 
     async fn delete(&self, id: TaskId) -> Result<(), EmberTroveError>;
 
-    /// Tasks the caller has marked for focus on `date` (My Day).
+    /// Tasks the caller has marked for focus on `date` (My Day), with node titles.
     async fn list_my_day(
         &self,
         owner_id: &str,
         date: NaiveDate,
-    ) -> Result<Vec<Task>, EmberTroveError>;
+    ) -> Result<Vec<MyDayTask>, EmberTroveError>;
 
     /// Aggregated task counts per project node for the dashboard.
     async fn counts_for_nodes(
@@ -271,28 +271,66 @@ impl TaskRepo for PgTaskRepo {
         &self,
         owner_id: &str,
         date: NaiveDate,
-    ) -> Result<Vec<Task>, EmberTroveError> {
-        let rows = sqlx::query_as::<_, TaskRow>(&format!(
+    ) -> Result<Vec<MyDayTask>, EmberTroveError> {
+        #[derive(sqlx::FromRow)]
+        struct MyDayRow {
+            id: Uuid,
+            node_id: Uuid,
+            owner_id: String,
+            title: String,
+            status: String,
+            priority: String,
+            focus_date: Option<NaiveDate>,
+            due_date: Option<NaiveDate>,
+            created_at: DateTime<Utc>,
+            updated_at: DateTime<Utc>,
+            node_title: String,
+        }
+
+        let rows = sqlx::query_as::<_, MyDayRow>(
             r#"
-            SELECT {SELECT_COLS}
-            FROM node_tasks
-            WHERE owner_id = $1 AND focus_date = $2
+            SELECT
+                t.id, t.node_id, t.owner_id, t.title,
+                t.status::text    AS status,
+                t.priority::text  AS priority,
+                t.focus_date, t.due_date, t.created_at, t.updated_at,
+                n.title           AS node_title
+            FROM node_tasks t
+            JOIN nodes n ON n.id = t.node_id
+            WHERE t.owner_id = $1 AND t.focus_date = $2
             ORDER BY
-                CASE priority::text
+                CASE t.priority::text
                     WHEN 'high'   THEN 0
                     WHEN 'medium' THEN 1
                     WHEN 'low'    THEN 2
                 END,
-                node_id, created_at
-            "#
-        ))
+                t.node_id, t.created_at
+            "#,
+        )
         .bind(owner_id)
         .bind(date)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("list my day failed: {e}")))?;
 
-        rows.into_iter().map(TaskRow::into_task).collect()
+        rows.into_iter()
+            .map(|r| {
+                let task = TaskRow {
+                    id: r.id,
+                    node_id: r.node_id,
+                    owner_id: r.owner_id,
+                    title: r.title,
+                    status: r.status,
+                    priority: r.priority,
+                    focus_date: r.focus_date,
+                    due_date: r.due_date,
+                    created_at: r.created_at,
+                    updated_at: r.updated_at,
+                }
+                .into_task()?;
+                Ok(MyDayTask { task, node_title: r.node_title })
+            })
+            .collect()
     }
 
     async fn counts_for_nodes(

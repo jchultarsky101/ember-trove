@@ -96,6 +96,17 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
             />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             <SidebarLink
+                icon="wb_sunny" label="My Day"
+                on_click=move || current_view.set(View::MyDay)
+                collapsed=collapsed
+            />
+            <SidebarLink
+                icon="dashboard" label="Projects"
+                on_click=move || current_view.set(View::ProjectDashboard)
+                collapsed=collapsed
+            />
+            <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
+            <SidebarLink
                 icon="share" label="Graph"
                 on_click=move || current_view.set(View::Graph)
                 collapsed=collapsed

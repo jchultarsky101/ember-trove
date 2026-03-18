@@ -8,7 +8,8 @@ use chrono::NaiveDate;
 use common::{
     auth::AuthClaims,
     id::{NodeId, TaskId},
-    task::{CreateTaskRequest, Task, UpdateTaskRequest},
+    node::{NodeListParams, NodeType},
+    task::{CreateTaskRequest, MyDayTask, ProjectDashboardEntry, Task, TaskCounts, UpdateTaskRequest},
 };
 use garde::Validate;
 use serde::Deserialize;
@@ -34,6 +35,10 @@ struct MyDayQuery {
 
 pub fn my_day_router() -> Router<AppState> {
     Router::new().route("/", get(my_day))
+}
+
+pub fn dashboard_router() -> Router<AppState> {
+    Router::new().route("/", get(project_dashboard))
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
@@ -89,8 +94,54 @@ async fn my_day(
     State(state): State<AppState>,
     Extension(claims): Extension<AuthClaims>,
     Query(q): Query<MyDayQuery>,
-) -> Result<Json<Vec<Task>>, ApiError> {
+) -> Result<Json<Vec<MyDayTask>>, ApiError> {
     let date = q.date.unwrap_or_else(|| chrono::Utc::now().date_naive());
     let tasks = state.tasks.list_my_day(&claims.sub, date).await?;
     Ok(Json(tasks))
+}
+
+/// GET /dashboard/projects — all project nodes with aggregated task counts.
+async fn project_dashboard(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+) -> Result<Json<Vec<ProjectDashboardEntry>>, ApiError> {
+    // Fetch all project nodes for this owner.
+    let params = NodeListParams {
+        node_type: Some(NodeType::Project),
+        status: None,
+        tag_id: None,
+        owner_id: Some(claims.sub.clone()),
+        page: Some(1),
+        per_page: Some(500),
+    };
+    let (projects, _) = state.nodes.list(params).await?;
+
+    if projects.is_empty() {
+        return Ok(Json(vec![]));
+    }
+
+    let node_ids: Vec<NodeId> = projects.iter().map(|n| n.id).collect();
+    let counts_map: std::collections::HashMap<NodeId, TaskCounts> = state
+        .tasks
+        .counts_for_nodes(&node_ids)
+        .await?
+        .into_iter()
+        .collect();
+
+    let empty = TaskCounts { open: 0, in_progress: 0, done: 0, cancelled: 0 };
+    let entries = projects
+        .into_iter()
+        .map(|n| {
+            let node_status = format!("{:?}", n.status).to_lowercase();
+            let task_counts = counts_map.get(&n.id).cloned().unwrap_or_else(|| empty.clone());
+            ProjectDashboardEntry {
+                node_id: n.id,
+                title: n.title,
+                node_status,
+                task_counts,
+            }
+        })
+        .collect();
+
+    Ok(Json(entries))
 }

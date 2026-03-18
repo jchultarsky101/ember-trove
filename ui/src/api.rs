@@ -8,7 +8,7 @@ use common::{
     node::{CreateNodeRequest, Node, NodeListResponse, NodeTitleEntry, UpdateNodeRequest},
     search::SearchResponse,
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
-    task::{CreateTaskRequest, Task, UpdateTaskRequest},
+    task::{CreateTaskRequest, MyDayTask, ProjectDashboardEntry, Task, UpdateTaskRequest},
 };
 use gloo_net::http::Request;
 use serde::Deserialize;
@@ -614,4 +614,20 @@ pub async fn delete_task(task_id: TaskId) -> Result<(), UiError> {
         let text = resp.text().await.unwrap_or_default();
         Err(UiError::api(status, text))
     }
+}
+
+pub async fn fetch_project_dashboard() -> Result<Vec<ProjectDashboardEntry>, UiError> {
+    let resp = Request::get(&api_url("/dashboard/projects"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn fetch_my_day() -> Result<Vec<MyDayTask>, UiError> {
+    let resp = Request::get(&api_url("/my-day"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
 }

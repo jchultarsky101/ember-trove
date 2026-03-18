@@ -46,6 +46,23 @@ pub struct TaskCounts {
     pub cancelled: u32,
 }
 
+/// A task enriched with its parent node's title, returned by the My Day endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MyDayTask {
+    #[serde(flatten)]
+    pub task: Task,
+    pub node_title: String,
+}
+
+/// One row in the Project Dashboard — a project node plus its task counts.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ProjectDashboardEntry {
+    pub node_id: crate::id::NodeId,
+    pub title: String,
+    pub node_status: String,
+    pub task_counts: TaskCounts,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct CreateTaskRequest {
     #[garde(length(min = 1, max = 500))]
