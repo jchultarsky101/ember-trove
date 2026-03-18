@@ -5,6 +5,90 @@ use crate::app::View;
 use crate::components::modals::delete_confirm::DeleteConfirmModal;
 use crate::components::toast::{ToastLevel, push_toast};
 
+// ── Palette ───────────────────────────────────────────────────────────────────
+
+/// Curated palette of tag colours — balanced, dark-mode-friendly hues.
+const PALETTE: &[(&str, &str)] = &[
+    // Ambers / oranges
+    ("#d97706", "Amber"),
+    ("#ea580c", "Orange"),
+    ("#dc2626", "Red"),
+    ("#e11d48", "Rose"),
+    // Purples / pinks
+    ("#9333ea", "Purple"),
+    ("#7c3aed", "Violet"),
+    ("#db2777", "Pink"),
+    ("#be185d", "Deep pink"),
+    // Blues / cyans
+    ("#2563eb", "Blue"),
+    ("#0284c7", "Sky"),
+    ("#0891b2", "Cyan"),
+    ("#0d9488", "Teal"),
+    // Greens
+    ("#16a34a", "Green"),
+    ("#65a30d", "Lime"),
+    // Neutrals
+    ("#64748b", "Slate"),
+    ("#78716c", "Stone"),
+];
+
+// ── Colour picker sub-component ───────────────────────────────────────────────
+
+/// Renders a row of palette swatches above the native `<input type="color">`.
+/// Clicking a swatch sets the colour immediately; the native picker is the
+/// escape hatch for custom hues.
+#[component]
+fn ColorPicker(
+    /// The currently selected hex colour (e.g. `"#d97706"`).
+    value: RwSignal<String>,
+) -> impl IntoView {
+    view! {
+        <div class="flex flex-col gap-1.5">
+            // Swatch grid
+            <div class="flex flex-wrap gap-1.5">
+                {PALETTE.iter().map(|&(hex, label)| {
+                    view! {
+                        <button
+                            type="button"
+                            title=label
+                            class=move || {
+                                let selected = value.get() == hex;
+                                let base = "w-5 h-5 rounded-full transition-transform \
+                                            hover:scale-110 focus:outline-none focus:ring-2 \
+                                            focus:ring-offset-1 focus:ring-white/60";
+                                if selected {
+                                    // Slightly larger + ring when active
+                                    format!("{base} ring-2 ring-white/80 scale-110")
+                                } else {
+                                    base.to_string()
+                                }
+                            }
+                            style=format!("background-color: {hex};")
+                            on:click=move |_| value.set(hex.to_string())
+                        />
+                    }
+                }).collect::<Vec<_>>()}
+            </div>
+            // Native colour picker as escape hatch for custom hues
+            <div class="flex items-center gap-2">
+                <input
+                    type="color"
+                    class="w-7 h-7 rounded cursor-pointer border border-stone-300
+                           dark:border-stone-600 bg-transparent p-0.5"
+                    prop:value=move || value.get()
+                    on:input=move |ev| value.set(event_target_value(&ev))
+                    title="Pick a custom colour"
+                />
+                <span class="text-xs text-stone-400 dark:text-stone-500 font-mono">
+                    {move || value.get()}
+                </span>
+            </div>
+        </div>
+    }
+}
+
+// ── TagManager ────────────────────────────────────────────────────────────────
+
 /// Tag browser + manager.
 ///
 /// Primary purpose: list all tags, filterable by a search box. Clicking a tag
@@ -117,14 +201,14 @@ pub fn TagManager() -> impl IntoView {
 
             // ── Create form (collapsible) ───────────────────────────────────────
             {move || show_create.get().then(|| view! {
-                <div class="px-6 py-3 border-b border-stone-200 dark:border-stone-800
-                            bg-stone-50 dark:bg-stone-900/50">
+                <div class="px-6 py-4 border-b border-stone-200 dark:border-stone-800
+                            bg-stone-50 dark:bg-stone-900/50 space-y-3">
+                    // Name row
                     <div class="flex items-center gap-2">
-                        <input
-                            type="color"
-                            class="w-8 h-8 rounded cursor-pointer border-0 flex-shrink-0"
-                            prop:value=move || new_color.get()
-                            on:input=move |ev| new_color.set(event_target_value(&ev))
+                        // Preview dot — reflects selected colour instantly
+                        <span
+                            class="w-3.5 h-3.5 rounded-full flex-shrink-0 transition-colors"
+                            style=move || format!("background-color: {};", new_color.get())
                         />
                         <input
                             type="text"
@@ -144,14 +228,16 @@ pub fn TagManager() -> impl IntoView {
                         />
                         <button
                             class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white
-                                   text-sm font-medium rounded-lg transition-colors"
+                                   text-sm font-medium rounded-lg transition-colors flex-shrink-0"
                             on:click=move |_| do_create()
                         >
                             "Create"
                         </button>
                     </div>
+                    // Colour picker (palette + native escape hatch)
+                    <ColorPicker value=new_color />
                     {move || error_msg.get().map(|msg| view! {
-                        <p class="mt-1.5 text-xs text-red-500">{msg}</p>
+                        <p class="text-xs text-red-500">{msg}</p>
                     })}
                 </div>
             })}
@@ -201,7 +287,8 @@ pub fn TagManager() -> impl IntoView {
                         tags.get().map(|result| {
                             match result {
                                 Ok(tag_list) if tag_list.is_empty() => view! {
-                                    <div class="flex flex-col items-center justify-center gap-3 py-16">
+                                    <div class="flex flex-col items-center justify-center
+                                                gap-3 py-16">
                                         <span
                                             class="material-symbols-outlined
                                                    text-stone-300 dark:text-stone-700"
@@ -227,8 +314,8 @@ pub fn TagManager() -> impl IntoView {
 
                                     if filtered.is_empty() {
                                         return view! {
-                                            <div class="flex flex-col items-center justify-center
-                                                        gap-2 py-12">
+                                            <div class="flex flex-col items-center
+                                                        justify-center gap-2 py-12">
                                                 <span
                                                     class="material-symbols-outlined
                                                            text-stone-300 dark:text-stone-700"
@@ -247,62 +334,64 @@ pub fn TagManager() -> impl IntoView {
                                     view! {
                                         <div class="divide-y divide-stone-100 dark:divide-stone-800">
                                             {filtered.into_iter().map(|tag| {
-                                                let tag_id   = tag.id;
-                                                let name     = tag.name.clone();
-                                                let color    = tag.color.clone();
+                                                let tag_id    = tag.id;
+                                                let name      = tag.name.clone();
+                                                let color     = tag.color.clone();
                                                 let tag_clone = tag.clone();
 
                                                 view! {
-                                                    <div class="flex items-center justify-between
-                                                                px-6 py-3
+                                                    <div class="px-6 py-3
                                                                 hover:bg-stone-50
                                                                 dark:hover:bg-stone-900/50 group">
                                                         {move || {
                                                             if editing_id.get() == Some(tag_id) {
                                                                 // ── Edit mode ──────────────────
+                                                                let row_color = RwSignal::new(edit_color.get_untracked());
+                                                                // Keep shared edit_color in sync
+                                                                // when the local swatch changes.
+                                                                Effect::new(move |_| {
+                                                                    edit_color.set(row_color.get());
+                                                                });
                                                                 view! {
-                                                                    <div class="flex items-center gap-2 flex-1">
-                                                                        <input
-                                                                            type="color"
-                                                                            class="w-6 h-6 rounded
-                                                                                   cursor-pointer
-                                                                                   border-0
-                                                                                   flex-shrink-0"
-                                                                            prop:value=move || edit_color.get()
-                                                                            on:input=move |ev| edit_color.set(event_target_value(&ev))
-                                                                        />
-                                                                        <input
-                                                                            type="text"
-                                                                            class="flex-1 px-2 py-1
-                                                                                   text-sm rounded
-                                                                                   border
-                                                                                   border-stone-300
-                                                                                   dark:border-stone-600
-                                                                                   bg-transparent
-                                                                                   text-stone-900
-                                                                                   dark:text-stone-100
-                                                                                   focus:outline-none
-                                                                                   focus:ring-1
-                                                                                   focus:ring-amber-500"
-                                                                            prop:value=move || edit_name.get()
-                                                                            on:input=move |ev| edit_name.set(event_target_value(&ev))
-                                                                        />
-                                                                        <button
-                                                                            class="px-2 py-1 text-xs
-                                                                                   bg-amber-600
-                                                                                   text-white rounded"
-                                                                            on:click=on_save_edit
-                                                                        >
-                                                                            "Save"
-                                                                        </button>
-                                                                        <button
-                                                                            class="px-2 py-1 text-xs
-                                                                                   text-stone-500
-                                                                                   hover:text-stone-700"
-                                                                            on:click=move |_| editing_id.set(None)
-                                                                        >
-                                                                            "Cancel"
-                                                                        </button>
+                                                                    <div class="space-y-2">
+                                                                        // Name + save/cancel row
+                                                                        <div class="flex items-center gap-2">
+                                                                            <span
+                                                                                class="w-3.5 h-3.5 rounded-full flex-shrink-0 transition-colors"
+                                                                                style=move || format!("background-color: {};", row_color.get())
+                                                                            />
+                                                                            <input
+                                                                                type="text"
+                                                                                class="flex-1 px-2 py-1 text-sm rounded
+                                                                                       border border-stone-300
+                                                                                       dark:border-stone-600
+                                                                                       bg-transparent
+                                                                                       text-stone-900 dark:text-stone-100
+                                                                                       focus:outline-none focus:ring-1
+                                                                                       focus:ring-amber-500"
+                                                                                prop:value=move || edit_name.get()
+                                                                                on:input=move |ev| edit_name.set(event_target_value(&ev))
+                                                                            />
+                                                                            <button
+                                                                                class="px-2 py-1 text-xs
+                                                                                       bg-amber-600 text-white
+                                                                                       rounded transition-colors
+                                                                                       hover:bg-amber-700"
+                                                                                on:click=on_save_edit
+                                                                            >
+                                                                                "Save"
+                                                                            </button>
+                                                                            <button
+                                                                                class="px-2 py-1 text-xs
+                                                                                       text-stone-500
+                                                                                       hover:text-stone-700"
+                                                                                on:click=move |_| editing_id.set(None)
+                                                                            >
+                                                                                "Cancel"
+                                                                            </button>
+                                                                        </div>
+                                                                        // Colour picker
+                                                                        <ColorPicker value=row_color />
                                                                     </div>
                                                                 }.into_any()
                                                             } else {
@@ -314,98 +403,73 @@ pub fn TagManager() -> impl IntoView {
                                                                 let del_name      = name.clone();
                                                                 let browse_tag    = tag_clone.clone();
                                                                 view! {
-                                                                    // Click whole row → browse
-                                                                    <button
-                                                                        class="flex items-center
-                                                                               gap-3 flex-1
-                                                                               text-left min-w-0"
-                                                                        on:click=move |_| {
-                                                                            tag_filter_ctx.set(Some(browse_tag.clone()));
-                                                                            current_view.set(View::NodeList);
-                                                                        }
-                                                                        title="Browse nodes with this tag"
-                                                                    >
-                                                                        <span
-                                                                            class="w-3.5 h-3.5
-                                                                                   rounded-full
-                                                                                   flex-shrink-0"
-                                                                            style:background-color=display_color
-                                                                        />
-                                                                        <span class="text-sm
-                                                                                    text-stone-900
-                                                                                    dark:text-stone-100
-                                                                                    truncate">
-                                                                            {display_name}
-                                                                        </span>
-                                                                        // Browse arrow — appears
-                                                                        // on hover so the intent
-                                                                        // is clear
-                                                                        <span
-                                                                            class="material-symbols-outlined
-                                                                                   text-stone-300
-                                                                                   dark:text-stone-600
-                                                                                   opacity-0
-                                                                                   group-hover:opacity-100
-                                                                                   transition-opacity
-                                                                                   ml-auto flex-shrink-0"
-                                                                            style="font-size: 15px;"
-                                                                        >
-                                                                            "arrow_forward"
-                                                                        </span>
-                                                                    </button>
-
-                                                                    // Edit / delete — subtle,
-                                                                    // visible only on hover
-                                                                    <div class="flex items-center
-                                                                                gap-1 ml-2
-                                                                                opacity-0
-                                                                                group-hover:opacity-100
-                                                                                transition-opacity
-                                                                                flex-shrink-0">
+                                                                    <div class="flex items-center justify-between">
+                                                                        // Click whole row → browse
                                                                         <button
-                                                                            class="p-1 rounded
-                                                                                   text-stone-400
-                                                                                   hover:text-stone-600
-                                                                                   dark:hover:text-stone-300
-                                                                                   hover:bg-stone-100
-                                                                                   dark:hover:bg-stone-800
-                                                                                   transition-colors"
-                                                                            title="Edit tag"
-                                                                            on:click=move |ev| {
-                                                                                ev.stop_propagation();
-                                                                                editing_id.set(Some(tag_id));
-                                                                                edit_name.set(edit_name_val.clone());
-                                                                                edit_color.set(edit_color_val.clone());
+                                                                            class="flex items-center gap-3 flex-1 text-left min-w-0"
+                                                                            on:click=move |_| {
+                                                                                tag_filter_ctx.set(Some(browse_tag.clone()));
+                                                                                current_view.set(View::NodeList);
                                                                             }
+                                                                            title="Browse nodes with this tag"
                                                                         >
                                                                             <span
-                                                                                class="material-symbols-outlined"
-                                                                                style="font-size: 15px;"
-                                                                            >
-                                                                                "edit"
+                                                                                class="w-3.5 h-3.5 rounded-full flex-shrink-0"
+                                                                                style:background-color=display_color
+                                                                            />
+                                                                            <span class="text-sm text-stone-900
+                                                                                        dark:text-stone-100 truncate">
+                                                                                {display_name}
                                                                             </span>
-                                                                        </button>
-                                                                        <button
-                                                                            class="p-1 rounded
-                                                                                   text-stone-400
-                                                                                   hover:text-red-500
-                                                                                   hover:bg-red-50
-                                                                                   dark:hover:bg-red-900/20
-                                                                                   transition-colors"
-                                                                            title="Delete tag"
-                                                                            on:click=move |ev| {
-                                                                                ev.stop_propagation();
-                                                                                delete_confirm_id.set(Some(tag_id));
-                                                                                delete_confirm_name.set(del_name.clone());
-                                                                            }
-                                                                        >
                                                                             <span
-                                                                                class="material-symbols-outlined"
+                                                                                class="material-symbols-outlined
+                                                                                       text-stone-300 dark:text-stone-600
+                                                                                       opacity-0 group-hover:opacity-100
+                                                                                       transition-opacity ml-auto flex-shrink-0"
                                                                                 style="font-size: 15px;"
                                                                             >
-                                                                                "delete"
+                                                                                "arrow_forward"
                                                                             </span>
                                                                         </button>
+                                                                        // Edit / delete — hover only
+                                                                        <div class="flex items-center gap-1 ml-2
+                                                                                    opacity-0 group-hover:opacity-100
+                                                                                    transition-opacity flex-shrink-0">
+                                                                            <button
+                                                                                class="p-1 rounded text-stone-400
+                                                                                       hover:text-stone-600
+                                                                                       dark:hover:text-stone-300
+                                                                                       hover:bg-stone-100
+                                                                                       dark:hover:bg-stone-800
+                                                                                       transition-colors"
+                                                                                title="Edit tag"
+                                                                                on:click=move |ev| {
+                                                                                    ev.stop_propagation();
+                                                                                    editing_id.set(Some(tag_id));
+                                                                                    edit_name.set(edit_name_val.clone());
+                                                                                    edit_color.set(edit_color_val.clone());
+                                                                                }
+                                                                            >
+                                                                                <span class="material-symbols-outlined"
+                                                                                      style="font-size: 15px;">"edit"</span>
+                                                                            </button>
+                                                                            <button
+                                                                                class="p-1 rounded text-stone-400
+                                                                                       hover:text-red-500
+                                                                                       hover:bg-red-50
+                                                                                       dark:hover:bg-red-900/20
+                                                                                       transition-colors"
+                                                                                title="Delete tag"
+                                                                                on:click=move |ev| {
+                                                                                    ev.stop_propagation();
+                                                                                    delete_confirm_id.set(Some(tag_id));
+                                                                                    delete_confirm_name.set(del_name.clone());
+                                                                                }
+                                                                            >
+                                                                                <span class="material-symbols-outlined"
+                                                                                      style="font-size: 15px;">"delete"</span>
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
                                                                 }.into_any()
                                                             }
