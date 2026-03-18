@@ -94,6 +94,11 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                 on_click=move || current_view.set(View::TagManager)
                 collapsed=collapsed
             />
+            <SidebarLink
+                icon="sticky_note_2" label="Notes"
+                on_click=move || current_view.set(View::Notes)
+                collapsed=collapsed
+            />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             <SidebarLink
                 icon="wb_sunny" label="My Day"
