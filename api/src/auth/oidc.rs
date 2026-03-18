@@ -75,8 +75,13 @@ impl AudClaim {
 
 /// OIDC client that handles discovery, code exchange, and JWT validation.
 pub struct OidcClient {
+    /// Browser-facing authorization endpoint (may be rewritten to external URL).
     pub authorization_endpoint: String,
+    /// Browser-facing end-session endpoint (may be rewritten to external URL).
     pub end_session_endpoint: String,
+    /// Internal (container-reachable) logout endpoint for backchannel calls.
+    /// Derived from `token_endpoint` so it is never rewritten.
+    backchannel_logout_endpoint: String,
     token_endpoint: String,
     client_id: String,
     client_secret: String,
@@ -114,9 +119,19 @@ impl OidcClient {
             "OIDC discovery complete"
         );
 
+        // Derive the backchannel logout URL from the token endpoint by replacing
+        // the trailing "/token" with "/logout".  This is the internal URL and must
+        // NOT be overwritten by OIDC_EXTERNAL_URL (which is browser-facing only).
+        let backchannel_logout_endpoint = discovery
+            .token_endpoint
+            .strip_suffix("/token")
+            .map(|base| format!("{base}/logout"))
+            .unwrap_or_else(|| discovery.end_session_endpoint.clone());
+
         Ok(Self {
             authorization_endpoint: discovery.authorization_endpoint,
             end_session_endpoint: discovery.end_session_endpoint,
+            backchannel_logout_endpoint,
             token_endpoint: discovery.token_endpoint,
             client_id,
             client_secret,
@@ -157,6 +172,36 @@ impl OidcClient {
         resp.json::<TokenResponse>()
             .await
             .map_err(|e| ApiError::Internal(format!("token response parse failed: {e}")))
+    }
+
+    /// Terminate the Keycloak SSO session server-side (backchannel logout).
+    /// POSTs directly to the end_session endpoint — no browser redirect needed.
+    /// Errors are non-fatal: a stale/expired refresh token still means the user
+    /// should be treated as logged out from our side.
+    pub async fn backchannel_logout(&self, refresh_token: &str) {
+        let result = self
+            .http
+            .post(&self.backchannel_logout_endpoint)
+            .form(&[
+                ("client_id", self.client_id.as_str()),
+                ("client_secret", self.client_secret.as_str()),
+                ("refresh_token", refresh_token),
+            ])
+            .send()
+            .await;
+
+        match result {
+            Ok(resp) if resp.status().is_success() => {
+                tracing::info!("backchannel logout: Keycloak SSO session terminated");
+            }
+            Ok(resp) => {
+                let status = resp.status();
+                tracing::warn!("backchannel logout: non-success status {status} (session may already be expired)");
+            }
+            Err(e) => {
+                tracing::warn!("backchannel logout: request failed: {e}");
+            }
+        }
     }
 
     /// Exchange a refresh token for a new set of tokens.

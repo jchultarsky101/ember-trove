@@ -145,21 +145,18 @@ async fn logout(
     State(state): State<AppState>,
     jar: PrivateCookieJar,
 ) -> (PrivateCookieJar, Json<RedirectResponse>) {
+    // Terminate the Keycloak SSO session server-side so the user isn't silently
+    // re-authenticated on the next login attempt.
+    if let Some(oidc) = state.oidc.as_ref() {
+        if let Some(refresh_token) = jar.get(REFRESH_COOKIE).map(|c| c.value().to_string()) {
+            oidc.backchannel_logout(&refresh_token).await;
+        }
+    }
+
     let updated_jar = jar
         .remove(Cookie::build((SESSION_COOKIE, "")).path("/").build())
         .remove(Cookie::build((REFRESH_COOKIE, "")).path("/api/auth/refresh").build());
 
-    // Build Keycloak RP-initiated logout URL so the SSO session is also terminated.
-    // Without this, Keycloak auto-logs the user back in on the next /auth/login visit.
-    let redirect_url = if let Some(oidc) = state.oidc.as_ref() {
-        let post_logout = urlencoding::encode(&state.auth.frontend_url);
-        format!(
-            "{}?post_logout_redirect_uri={}&client_id={}",
-            oidc.end_session_endpoint, post_logout, state.auth.client_id
-        )
-    } else {
-        state.auth.frontend_url.clone()
-    };
-
-    (updated_jar, Json(RedirectResponse { redirect_url }))
+    // Redirect straight back to the frontend — no Keycloak confirmation dialog.
+    (updated_jar, Json(RedirectResponse { redirect_url: state.auth.frontend_url.clone() }))
 }

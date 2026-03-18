@@ -48,6 +48,9 @@ pub trait TaskRepo: Send + Sync {
 
     /// All tasks owned by `owner_id` — used for backup.
     async fn list_all_for_owner(&self, owner_id: &str) -> Result<Vec<Task>, EmberTroveError>;
+
+    /// All tasks across all owners — used for full backup.
+    async fn list_all(&self) -> Result<Vec<Task>, EmberTroveError>;
 }
 
 // ── PgTaskRepo ────────────────────────────────────────────────────────────────
@@ -402,6 +405,21 @@ impl TaskRepo for PgTaskRepo {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("list_all_for_owner tasks failed: {e}")))?;
+
+        rows.into_iter().map(TaskRow::into_task).collect()
+    }
+
+    async fn list_all(&self) -> Result<Vec<Task>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, TaskRow>(&format!(
+            r#"
+            SELECT {SELECT_COLS}
+            FROM node_tasks
+            ORDER BY created_at ASC
+            "#
+        ))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list_all tasks failed: {e}")))?;
 
         rows.into_iter().map(TaskRow::into_task).collect()
     }

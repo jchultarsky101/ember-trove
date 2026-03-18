@@ -38,10 +38,10 @@ pub async fn parse_json<T: serde::de::DeserializeOwned>(
             // unconditionally causes an infinite loop when the refresh token
             // is also invalid (e.g. after a server restart with new signing
             // keys) — every reload gets 401 again, triggers another reload.
-            if refresh_session().await.is_ok() {
-                if let Some(win) = web_sys::window() {
-                    let _ = win.location().reload();
-                }
+            if refresh_session().await.is_ok()
+                && let Some(win) = web_sys::window()
+            {
+                let _ = win.location().reload();
             }
         }
         let text = response
@@ -697,17 +697,6 @@ pub async fn delete_backup(id: uuid::Uuid) -> Result<(), UiError> {
     }
 }
 
-pub async fn download_backup_url(id: uuid::Uuid) -> Result<String, UiError> {
-    let resp = Request::get(&api_url(&format!("/admin/backups/{id}/download")))
-        .send()
-        .await
-        .map_err(|e| UiError::Network(e.to_string()))?;
-    let val: serde_json::Value = parse_json(resp).await?;
-    val["url"]
-        .as_str()
-        .map(String::from)
-        .ok_or_else(|| UiError::Parse("missing 'url' field in download response".to_string()))
-}
 
 pub async fn preview_backup_restore(id: uuid::Uuid) -> Result<common::backup::BackupPreview, UiError> {
     let resp = Request::get(&api_url(&format!("/admin/backups/{id}/preview")))

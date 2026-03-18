@@ -98,7 +98,7 @@ pub fn SearchBar() -> impl IntoView {
                 class="w-full px-4 py-2 pl-10 text-sm bg-stone-100 dark:bg-stone-800
                     border border-transparent rounded-lg focus:outline-none
                     focus:ring-2 focus:ring-amber-500 dark:text-stone-100"
-                placeholder="Search\u{2026} (Enter for full search)"
+                placeholder="Search\u{2026} (Enter)"
                 prop:value=move || search_query.get()
                 on:input=on_input
                 on:keydown=on_keydown

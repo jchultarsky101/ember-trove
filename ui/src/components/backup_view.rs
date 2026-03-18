@@ -237,7 +237,13 @@ fn BackupRow(
 ) -> impl IntoView {
     let job_id = job.id;
     let ts = job.created_at.format("%b %-d, %Y %H:%M UTC").to_string();
-    let size_kb = job.size_bytes / 1024;
+    let size_display = if job.size_bytes < 1024 {
+        format!("{} B", job.size_bytes)
+    } else if job.size_bytes < 1024 * 1024 {
+        format!("{} KB", job.size_bytes / 1024)
+    } else {
+        format!("{:.1} MB", job.size_bytes as f64 / (1024.0 * 1024.0))
+    };
     let summary = format!(
         "{} nodes · {} edges · {} tags · {} notes · {} tasks · {} attachments",
         job.node_count,
@@ -262,30 +268,22 @@ fn BackupRow(
 
             // Size
             <span class="text-xs text-stone-400 dark:text-stone-500 whitespace-nowrap mt-0.5">
-                {format!("{size_kb} KB")}
+                {size_display}
             </span>
 
             // Actions
             <div class="flex items-center gap-1 flex-shrink-0">
-                // Download
+                // Download — open the streaming API endpoint directly; the session
+                // cookie is sent automatically so no presigned URL is needed.
                 <button
                     class="p-1.5 rounded-lg text-stone-400 hover:text-amber-600 dark:hover:text-amber-400
                         hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
                     title="Download backup"
                     on:click=move |_| {
-                        wasm_bindgen_futures::spawn_local(async move {
-                            match api::download_backup_url(job_id).await {
-                                Ok(url) => {
-                                    if let Some(win) = web_sys::window() {
-                                        let _ = win.open_with_url_and_target(&url, "_blank");
-                                    }
-                                }
-                                Err(e) => push_toast(
-                                    ToastLevel::Error,
-                                    format!("Download failed: {e}"),
-                                ),
-                            }
-                        });
+                        if let Some(win) = web_sys::window() {
+                            let url = format!("/api/admin/backups/{job_id}/download");
+                            let _ = win.open_with_url_and_target(&url, "_blank");
+                        }
                     }
                 >
                     <span class="material-symbols-outlined" style="font-size: 16px;">

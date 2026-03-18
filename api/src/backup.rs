@@ -40,31 +40,12 @@ fn add_bytes_to_archive<W: Write>(
 /// Collect all owner data, pack it into a tar.gz archive, upload to S3,
 /// and record the job in `backup_jobs`.
 pub async fn create_backup(state: &AppState, owner_id: &str) -> Result<BackupJob, ApiError> {
-    // Fetch all data for this owner.
-    let nodes = state
-        .nodes
-        .list_all_for_owner(owner_id)
-        .await
-        .map_err(ApiError::from)?;
-
-    let tags = state
-        .tags
-        .list(owner_id)
-        .await
-        .map_err(ApiError::from)?;
-
-    let feed_notes = state
-        .notes
-        .feed_for_owner(owner_id)
-        .await
-        .map_err(ApiError::from)?;
-    let notes: Vec<_> = feed_notes.into_iter().map(|fn_| fn_.note).collect();
-
-    let tasks = state
-        .tasks
-        .list_all_for_owner(owner_id)
-        .await
-        .map_err(ApiError::from)?;
+    // Fetch all data across all users.
+    let nodes = state.nodes.list_all().await.map_err(ApiError::from)?;
+    let tags = state.tags.list_all().await.map_err(ApiError::from)?;
+    let notes = state.notes.list_all().await.map_err(ApiError::from)?;
+    let tasks = state.tasks.list_all().await.map_err(ApiError::from)?;
+    let edges = state.edges.list_all().await.map_err(ApiError::from)?;
 
     // Collect attachments for every node.
     let mut attachments = Vec::new();
@@ -76,17 +57,6 @@ pub async fn create_backup(state: &AppState, owner_id: &str) -> Result<BackupJob
             .map_err(ApiError::from)?;
         attachments.append(&mut node_attachments);
     }
-
-    // Fetch edges (all edges involving owner's nodes — source or target).
-    let all_edges = state.edges.list_all().await.map_err(ApiError::from)?;
-    let owner_node_ids: std::collections::HashSet<Uuid> =
-        nodes.iter().map(|n| n.id.0).collect();
-    let edges: Vec<_> = all_edges
-        .into_iter()
-        .filter(|e| {
-            owner_node_ids.contains(&e.source_id.0) || owner_node_ids.contains(&e.target_id.0)
-        })
-        .collect();
 
     let entity_counts = EntityCounts {
         nodes: nodes.len() as u32,
@@ -211,11 +181,7 @@ pub async fn preview_restore(
     let mut warnings = Vec::new();
 
     // Warn about current data that will be replaced.
-    let current_nodes = state
-        .nodes
-        .list_all_for_owner(owner_id)
-        .await
-        .map_err(ApiError::from)?;
+    let current_nodes = state.nodes.list_all().await.map_err(ApiError::from)?;
     if !current_nodes.is_empty() {
         warnings.push(format!(
             "{} existing node(s) and all associated data will be deleted before restore.",
@@ -281,16 +247,14 @@ pub async fn execute_restore(
         .await
         .map_err(|e| ApiError::Internal(format!("begin transaction failed: {e}")))?;
 
-    // Delete owner's nodes (CASCADE removes edges, notes, tasks, attachments, permissions).
-    sqlx::query("DELETE FROM nodes WHERE owner_id = $1")
-        .bind(owner_id)
+    // Delete all nodes (CASCADE removes edges, notes, tasks, attachments, permissions).
+    sqlx::query("DELETE FROM nodes")
         .execute(&mut *tx)
         .await
         .map_err(|e| ApiError::Internal(format!("delete nodes failed: {e}")))?;
 
-    // Delete owner's tags.
-    sqlx::query("DELETE FROM tags WHERE owner_id = $1")
-        .bind(owner_id)
+    // Delete all tags.
+    sqlx::query("DELETE FROM tags")
         .execute(&mut *tx)
         .await
         .map_err(|e| ApiError::Internal(format!("delete tags failed: {e}")))?;

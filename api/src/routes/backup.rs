@@ -3,8 +3,10 @@
 //! Mounted under `/api/admin/backups` in `routes/mod.rs`.
 
 use axum::{
+    body::Body,
     extract::{Path, State},
-    http::StatusCode,
+    http::{StatusCode, header},
+    response::Response,
     routing::{delete, get, post},
     Extension, Json, Router,
 };
@@ -88,7 +90,7 @@ async fn download_backup_handler(
     State(state): State<AppState>,
     Extension(claims): Extension<AuthClaims>,
     Path(id): Path<Uuid>,
-) -> Result<Json<serde_json::Value>, ApiError> {
+) -> Result<Response, ApiError> {
     require_admin(&claims)?;
 
     let job = state.backup.get(id).await.map_err(ApiError::from)?;
@@ -98,13 +100,22 @@ async fn download_backup_handler(
         ));
     }
 
-    let url = state
+    let bytes = state
         .object_store
-        .presigned_url(&job.s3_key, 3600)
+        .get(&job.s3_key)
         .await
-        .map_err(|e| ApiError::Storage(format!("presigned URL failed: {e}")))?;
+        .map_err(|e| ApiError::Storage(format!("backup download failed: {e}")))?;
 
-    Ok(Json(serde_json::json!({ "url": url })))
+    let filename = format!("ember-trove-backup-{id}.tar.gz");
+    let disposition = format!("attachment; filename=\"{filename}\"");
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/gzip")
+        .header(header::CONTENT_DISPOSITION, disposition)
+        .header(header::CONTENT_LENGTH, bytes.len())
+        .body(Body::from(bytes))
+        .map_err(|e| ApiError::Internal(format!("response build failed: {e}")))
 }
 
 async fn preview_restore_handler(
