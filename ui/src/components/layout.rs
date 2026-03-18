@@ -8,7 +8,8 @@ use crate::{
         modals::create_node::CreateNodeModal,
         my_day_view::MyDayView,
         node_editor::NodeEditor,
-        node_list::NodeList, node_view::NodeView, project_dashboard::ProjectDashboard,
+        node_list::NodeList, node_view::NodeView, notes_view::NotesView,
+        project_dashboard::ProjectDashboard,
         search_view::SearchView, sidebar::Sidebar,
         tag_manager::TagManager, toast::ToastOverlay,
     },
@@ -148,6 +149,7 @@ fn ViewSwitch() -> impl IntoView {
         View::Admin => view! { <AdminView /> }.into_any(),
         View::ProjectDashboard => view! { <ProjectDashboard /> }.into_any(),
         View::MyDay => view! { <MyDayView /> }.into_any(),
+        View::Notes => view! { <NotesView /> }.into_any(),
     }
 }
 

@@ -6,6 +6,8 @@ pub mod layout;
 pub mod modals;
 pub mod node_editor;
 pub mod node_list;
+pub mod note_panel;
+pub mod notes_view;
 pub mod node_meta;
 pub mod node_view;
 pub mod permission_dialog;

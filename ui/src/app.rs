@@ -39,6 +39,7 @@ pub enum View {
     Admin,
     ProjectDashboard,
     MyDay,
+    Notes,
 }
 
 // ── App root ───────────────────────────────────────────────────────────────
