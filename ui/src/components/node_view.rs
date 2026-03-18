@@ -228,6 +228,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
 #[component]
 fn EdgePanel(node_id: NodeId) -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let open = RwSignal::new(false);
     let refresh_edges = RwSignal::new(0u32);
     let show_add = RwSignal::new(false);
     let target_id_input = RwSignal::new(String::new());
@@ -308,23 +309,39 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
 
     view! {
         <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-6">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                    "Connections"
-                </h2>
+            <div class="flex items-center justify-between">
                 <button
-                    class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
-                        dark:hover:text-stone-300 hover:bg-stone-100
-                        dark:hover:bg-stone-800 transition-colors"
-                    on:click=move |_| show_add.update(|v| *v = !*v)
-                    title=move || if show_add.get() { "Cancel" } else { "Add Edge" }
+                    class="flex items-center gap-1 text-left cursor-pointer"
+                    on:click=move |_| open.update(|v| *v = !*v)
                 >
-                    <span class="material-symbols-outlined" style="font-size: 16px;">
-                        {move || if show_add.get() { "close" } else { "add_link" }}
+                    <span
+                        class="material-symbols-outlined text-stone-400 dark:text-stone-500"
+                        style="font-size: 16px;"
+                    >
+                        {move || if open.get() { "expand_more" } else { "chevron_right" }}
                     </span>
+                    <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                        "Connections"
+                    </h2>
                 </button>
+                {move || open.get().then(|| view! {
+                    <button
+                        class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                            dark:hover:text-stone-300 hover:bg-stone-100
+                            dark:hover:bg-stone-800 transition-colors"
+                        on:click=move |_| show_add.update(|v| *v = !*v)
+                        title=move || if show_add.get() { "Cancel" } else { "Add Edge" }
+                    >
+                        <span class="material-symbols-outlined" style="font-size: 16px;">
+                            {move || if show_add.get() { "close" } else { "add_link" }}
+                        </span>
+                    </button>
+                })}
             </div>
 
+            // Add edge form + edge list (only when expanded)
+            {move || open.get().then(|| view! {
+            <div class="mt-4">
             // Add edge form
             {move || show_add.get().then(|| view! {
                 <div class="mb-4 p-3 bg-stone-50 dark:bg-stone-900 rounded-lg space-y-2">
@@ -495,6 +512,8 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                     })
                 }}
             </Suspense>
+            </div>  // close mt-4
+            })}  // close open.then
         </div>
     }
 }
@@ -503,6 +522,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
 #[component]
 fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let open = RwSignal::new(false);
 
     let backlinks = LocalResource::new(move || {
         let node_id = node_id;
@@ -511,60 +531,75 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
 
     view! {
         <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-6">
-            <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300 mb-3">
-                "Linked Here"
-            </h2>
-            <Suspense fallback=|| view! {
-                <div class="text-xs text-stone-400">"Loading backlinks..."</div>
-            }>
-                {move || {
-                    backlinks.get().map(|result| {
-                        match result {
-                            Ok(nodes) if nodes.is_empty() => view! {
-                                <div class="flex flex-col items-center gap-2 py-6">
-                                    <span
-                                        class="material-symbols-outlined text-stone-300 dark:text-stone-700"
-                                        style="font-size: 32px;"
-                                    >
-                                        "link_off"
-                                    </span>
-                                    <p class="text-xs text-stone-400 dark:text-stone-600">
-                                        "No other notes link here."
-                                    </p>
-                                </div>
-                            }.into_any(),
-                            Ok(nodes) => view! {
-                                <div class="space-y-1">
-                                    {nodes.into_iter().map(|node| {
-                                        let node_id = node.id;
-                                        let title = node.title.clone();
-                                        let node_type = format!("{:?}", node.node_type).to_lowercase();
-                                        view! {
-                                            <button
-                                                class="flex items-center gap-2 w-full text-left py-1.5 px-2 rounded
-                                                    text-xs hover:bg-stone-50 dark:hover:bg-stone-800/50
-                                                    text-stone-600 dark:text-stone-400
-                                                    hover:text-amber-600 dark:hover:text-amber-400"
-                                                on:click=move |_| current_view.set(View::NodeDetail(node_id))
-                                            >
-                                                <span class="material-symbols-outlined text-stone-400 dark:text-stone-600"
-                                                    style="font-size: 14px;">"arrow_back"</span>
-                                                <span class="font-medium truncate">{title}</span>
-                                                <span class="text-stone-400 dark:text-stone-600 shrink-0">
-                                                    {format!("({node_type})")}
-                                                </span>
-                                            </button>
-                                        }
-                                    }).collect::<Vec<_>>()}
-                                </div>
-                            }.into_any(),
-                            Err(e) => view! {
-                                <div class="text-xs text-red-500">{format!("Error: {e}")}</div>
-                            }.into_any(),
-                        }
-                    })
-                }}
-            </Suspense>
+            <button
+                class="flex items-center gap-1 text-left cursor-pointer"
+                on:click=move |_| open.update(|v| *v = !*v)
+            >
+                <span
+                    class="material-symbols-outlined text-stone-400 dark:text-stone-500"
+                    style="font-size: 16px;"
+                >
+                    {move || if open.get() { "expand_more" } else { "chevron_right" }}
+                </span>
+                <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                    "Linked Here"
+                </h2>
+            </button>
+            {move || open.get().then(|| view! {
+                <div class="mt-4">
+                <Suspense fallback=|| view! {
+                    <div class="text-xs text-stone-400">"Loading backlinks..."</div>
+                }>
+                    {move || {
+                        backlinks.get().map(|result| {
+                            match result {
+                                Ok(nodes) if nodes.is_empty() => view! {
+                                    <div class="flex flex-col items-center gap-2 py-6">
+                                        <span
+                                            class="material-symbols-outlined text-stone-300 dark:text-stone-700"
+                                            style="font-size: 32px;"
+                                        >
+                                            "link_off"
+                                        </span>
+                                        <p class="text-xs text-stone-400 dark:text-stone-600">
+                                            "No other notes link here."
+                                        </p>
+                                    </div>
+                                }.into_any(),
+                                Ok(nodes) => view! {
+                                    <div class="space-y-1">
+                                        {nodes.into_iter().map(|node| {
+                                            let node_id = node.id;
+                                            let title = node.title.clone();
+                                            let node_type = format!("{:?}", node.node_type).to_lowercase();
+                                            view! {
+                                                <button
+                                                    class="flex items-center gap-2 w-full text-left py-1.5 px-2 rounded
+                                                        text-xs hover:bg-stone-50 dark:hover:bg-stone-800/50
+                                                        text-stone-600 dark:text-stone-400
+                                                        hover:text-amber-600 dark:hover:text-amber-400"
+                                                    on:click=move |_| current_view.set(View::NodeDetail(node_id))
+                                                >
+                                                    <span class="material-symbols-outlined text-stone-400 dark:text-stone-600"
+                                                        style="font-size: 14px;">"arrow_back"</span>
+                                                    <span class="font-medium truncate">{title}</span>
+                                                    <span class="text-stone-400 dark:text-stone-600 shrink-0">
+                                                        {format!("({node_type})")}
+                                                    </span>
+                                                </button>
+                                            }
+                                        }).collect::<Vec<_>>()}
+                                    </div>
+                                }.into_any(),
+                                Err(e) => view! {
+                                    <div class="text-xs text-red-500">{format!("Error: {e}")}</div>
+                                }.into_any(),
+                            }
+                        })
+                    }}
+                </Suspense>
+                </div>
+            })}
         </div>
     }
 }
