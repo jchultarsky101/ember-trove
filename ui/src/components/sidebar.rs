@@ -24,6 +24,8 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
 
     let tag_filter =
         use_context::<RwSignal<Option<Tag>>>().expect("tag_filter signal must be provided");
+    let node_type_filter =
+        use_context::<RwSignal<Option<String>>>().expect("node_type_filter signal must be provided");
 
     view! {
         <nav class="flex-1 overflow-y-auto px-2 py-4 space-y-1">
@@ -62,11 +64,48 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                 }
             }}
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
+            // "All Nodes" + per-type sub-links
             <SidebarLink
-                icon="description" label="All Nodes"
-                on_click=move || current_view.set(View::NodeList)
+                icon="segment" label="All Nodes"
+                on_click=move || {
+                    node_type_filter.set(None);
+                    current_view.set(View::NodeList);
+                }
                 collapsed=collapsed
             />
+            // Type-specific sub-links (hidden when sidebar is collapsed)
+            {move || {
+                if collapsed.get() { return None; }
+                Some(view! {
+                    <div class="ml-3 border-l border-stone-200 dark:border-stone-700 pl-2 space-y-0.5">
+                        <TypeFilterLink
+                            icon="description" label="Articles" value="article"
+                            node_type_filter=node_type_filter
+                            current_view=current_view
+                        />
+                        <TypeFilterLink
+                            icon="rocket_launch" label="Projects" value="project"
+                            node_type_filter=node_type_filter
+                            current_view=current_view
+                        />
+                        <TypeFilterLink
+                            icon="category" label="Areas" value="area"
+                            node_type_filter=node_type_filter
+                            current_view=current_view
+                        />
+                        <TypeFilterLink
+                            icon="bookmarks" label="Resources" value="resource"
+                            node_type_filter=node_type_filter
+                            current_view=current_view
+                        />
+                        <TypeFilterLink
+                            icon="menu_book" label="References" value="reference"
+                            node_type_filter=node_type_filter
+                            current_view=current_view
+                        />
+                    </div>
+                }.into_any())
+            }}
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             <SidebarLink
                 icon="label" label="Tags"
@@ -138,6 +177,42 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                 }
             }}
         </div>
+    }
+}
+
+/// Compact sub-link for filtering NodeList by a specific node type.
+#[component]
+fn TypeFilterLink(
+    icon: &'static str,
+    label: &'static str,
+    value: &'static str,
+    node_type_filter: RwSignal<Option<String>>,
+    current_view: RwSignal<View>,
+) -> impl IntoView {
+    view! {
+        <button
+            class=move || {
+                let active = node_type_filter.get().as_deref() == Some(value);
+                let base = "flex items-center w-full gap-2 px-2 py-1.5 rounded-lg text-xs \
+                            font-medium transition-colors cursor-pointer";
+                if active {
+                    format!("{base} bg-amber-50 dark:bg-amber-900/20 \
+                             text-amber-700 dark:text-amber-400")
+                } else {
+                    format!("{base} text-stone-600 dark:text-stone-400 \
+                             hover:bg-stone-100 dark:hover:bg-stone-800 \
+                             hover:text-stone-800 dark:hover:text-stone-200")
+                }
+            }
+            on:click=move |_| {
+                node_type_filter.set(Some(value.to_string()));
+                current_view.set(View::NodeList);
+            }
+            title=label
+        >
+            <span class="material-symbols-outlined" style="font-size: 14px;">{icon}</span>
+            {label}
+        </button>
     }
 }
 
