@@ -30,6 +30,9 @@ pub struct SearchResult {
     pub node_type: String,
     /// Lowercase status string, e.g. `"draft"`, `"published"`, `"archived"`.
     pub status: String,
+    /// Where the match was found: `"node"` (title/body), `"note"`, or `"task"`.
+    /// `None` for browse (empty-query) results.
+    pub match_source: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
