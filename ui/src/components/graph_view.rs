@@ -27,6 +27,7 @@ use common::{
 use crate::{
     api::{fetch_all_edges, fetch_nodes, fetch_positions, save_position},
     app::View,
+    components::dark_mode_toggle::Theme,
 };
 
 // SVG coordinate-space canvas size
@@ -210,6 +211,7 @@ fn force_layout(node_ids: &[Uuid], edge_pairs: &[(Uuid, Uuid)]) -> HashMap<Uuid,
 #[component]
 pub fn GraphView() -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let theme = use_context::<RwSignal<Theme>>().map(|t| t.read_only());
 
     let loading = RwSignal::new(true);
     let error_msg = RwSignal::new(Option::<String>::None);
@@ -427,9 +429,21 @@ pub fn GraphView() -> impl IntoView {
                                 <text
                                     x=move || format!("{:.1}", positions.get().get(&id).map(|p| p.0).unwrap_or(W / 2.0))
                                     y=move || format!("{:.1}", positions.get().get(&id).map(|p| p.1 + 5.0).unwrap_or(H / 2.0 + 5.0))
-                                    style="text-anchor: middle; font-size: 10px; font-weight: 600; \
-                                           fill: #111827; stroke: white; stroke-width: 3px; \
-                                           paint-order: stroke fill; pointer-events: none;"
+                                    style=move || {
+                                        let is_dark = theme
+                                            .map(|t| t.get() == Theme::Dark)
+                                            .unwrap_or(false);
+                                        let (text_fill, halo) = if is_dark {
+                                            ("#fcd34d", "#0c0a09")  // amber-300 on stone-950
+                                        } else {
+                                            ("#92400e", "#fafaf9")  // amber-900 on stone-50
+                                        };
+                                        format!(
+                                            "text-anchor: middle; font-size: 10px; font-weight: 600; \
+                                             fill: {text_fill}; stroke: {halo}; stroke-width: 3px; \
+                                             paint-order: stroke fill; pointer-events: none;"
+                                        )
+                                    }
                                 >
                                     {display}
                                 </text>

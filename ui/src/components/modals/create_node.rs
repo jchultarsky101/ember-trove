@@ -5,6 +5,7 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     api::create_node,
     app::View,
+    components::toast::{ToastLevel, push_toast},
 };
 
 /// Quick-capture modal — lightweight node creation without leaving the current view.
@@ -69,6 +70,7 @@ pub fn CreateNodeModal(
             match create_node(&req).await {
                 Ok(node) => {
                     loading.set(false);
+                    push_toast(ToastLevel::Success, format!("\"{}\" created.", node.title));
                     refresh.update(|n| *n += 1);
                     current_view.set(View::NodeDetail(node.id));
                     on_close.run(());

@@ -8,8 +8,10 @@ use pulldown_cmark::{Options, Parser, html};
 
 use crate::app::View;
 use crate::components::attachment_panel::AttachmentPanel;
+use crate::components::modals::delete_confirm::DeleteConfirmModal;
 use crate::components::permission_dialog::PermissionPanel;
 use crate::components::tag_bar::TagBar;
+use crate::components::toast::{ToastLevel, push_toast};
 use crate::wikilink::preprocess_wikilinks;
 
 /// Render markdown with wiki-link resolution.
@@ -50,14 +52,30 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
     let titles = LocalResource::new(|| async move { crate::api::fetch_node_titles().await });
 
     let deleting = RwSignal::new(false);
+    let show_delete_confirm = RwSignal::new(false);
 
-    let on_delete = move |_| {
+    // Derive node title for the confirm dialog (empty string until node loads).
+    let delete_item_name = Memo::new(move |_| {
+        node.get()
+            .and_then(|r| r.ok())
+            .map(|n| n.title.clone())
+            .unwrap_or_default()
+    });
+
+    let do_delete = move || {
         deleting.set(true);
+        show_delete_confirm.set(false);
         let id = id;
         wasm_bindgen_futures::spawn_local(async move {
-            if crate::api::delete_node(id).await.is_ok() {
-                refresh.update(|n| *n += 1);
-                current_view.set(View::NodeList);
+            match crate::api::delete_node(id).await {
+                Ok(_) => {
+                    push_toast(ToastLevel::Success, "Node deleted.");
+                    refresh.update(|n| *n += 1);
+                    current_view.set(View::NodeList);
+                }
+                Err(e) => {
+                    push_toast(ToastLevel::Error, format!("Delete failed: {e}"));
+                }
             }
             deleting.set(false);
         });
@@ -135,8 +153,9 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                             <button
                                                 class="p-1.5 rounded-lg text-stone-400 hover:text-red-600
                                                     dark:hover:text-red-400 hover:bg-red-50
-                                                    dark:hover:bg-red-900/30 transition-colors"
-                                                on:click=on_delete
+                                                    dark:hover:bg-red-900/30 transition-colors
+                                                    disabled:opacity-30"
+                                                on:click=move |_| show_delete_confirm.set(true)
                                                 disabled=move || deleting.get()
                                                 title=move || if deleting.get() { "Deleting…" } else { "Delete" }
                                             >
@@ -171,6 +190,13 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                 })
             }}
         </Suspense>
+
+        <DeleteConfirmModal
+            show=show_delete_confirm.read_only()
+            item_name=Signal::derive(move || delete_item_name.get())
+            on_confirm=Callback::new(move |_| do_delete())
+            on_cancel=Callback::new(move |_| show_delete_confirm.set(false))
+        />
     }
 }
 
