@@ -25,6 +25,9 @@ pub trait NoteRepo: Send + Sync {
 
     /// All notes by a given owner, newest first, with node titles (central feed).
     async fn feed_for_owner(&self, owner_id: &str) -> Result<Vec<FeedNote>, EmberTroveError>;
+
+    /// All notes across all owners — used for full backup.
+    async fn list_all(&self) -> Result<Vec<Note>, EmberTroveError>;
 }
 
 // ── PgNoteRepo ─────────────────────────────────────────────────────────────────
@@ -99,6 +102,21 @@ impl NoteRepo for PgNoteRepo {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("list notes failed: {e}")))?;
+
+        Ok(rows.into_iter().map(NoteRow::into_note).collect())
+    }
+
+    async fn list_all(&self) -> Result<Vec<Note>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, NoteRow>(
+            r#"
+            SELECT id, node_id, owner_id, body, created_at
+            FROM node_notes
+            ORDER BY created_at ASC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list_all notes failed: {e}")))?;
 
         Ok(rows.into_iter().map(NoteRow::into_note).collect())
     }

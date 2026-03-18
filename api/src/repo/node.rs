@@ -40,6 +40,9 @@ pub trait NodeRepo: Send + Sync {
 
     /// Fetch every node owned by `owner_id` with tags populated — used for backup.
     async fn list_all_for_owner(&self, owner_id: &str) -> Result<Vec<Node>, EmberTroveError>;
+
+    /// Fetch every node across all owners with tags populated — used for full backup.
+    async fn list_all(&self) -> Result<Vec<Node>, EmberTroveError>;
 }
 
 pub struct PgNodeRepo {
@@ -489,6 +492,33 @@ impl NodeRepo for PgNodeRepo {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("list_all_for_owner failed: {e}")))?;
+
+        let mut nodes = rows
+            .into_iter()
+            .map(NodeRow::into_node)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let node_ids: Vec<Uuid> = nodes.iter().map(|n| n.id.0).collect();
+        let mut tag_map = fetch_tags_for_nodes(&self.pool, &node_ids).await?;
+        for node in &mut nodes {
+            node.tags = tag_map.remove(&node.id.0).unwrap_or_default();
+        }
+
+        Ok(nodes)
+    }
+
+    async fn list_all(&self) -> Result<Vec<Node>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, NodeRow>(
+            r#"
+            SELECT id, owner_id, node_type::text, title, slug, body, metadata,
+                   status::text, created_at, updated_at
+            FROM nodes
+            ORDER BY created_at ASC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list_all nodes failed: {e}")))?;
 
         let mut nodes = rows
             .into_iter()

@@ -320,6 +320,34 @@ button[type="submit"]:hover,
   background-color: #b45309 !important; /* amber-700 */
 }
 
+/* Secondary / cancel button (e.g. "Back" on logout confirmation) */
+.pf-c-button.pf-m-secondary,
+.btn-default,
+a.btn-default {
+  width: 100%;
+  padding: 0.5625rem 1rem !important;
+  background-color: transparent !important;
+  border: 1px solid #57534e !important; /* stone-600 */
+  border-radius: 0.5rem !important;
+  color: #a8a29e !important;            /* stone-400 */
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none !important;
+  display: block;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.pf-c-button.pf-m-secondary:hover,
+.btn-default:hover,
+a.btn-default:hover {
+  background-color: #292524 !important; /* stone-800 */
+  border-color: #a8a29e !important;     /* stone-400 */
+  color: #d6d3d1 !important;            /* stone-300 */
+}
+
 input[type="submit"]:focus,
 .btn-primary:focus,
 .pf-c-button.pf-m-primary:focus {
@@ -367,6 +395,11 @@ input[type="submit"]:disabled,
   background-color: rgba(234, 179, 8, 0.1) !important;
   border: 1px solid rgba(234, 179, 8, 0.3) !important;
   color: #fde047 !important; /* yellow-300 */
+}
+
+/* Hide info-message container when it has no child elements (only whitespace) */
+#kc-info-message:not(:has(*)) {
+  display: none !important;
 }
 
 .alert-info,
