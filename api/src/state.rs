@@ -10,7 +10,7 @@ use crate::{
     object_store::ObjectStore,
     repo::{
         attachment::AttachmentRepo, edge::EdgeRepo, graph::GraphRepo, node::NodeRepo,
-        permission::PermissionRepo, search::SearchRepo, tag::TagRepo,
+        permission::PermissionRepo, search::SearchRepo, tag::TagRepo, task::TaskRepo,
     },
 };
 
@@ -20,6 +20,7 @@ pub struct AppState {
     pub nodes: Arc<dyn NodeRepo>,
     pub edges: Arc<dyn EdgeRepo>,
     pub tags: Arc<dyn TagRepo>,
+    pub tasks: Arc<dyn TaskRepo>,
     pub attachments: Arc<dyn AttachmentRepo>,
     pub permissions: Arc<dyn PermissionRepo>,
     pub search: Arc<dyn SearchRepo>,

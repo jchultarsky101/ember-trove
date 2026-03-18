@@ -7,6 +7,7 @@ pub mod nodes;
 pub mod permissions;
 pub mod search;
 pub mod tags;
+pub mod tasks;
 
 use axum::{extract::State, middleware, routing::get, Json, Router};
 use axum::http::{header, Method};
@@ -47,6 +48,9 @@ pub fn build_router(state: AppState) -> Router {
     let protected = Router::new()
         .merge(auth::protected_router())
         .nest("/nodes", nodes::router())
+        .nest("/nodes/{node_id}/tasks", tasks::node_task_router())
+        .nest("/tasks", tasks::task_router())
+        .nest("/my-day", tasks::my_day_router())
         .nest("/edges", edges::router())
         .nest("/tags", tags::router())
         .nest("/attachments", attachments::router())
