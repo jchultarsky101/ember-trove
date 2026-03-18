@@ -3,7 +3,7 @@ use leptos::prelude::*;
 
 use crate::{
     auth::provide_auth_state,
-    components::{dark_mode_toggle::Theme, layout::Layout},
+    components::{dark_mode_toggle::Theme, layout::Layout, toast::ToastState},
 };
 
 // ── localStorage helpers ───────────────────────────────────────────────────
@@ -86,9 +86,17 @@ pub fn App() -> impl IntoView {
     let tag_filter: RwSignal<Option<Tag>> = RwSignal::new(None);
     provide_context(tag_filter);
 
+    // Node-type filter — set by sidebar type links, read by NodeList.
+    let node_type_filter: RwSignal<Option<String>> = RwSignal::new(None);
+    provide_context(node_type_filter);
+
     // Shared search query — written by SearchBar, read by SearchView.
     let search_query: RwSignal<String> = RwSignal::new(String::new());
     provide_context(search_query);
+
+    // Toast notification state.
+    let toast_state = ToastState::new();
+    provide_context(toast_state);
 
     view! {
         <Layout auth_state=auth_state />

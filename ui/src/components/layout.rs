@@ -8,7 +8,7 @@ use crate::{
         modals::create_node::CreateNodeModal,
         node_editor::NodeEditor,
         node_list::NodeList, node_view::NodeView, search_view::SearchView, sidebar::Sidebar,
-        tag_manager::TagManager,
+        tag_manager::TagManager, toast::ToastOverlay,
     },
 };
 
@@ -81,6 +81,9 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                 show=show_capture.read_only()
                 on_close=Callback::new(move |_| show_capture.set(false))
             />
+
+            // Toast notification overlay
+            <ToastOverlay />
         </AuthGate>
     }
 }

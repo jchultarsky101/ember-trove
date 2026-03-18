@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 /// Confirmation dialog for destructive deletes.
 use leptos::prelude::*;
 
@@ -11,27 +10,55 @@ pub fn DeleteConfirmModal(
 ) -> impl IntoView {
     view! {
         <Show when=move || show.get()>
-            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                <div class="bg-white dark:bg-gray-900 rounded-xl shadow-xl p-6 w-full max-w-sm">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                        "Delete?"
-                    </h2>
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            // Backdrop
+            <div
+                class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+                on:click=move |_| on_cancel.run(())
+            />
+            // Panel
+            <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div
+                    class="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl
+                           border border-stone-200 dark:border-stone-700
+                           w-full max-w-sm p-6 flex flex-col gap-4"
+                    on:click=|ev| ev.stop_propagation()
+                >
+                    // Icon + title
+                    <div class="flex items-center gap-3">
+                        <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30
+                                    flex items-center justify-center">
+                            <span class="material-symbols-outlined text-red-600 dark:text-red-400"
+                                  style="font-size: 20px;">"delete_forever"</span>
+                        </div>
+                        <h2 class="text-base font-semibold text-stone-900 dark:text-stone-100">
+                            "Confirm Delete"
+                        </h2>
+                    </div>
+
+                    // Body
+                    <p class="text-sm text-stone-600 dark:text-stone-400 leading-relaxed">
                         "Are you sure you want to delete "
-                        <strong>{move || item_name.get()}</strong>
-                        "? This cannot be undone."
+                        <strong class="text-stone-800 dark:text-stone-200">
+                            {move || item_name.get()}
+                        </strong>
+                        "? This action cannot be undone."
                     </p>
-                    <div class="flex justify-end gap-3">
+
+                    // Actions
+                    <div class="flex justify-end gap-2 pt-1">
                         <button
-                            class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300
-                                hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                            class="px-4 py-2 text-sm rounded-lg
+                                   text-stone-600 dark:text-stone-400
+                                   hover:bg-stone-100 dark:hover:bg-stone-800
+                                   transition-colors"
                             on:click=move |_| on_cancel.run(())
                         >
                             "Cancel"
                         </button>
                         <button
-                            class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white
-                                rounded-lg transition-colors"
+                            class="px-4 py-2 text-sm font-medium rounded-lg
+                                   bg-red-600 hover:bg-red-700
+                                   text-white transition-colors"
                             on:click=move |_| on_confirm.run(())
                         >
                             "Delete"
