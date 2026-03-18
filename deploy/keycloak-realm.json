@@ -25,7 +25,8 @@
       "implicitFlowEnabled": false,
       "serviceAccountsEnabled": false,
       "attributes": {
-        "pkce.code.challenge.method": ""
+        "pkce.code.challenge.method": "",
+        "post.logout.redirect.uris": "http://localhost:8003##http://localhost:3003"
       },
       "protocolMappers": [
         {
