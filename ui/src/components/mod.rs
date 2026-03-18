@@ -14,4 +14,5 @@ pub mod search_view;
 pub mod sidebar;
 pub mod tag_bar;
 pub mod tag_manager;
+pub mod task_panel;
 pub mod toast;
