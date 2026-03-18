@@ -23,7 +23,7 @@ pub fn NotesView() -> impl IntoView {
             </div>
 
             // Feed
-            <div class="flex-1 overflow-auto p-6 max-w-2xl">
+            <div class="flex-1 overflow-auto p-6 flex flex-col">
                 <Suspense fallback=move || view! {
                     <p class="text-sm text-stone-400">"Loading…"</p>
                 }>
@@ -34,7 +34,7 @@ pub fn NotesView() -> impl IntoView {
 
                         if notes.is_empty() {
                             return view! {
-                                <div class="flex flex-col items-center gap-3 py-16">
+                                <div class="flex-1 flex flex-col items-center justify-center gap-3">
                                     <span class="material-symbols-outlined text-stone-300 dark:text-stone-700"
                                         style="font-size: 48px;">{"sticky_note_2"}</span>
                                     <p class="text-stone-400 dark:text-stone-500 text-sm text-center">
@@ -48,7 +48,7 @@ pub fn NotesView() -> impl IntoView {
                         }
 
                         view! {
-                            <div class="space-y-4">
+                            <div class="space-y-4 max-w-2xl mx-auto w-full">
                                 {notes.into_iter().map(|feed_note| {
                                     let node_id = feed_note.note.node_id;
                                     let node_title = feed_note.node_title.clone();
