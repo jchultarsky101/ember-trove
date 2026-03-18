@@ -65,7 +65,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
 
     view! {
         <Suspense fallback=move || view! {
-            <div class="p-6 text-gray-400 text-sm">"Loading node..."</div>
+            <div class="p-6 text-stone-400 text-sm">"Loading node..."</div>
         }>
             {move || {
                 node.get().map(|result| {
@@ -104,36 +104,36 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
 
                             view! {
                                 <div class="flex flex-col h-full">
-                                    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+                                    <div class="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-800">
                                         <div class="flex items-center gap-3">
                                             <button
-                                                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                                class="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
                                                 on:click=move |_| current_view.set(View::NodeList)
                                             >
                                                 <span class="material-symbols-outlined">"arrow_back"</span>
                                             </button>
-                                            <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                            <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
                                                 {n.title.clone()}
                                             </h1>
-                                            <span class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                                            <span class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
                                                 {node_type}
                                             </span>
-                                            <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                            <span class="px-2 py-0.5 text-xs rounded-full bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400">
                                                 {status}
                                             </span>
                                         </div>
                                         <div class="flex items-center gap-1">
                                             <button
-                                                class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
-                                                    dark:hover:text-gray-300 hover:bg-gray-100
-                                                    dark:hover:bg-gray-800 transition-colors"
+                                                class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                                                    dark:hover:text-stone-300 hover:bg-stone-100
+                                                    dark:hover:bg-stone-800 transition-colors"
                                                 on:click=move |_| current_view.set(View::NodeEdit(edit_id))
                                                 title="Edit"
                                             >
                                                 <span class="material-symbols-outlined">"edit"</span>
                                             </button>
                                             <button
-                                                class="p-1.5 rounded-lg text-gray-400 hover:text-red-600
+                                                class="p-1.5 rounded-lg text-stone-400 hover:text-red-600
                                                     dark:hover:text-red-400 hover:bg-red-50
                                                     dark:hover:bg-red-900/30 transition-colors"
                                                 on:click=on_delete
@@ -147,7 +147,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         </div>
                                     </div>
                                     // Tags
-                                    <div class="border-b border-gray-200 dark:border-gray-800">
+                                    <div class="border-b border-stone-200 dark:border-stone-800">
                                         <TagBar node_id=id />
                                     </div>
                                     <div class="flex-1 overflow-auto p-6">
@@ -257,15 +257,15 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
     };
 
     view! {
-        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+        <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-6">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                     "Connections"
                 </h2>
                 <button
-                    class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
-                        dark:hover:text-gray-300 hover:bg-gray-100
-                        dark:hover:bg-gray-800 transition-colors"
+                    class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                        dark:hover:text-stone-300 hover:bg-stone-100
+                        dark:hover:bg-stone-800 transition-colors"
                     on:click=move |_| show_add.update(|v| *v = !*v)
                     title=move || if show_add.get() { "Cancel" } else { "Add Edge" }
                 >
@@ -277,15 +277,15 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
 
             // Add edge form
             {move || show_add.get().then(|| view! {
-                <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-2">
+                <div class="mb-4 p-3 bg-stone-50 dark:bg-stone-900 rounded-lg space-y-2">
                     <div class="flex gap-2">
                         <div class="relative flex-1">
                             <input
                                 type="text"
                                 node_ref=search_input_ref
-                                class="w-full px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600
-                                    bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none
-                                    focus:ring-1 focus:ring-blue-500"
+                                class="w-full px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
+                                    bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none
+                                    focus:ring-1 focus:ring-amber-500"
                                 placeholder="Search for a node…"
                                 on:input=move |ev| {
                                     let v = event_target_value(&ev);
@@ -304,7 +304,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                                 }
                                 Some(view! {
                                     <div class="absolute z-30 top-full left-0 right-0 mt-0.5
-                                        bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700
+                                        bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700
                                         rounded-lg shadow-lg overflow-hidden">
                                         {results.into_iter().map(|r| {
                                             let id_str = r.node_id.to_string();
@@ -313,8 +313,8 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                                             view! {
                                                 <button
                                                     class="w-full text-left px-3 py-1.5 text-xs
-                                                        hover:bg-gray-100 dark:hover:bg-gray-800
-                                                        text-gray-700 dark:text-gray-300"
+                                                        hover:bg-stone-100 dark:hover:bg-stone-800
+                                                        text-stone-700 dark:text-stone-300"
                                                     on:mousedown=move |_| {
                                                         target_id_input.set(id_str.clone());
                                                         node_search_query.set(title.clone());
@@ -333,8 +333,8 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                             }}
                             </Suspense></div>
                         <select
-                            class="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600
-                                bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300
+                            class="px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
+                                bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300
                                 focus:outline-none"
                             prop:value=move || edge_type_input.get()
                             on:change=move |ev| edge_type_input.set(event_target_value(&ev))
@@ -349,17 +349,17 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                     <div class="flex gap-2">
                         <input
                             type="text"
-                            class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600
-                                bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none
-                                focus:ring-1 focus:ring-blue-500"
+                            class="flex-1 px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
+                                bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none
+                                focus:ring-1 focus:ring-amber-500"
                             placeholder="Label (optional)..."
                             prop:value=move || label_input.get()
                             on:input=move |ev| label_input.set(event_target_value(&ev))
                         />
                         <button
-                            class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
-                                dark:hover:text-gray-300 hover:bg-gray-100
-                                dark:hover:bg-gray-800 transition-colors"
+                            class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                                dark:hover:text-stone-300 hover:bg-stone-100
+                                dark:hover:bg-stone-800 transition-colors"
                             on:click=on_add_edge
                             title="Add edge"
                         >
@@ -374,7 +374,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
 
             // Edge list
             <Suspense fallback=|| view! {
-                <div class="text-xs text-gray-400">"Loading edges..."</div>
+                <div class="text-xs text-stone-400">"Loading edges..."</div>
             }>
                 {move || {
                     edges.get().map(|result| {
@@ -383,12 +383,12 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                                 view! {
                                     <div class="flex flex-col items-center gap-2 py-6">
                                         <span
-                                            class="material-symbols-outlined text-gray-300 dark:text-gray-700"
+                                            class="material-symbols-outlined text-stone-300 dark:text-stone-700"
                                             style="font-size: 32px;"
                                         >
                                             "hub"
                                         </span>
-                                        <p class="text-xs text-gray-400 dark:text-gray-600">
+                                        <p class="text-xs text-stone-400 dark:text-stone-600">
                                             "No connections yet."
                                         </p>
                                     </div>
@@ -407,17 +407,17 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                                             let label = edge.label.clone().unwrap_or_default();
                                             view! {
                                                 <div class="flex items-center justify-between py-1.5 px-2 rounded
-                                                    hover:bg-gray-50 dark:hover:bg-gray-800/50 group">
+                                                    hover:bg-stone-50 dark:hover:bg-stone-800/50 group">
                                                     <button
-                                                        class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400
-                                                            hover:text-blue-600 dark:hover:text-blue-400 min-w-0"
+                                                        class="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-400
+                                                            hover:text-amber-600 dark:hover:text-amber-400 min-w-0"
                                                         on:click=move |_| current_view.set(View::NodeDetail(other_id))
                                                     >
                                                         <span class="shrink-0">{direction}</span>
-                                                        <span class="text-gray-400 dark:text-gray-500 shrink-0">{edge_type_label}</span>
+                                                        <span class="text-stone-400 dark:text-stone-500 shrink-0">{edge_type_label}</span>
                                                         <span class="font-medium truncate">{other_title}</span>
                                                         {(!label.is_empty()).then(|| view! {
-                                                            <span class="italic text-gray-400 shrink-0">{format!("({label})")}</span>
+                                                            <span class="italic text-stone-400 shrink-0">{format!("({label})")}</span>
                                                         })}
                                                     </button>
                                                     <button
@@ -460,12 +460,12 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
     });
 
     view! {
-        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+        <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-6">
+            <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300 mb-3">
                 "Linked Here"
             </h2>
             <Suspense fallback=|| view! {
-                <div class="text-xs text-gray-400">"Loading backlinks..."</div>
+                <div class="text-xs text-stone-400">"Loading backlinks..."</div>
             }>
                 {move || {
                     backlinks.get().map(|result| {
@@ -473,12 +473,12 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
                             Ok(nodes) if nodes.is_empty() => view! {
                                 <div class="flex flex-col items-center gap-2 py-6">
                                     <span
-                                        class="material-symbols-outlined text-gray-300 dark:text-gray-700"
+                                        class="material-symbols-outlined text-stone-300 dark:text-stone-700"
                                         style="font-size: 32px;"
                                     >
                                         "link_off"
                                     </span>
-                                    <p class="text-xs text-gray-400 dark:text-gray-600">
+                                    <p class="text-xs text-stone-400 dark:text-stone-600">
                                         "No other notes link here."
                                     </p>
                                 </div>
@@ -492,15 +492,15 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
                                         view! {
                                             <button
                                                 class="flex items-center gap-2 w-full text-left py-1.5 px-2 rounded
-                                                    text-xs hover:bg-gray-50 dark:hover:bg-gray-800/50
-                                                    text-gray-600 dark:text-gray-400
-                                                    hover:text-blue-600 dark:hover:text-blue-400"
+                                                    text-xs hover:bg-stone-50 dark:hover:bg-stone-800/50
+                                                    text-stone-600 dark:text-stone-400
+                                                    hover:text-amber-600 dark:hover:text-amber-400"
                                                 on:click=move |_| current_view.set(View::NodeDetail(node_id))
                                             >
-                                                <span class="material-symbols-outlined text-gray-400 dark:text-gray-600"
+                                                <span class="material-symbols-outlined text-stone-400 dark:text-stone-600"
                                                     style="font-size: 14px;">"arrow_back"</span>
                                                 <span class="font-medium truncate">{title}</span>
-                                                <span class="text-gray-400 dark:text-gray-600 shrink-0">
+                                                <span class="text-stone-400 dark:text-stone-600 shrink-0">
                                                     {format!("({node_type})")}
                                                 </span>
                                             </button>

@@ -46,8 +46,8 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                             // Shortcut: jump to Search view filtered by tag (no text needed)
                             <button
                                 class="w-full text-left mt-1 px-2 py-1 text-xs
-                                    text-blue-500 dark:text-blue-400
-                                    hover:text-blue-700 dark:hover:text-blue-300
+                                    text-amber-500 dark:text-amber-400
+                                    hover:text-amber-700 dark:hover:text-amber-300
                                     transition-colors"
                                 on:click=move |_| {
                                     tag_filter.set(None);
@@ -61,19 +61,19 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                     }.into_any()
                 }
             }}
-            <div class="border-t border-gray-200 dark:border-gray-700 my-3" />
+            <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             <SidebarLink
                 icon="description" label="All Nodes"
                 on_click=move || current_view.set(View::NodeList)
                 collapsed=collapsed
             />
-            <div class="border-t border-gray-200 dark:border-gray-700 my-3" />
+            <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             <SidebarLink
                 icon="label" label="Tags"
                 on_click=move || current_view.set(View::TagManager)
                 collapsed=collapsed
             />
-            <div class="border-t border-gray-200 dark:border-gray-700 my-3" />
+            <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             <SidebarLink
                 icon="share" label="Graph"
                 on_click=move || current_view.set(View::Graph)
@@ -85,7 +85,7 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                 {
                     Some(view! {
                         <div>
-                            <div class="border-t border-gray-200 dark:border-gray-700 my-3" />
+                            <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
                             <SidebarLink
                                 icon="admin_panel_settings" label="Admin"
                                 on_click=move || current_view.set(View::Admin)
@@ -99,7 +99,7 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
             }}
         </nav>
         // User / logout section
-        <div class="px-2 py-3 border-t border-gray-200 dark:border-gray-800">
+        <div class="px-2 py-3 border-t border-stone-200 dark:border-stone-800">
             {move || {
                 let is_collapsed = collapsed.get();
                 if let AuthStatus::Authenticated(ref user) = auth_state.get() {
@@ -110,8 +110,8 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                             <button
                                 on:click=on_logout
                                 class="flex items-center justify-center w-full p-2 rounded-lg
-                                    text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800
-                                    dark:text-gray-400 cursor-pointer"
+                                    text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800
+                                    dark:text-stone-400 cursor-pointer"
                                 title=format!("{name} — Logout")
                             >
                                 <span class="material-symbols-outlined">"logout"</span>
@@ -121,11 +121,11 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                         // Expanded: username + logout link
                         Some(view! {
                             <div class="flex items-center justify-between px-1">
-                                <span class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                <span class="text-xs text-stone-500 dark:text-stone-400 truncate">
                                     {name}
                                 </span>
                                 <button
-                                    class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+                                    class="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 cursor-pointer"
                                     on:click=on_logout
                                 >
                                     "Logout"
@@ -152,7 +152,7 @@ fn SidebarLink(
         <button
             class=move || {
                 let base = "flex items-center w-full rounded-lg text-sm font-medium \
-                    text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 \
+                    text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 \
                     transition-colors cursor-pointer py-2";
                 if collapsed.get() {
                     format!("{base} justify-center px-0")
@@ -163,7 +163,7 @@ fn SidebarLink(
             title=label
             on:click=move |_| on_click.run(())
         >
-            <span class="material-symbols-outlined text-gray-500 dark:text-gray-400">{icon}</span>
+            <span class="material-symbols-outlined text-stone-500 dark:text-stone-400">{icon}</span>
             <span
                 class="truncate"
                 class:hidden=move || collapsed.get()

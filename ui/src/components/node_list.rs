@@ -56,8 +56,8 @@ pub fn NodeList() -> impl IntoView {
 
     view! {
         <div class="flex flex-col h-full">
-            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-                <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100">"Nodes"</h1>
+            <div class="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-800">
+                <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">"Nodes"</h1>
                 <div class="flex items-center gap-2">
                     // Active tag-filter badge: shows tag name + colour + × to clear
                     {move || tag_filter.get().map(|tag| {
@@ -78,8 +78,8 @@ pub fn NodeList() -> impl IntoView {
                         }
                     })}
                     <button
-                        class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
-                            hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                            hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
                         on:click=move |_| current_view.set(View::NodeCreate)
                         title="New node"
                     >
@@ -89,7 +89,7 @@ pub fn NodeList() -> impl IntoView {
             </div>
 
             // Status filter pills
-            <div class="flex gap-1 px-6 py-2 border-b border-gray-100 dark:border-gray-800">
+            <div class="flex gap-1 px-6 py-2 border-b border-stone-100 dark:border-stone-800">
                 {[("All", None), ("Draft", Some("draft")), ("Published", Some("published")), ("Archived", Some("archived"))].iter().map(|&(label, value)| {
                     let value_owned: Option<String> = value.map(|s| s.to_string());
                     let value_cmp = value_owned.clone();
@@ -99,9 +99,9 @@ pub fn NodeList() -> impl IntoView {
                                 let active = status_filter.get() == value_cmp;
                                 let base = "px-2.5 py-0.5 text-xs rounded-full font-medium transition-colors";
                                 if active {
-                                    format!("{base} bg-blue-600 text-white")
+                                    format!("{base} bg-amber-600 text-white")
                                 } else {
-                                    format!("{base} bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700")
+                                    format!("{base} bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700")
                                 }
                             }
                             on:click={
@@ -117,7 +117,7 @@ pub fn NodeList() -> impl IntoView {
 
             <div class="flex-1 overflow-auto">
                 <Suspense fallback=move || view! {
-                    <div class="p-6 text-gray-400 text-sm">"Loading nodes..."</div>
+                    <div class="p-6 text-stone-400 text-sm">"Loading nodes..."</div>
                 }>
                     {move || {
                         nodes.get().map(|result| {
@@ -125,12 +125,12 @@ pub fn NodeList() -> impl IntoView {
                                 Ok(list) if list.is_empty() => view! {
                                     <div class="flex flex-col items-center justify-center h-full gap-3 p-12">
                                         <span
-                                            class="material-symbols-outlined text-gray-300 dark:text-gray-700"
+                                            class="material-symbols-outlined text-stone-300 dark:text-stone-700"
                                             style="font-size: 48px;"
                                         >
                                             "description"
                                         </span>
-                                        <p class="text-gray-400 dark:text-gray-600 text-sm text-center">
+                                        <p class="text-stone-400 dark:text-stone-600 text-sm text-center">
                                             "No nodes found."
                                         </p>
                                     </div>
@@ -159,7 +159,7 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
         use_context::<RwSignal<Option<Tag>>>().unwrap_or_else(|| RwSignal::new(None));
 
     view! {
-        <ul class="divide-y divide-gray-200 dark:divide-gray-800">
+        <ul class="divide-y divide-stone-200 dark:divide-stone-800">
             {nodes.into_iter().map(|node| {
                 let id = node.id;
                 let node_type = format!("{:?}", node.node_type).to_lowercase();
@@ -170,20 +170,20 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
                 let status_class = match status.as_str() {
                     "published" => "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
                     "archived"  => "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-                    _           => "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+                    _           => "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400",
                 };
                 view! {
                     <li
-                        class="px-6 py-4 hover:bg-gray-100 dark:hover:bg-gray-900 cursor-pointer transition-colors"
+                        class="px-6 py-4 hover:bg-stone-100 dark:hover:bg-stone-900 cursor-pointer transition-colors"
                         on:click=move |_| current_view.set(View::NodeDetail(id))
                     >
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    <span class="text-sm font-medium text-stone-900 dark:text-stone-100">
                                         {node.title.clone()}
                                     </span>
-                                    <span class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                                    <span class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
                                         {node_type}
                                     </span>
                                     <span class=format!("px-2 py-0.5 text-xs rounded-full {status_class}")>
@@ -213,12 +213,12 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
                                     }).collect::<Vec<_>>()}
                                 </div>
                                 {node.body.as_deref().and_then(body_preview).map(|preview| view! {
-                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+                                    <p class="text-xs text-stone-500 dark:text-stone-400 mt-1 truncate">
                                         {preview}
                                     </p>
                                 })}
                             </div>
-                            <span class="text-xs text-gray-400 shrink-0 mt-0.5">{updated}</span>
+                            <span class="text-xs text-stone-400 shrink-0 mt-0.5">{updated}</span>
                         </div>
                     </li>
                 }

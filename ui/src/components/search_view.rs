@@ -101,9 +101,9 @@ pub fn SearchView() -> impl IntoView {
     view! {
         <div class="flex flex-col h-full">
             // Filter bar
-            <div class="flex items-center gap-2 px-6 py-3 border-b border-gray-200 dark:border-gray-800
-                bg-white dark:bg-gray-900 flex-wrap">
-                <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100 shrink-0">"Search"</h1>
+            <div class="flex items-center gap-2 px-6 py-3 border-b border-stone-200 dark:border-stone-800
+                bg-white dark:bg-stone-900 flex-wrap">
+                <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100 shrink-0">"Search"</h1>
 
                 // AND/OR toggle — only when 2+ tags selected
                 {move || {
@@ -112,8 +112,8 @@ pub fn SearchView() -> impl IntoView {
                         Some(view! {
                             <button
                                 class="px-2 py-0.5 text-xs font-semibold rounded border
-                                    border-blue-400 text-blue-500 dark:text-blue-400
-                                    hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors shrink-0"
+                                    border-amber-400 text-amber-500 dark:text-amber-400
+                                    hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors shrink-0"
                                 title="Toggle AND / OR between tags"
                                 on:click=move |_| tag_op_and.update(|v| *v = !*v)
                             >
@@ -162,9 +162,9 @@ pub fn SearchView() -> impl IntoView {
 
                         view! {
                             <select
-                                class="text-xs rounded-md border border-gray-300 dark:border-gray-600
-                                    bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300
-                                    px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                class="text-xs rounded-md border border-stone-300 dark:border-stone-600
+                                    bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300
+                                    px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-500"
                                 on:change=move |ev| {
                                     let val = event_target_value(&ev);
                                     if !val.is_empty()
@@ -199,23 +199,23 @@ pub fn SearchView() -> impl IntoView {
 
                 <div class="flex items-center gap-3 ml-auto">
                     {move || loading.get().then_some(view! {
-                        <span class="text-xs text-gray-400 dark:text-gray-500 animate-pulse">"Searching\u{2026}"</span>
+                        <span class="text-xs text-stone-400 dark:text-stone-500 animate-pulse">"Searching\u{2026}"</span>
                     })}
-                    <label class="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+                    <label class="flex items-center gap-1.5 text-sm text-stone-600 dark:text-stone-400 cursor-pointer select-none">
                         <input
                             type="checkbox"
-                            class="rounded border-gray-300 dark:border-gray-600 text-blue-500
-                                focus:ring-blue-500 dark:bg-gray-700"
+                            class="rounded border-stone-300 dark:border-stone-600 text-amber-500
+                                focus:ring-amber-500 dark:bg-stone-700"
                             prop:checked=move || fuzzy.get()
                             on:change=move |_| fuzzy.update(|f| *f = !*f)
                         />
                         "Fuzzy"
                     </label>
-                    <label class="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+                    <label class="flex items-center gap-1.5 text-sm text-stone-600 dark:text-stone-400 cursor-pointer select-none">
                         <input
                             type="checkbox"
-                            class="rounded border-gray-300 dark:border-gray-600 text-green-500
-                                focus:ring-green-500 dark:bg-gray-700"
+                            class="rounded border-stone-300 dark:border-stone-600 text-green-500
+                                focus:ring-green-500 dark:bg-stone-700"
                             prop:checked=move || published_only.get()
                             on:change=move |_| published_only.update(|v| *v = !*v)
                         />
@@ -240,7 +240,7 @@ pub fn SearchView() -> impl IntoView {
                         let total_pages = ((total as f64) / (per_page as f64)).ceil() as u32;
 
                         view! {
-                            <div class="mb-3 text-sm text-gray-500 dark:text-gray-400">
+                            <div class="mb-3 text-sm text-stone-500 dark:text-stone-400">
                                 {format!("{total} result{}", if total == 1 { "" } else { "s" })}
                                 {if total_pages > 1 {
                                     format!(" \u{00b7} page {current_page} of {total_pages}")
@@ -251,7 +251,7 @@ pub fn SearchView() -> impl IntoView {
 
                             {if resp.results.is_empty() && total == 0 {
                                 view! {
-                                    <div class="text-center py-12 text-gray-400 dark:text-gray-600">
+                                    <div class="text-center py-12 text-stone-400 dark:text-stone-600">
                                         <span class="material-symbols-outlined text-4xl mb-2 block">"search_off"</span>
                                         <p>"No results found. Try different keywords, tags, or enable fuzzy search."</p>
                                     </div>
@@ -265,27 +265,27 @@ pub fn SearchView() -> impl IntoView {
 
                                             view! {
                                                 <button
-                                                    class="w-full text-left block p-4 rounded-lg border border-gray-200
-                                                        dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700
-                                                        bg-white dark:bg-gray-900 transition-colors"
+                                                    class="w-full text-left block p-4 rounded-lg border border-stone-200
+                                                        dark:border-stone-700 hover:border-amber-300 dark:hover:border-amber-700
+                                                        bg-white dark:bg-stone-900 transition-colors"
                                                     on:click=move |_| {
                                                         current_view.set(View::NodeDetail(node_id));
                                                     }
                                                 >
                                                     <div class="flex items-center justify-between mb-1">
-                                                        <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                        <h3 class="text-sm font-medium text-stone-900 dark:text-stone-100">
                                                             {result.title}
                                                         </h3>
-                                                        <span class="text-xs text-gray-400 dark:text-gray-500 ml-2 shrink-0">
+                                                        <span class="text-xs text-stone-400 dark:text-stone-500 ml-2 shrink-0">
                                                             {format!("{rank_pct:.0}%")}
                                                         </span>
                                                     </div>
-                                                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-1 font-mono">
+                                                    <p class="text-xs text-stone-500 dark:text-stone-400 mb-1 font-mono">
                                                         {result.slug}
                                                     </p>
                                                     {result.snippet.map(|s| view! {
                                                         <p
-                                                            class="text-xs text-gray-600 dark:text-gray-400 line-clamp-2"
+                                                            class="text-xs text-stone-600 dark:text-stone-400 line-clamp-2"
                                                             inner_html=s
                                                         />
                                                     })}
@@ -315,7 +315,7 @@ pub fn SearchView() -> impl IntoView {
                 {move || {
                     if results.get().is_none() && loading.get() {
                         Some(view! {
-                            <div class="text-center py-16 text-gray-400 dark:text-gray-600">
+                            <div class="text-center py-16 text-stone-400 dark:text-stone-600">
                                 <span class="text-sm animate-pulse">"Loading\u{2026}"</span>
                             </div>
                         }.into_any())
@@ -359,8 +359,8 @@ fn Pagination(
     view! {
         <div class="flex items-center justify-center gap-1 mt-6">
             <button
-                class="px-3 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-600
-                    text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800
+                class="px-3 py-1.5 text-xs rounded-md border border-stone-300 dark:border-stone-600
+                    text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800
                     disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 prop:disabled=prev_disabled
                 on:click=on_prev
@@ -375,9 +375,9 @@ fn Pagination(
                         class=move || format!(
                             "px-3 py-1.5 text-xs rounded-md transition-colors {}",
                             if is_current {
-                                "bg-blue-600 text-white font-medium"
+                                "bg-amber-600 text-white font-medium"
                             } else {
-                                "border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                                "border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
                             }
                         )
                         on:click=move |_| {
@@ -392,8 +392,8 @@ fn Pagination(
             }).collect::<Vec<_>>()}
 
             <button
-                class="px-3 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-600
-                    text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800
+                class="px-3 py-1.5 text-xs rounded-md border border-stone-300 dark:border-stone-600
+                    text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800
                     disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 prop:disabled=next_disabled
                 on:click=on_next

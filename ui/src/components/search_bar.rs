@@ -95,9 +95,9 @@ pub fn SearchBar() -> impl IntoView {
         <div class="relative">
             <input
                 type="search"
-                class="w-full px-4 py-2 pl-10 text-sm bg-gray-100 dark:bg-gray-800
+                class="w-full px-4 py-2 pl-10 text-sm bg-stone-100 dark:bg-stone-800
                     border border-transparent rounded-lg focus:outline-none
-                    focus:ring-2 focus:ring-blue-500 dark:text-gray-100"
+                    focus:ring-2 focus:ring-amber-500 dark:text-stone-100"
                 placeholder="Search\u{2026} (Enter for full search)"
                 prop:value=move || search_query.get()
                 on:input=on_input
@@ -106,12 +106,12 @@ pub fn SearchBar() -> impl IntoView {
                 on:focus=on_focus
             />
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2
-                text-gray-400 pointer-events-none text-lg">
+                text-stone-400 pointer-events-none text-lg">
                 "search"
             </span>
             {move || loading.get().then_some(view! {
                 <span class="absolute right-3 top-1/2 -translate-y-1/2
-                    text-gray-400 text-xs animate-pulse">
+                    text-stone-400 text-xs animate-pulse">
                     "\u{2026}"
                 </span>
             })}
@@ -125,31 +125,31 @@ pub fn SearchBar() -> impl IntoView {
                     return None;
                 }
                 Some(view! {
-                    <div class="absolute z-50 mt-1 w-full bg-white dark:bg-gray-900 border
-                        border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden">
+                    <div class="absolute z-50 mt-1 w-full bg-white dark:bg-stone-900 border
+                        border-stone-200 dark:border-stone-700 rounded-lg shadow-lg overflow-hidden">
                         {items.into_iter().map(|r| {
                             let node_id = r.node_id;
                             view! {
                                 <button
-                                    class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50
-                                        dark:hover:bg-gray-800 transition-colors border-b
-                                        border-gray-100 dark:border-gray-800 last:border-0"
+                                    class="w-full text-left px-3 py-2 text-sm hover:bg-stone-50
+                                        dark:hover:bg-stone-800 transition-colors border-b
+                                        border-stone-100 dark:border-stone-800 last:border-0"
                                     on:mousedown=move |ev| {
                                         ev.prevent_default();
                                         show_dropdown.set(false);
                                         current_view.set(View::NodeDetail(node_id));
                                     }
                                 >
-                                    <div class="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                    <div class="font-medium text-stone-900 dark:text-stone-100 truncate">
                                         {r.title}
                                     </div>
-                                    <div class="text-xs text-gray-400 truncate">{r.slug}</div>
+                                    <div class="text-xs text-stone-400 truncate">{r.slug}</div>
                                 </button>
                             }
                         }).collect::<Vec<_>>()}
                         <button
-                            class="w-full text-center px-3 py-2 text-xs text-blue-600
-                                dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800
+                            class="w-full text-center px-3 py-2 text-xs text-amber-600
+                                dark:text-amber-400 hover:bg-stone-50 dark:hover:bg-stone-800
                                 transition-colors font-medium"
                             on:mousedown=move |ev| {
                                 ev.prevent_default();

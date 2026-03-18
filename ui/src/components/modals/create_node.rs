@@ -102,21 +102,21 @@ pub fn CreateNodeModal(
                 class="fixed inset-0 z-50 flex items-center justify-center p-4"
                 on:keydown=handle_keydown
             >
-                <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl
-                            border border-gray-200 dark:border-gray-700
+                <div class="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl
+                            border border-stone-200 dark:border-stone-700
                             w-full max-w-lg flex flex-col gap-4 p-6"
                     // Prevent backdrop click from closing when clicking inside
                     on:click=|ev| ev.stop_propagation()
                 >
                     // Header
                     <div class="flex items-center justify-between">
-                        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        <h2 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
                             "Quick Capture"
                         </h2>
                         <button
                             class="w-7 h-7 flex items-center justify-center rounded-lg
-                                   text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
-                                   hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                   text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                                   hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
                             on:click=move |_| on_close.run(())
                             title="Close (Esc)"
                         >
@@ -128,7 +128,7 @@ pub fn CreateNodeModal(
 
                     // Title input
                     <div class="flex flex-col gap-1">
-                        <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        <label class="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">
                             "Title"
                             <span class="text-red-400 ml-0.5">"*"</span>
                         </label>
@@ -137,11 +137,11 @@ pub fn CreateNodeModal(
                             placeholder="Node title…"
                             autofocus
                             class="w-full px-3 py-2 rounded-lg text-sm
-                                   bg-gray-50 dark:bg-gray-800
-                                   border border-gray-200 dark:border-gray-700
-                                   text-gray-900 dark:text-gray-100
-                                   placeholder-gray-400 dark:placeholder-gray-500
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
+                                   bg-stone-50 dark:bg-stone-800
+                                   border border-stone-200 dark:border-stone-700
+                                   text-stone-900 dark:text-stone-100
+                                   placeholder-stone-400 dark:placeholder-stone-500
+                                   focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400
                                    transition-colors"
                             prop:value=move || title.get()
                             on:input=move |ev| title.set(event_target_value(&ev))
@@ -150,15 +150,15 @@ pub fn CreateNodeModal(
 
                     // Type select
                     <div class="flex flex-col gap-1">
-                        <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        <label class="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">
                             "Type"
                         </label>
                         <select
                             class="w-full px-3 py-2 rounded-lg text-sm
-                                   bg-gray-50 dark:bg-gray-800
-                                   border border-gray-200 dark:border-gray-700
-                                   text-gray-900 dark:text-gray-100
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
+                                   bg-stone-50 dark:bg-stone-800
+                                   border border-stone-200 dark:border-stone-700
+                                   text-stone-900 dark:text-stone-100
+                                   focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400
                                    transition-colors cursor-pointer"
                             prop:value=move || node_type_str.get()
                             on:change=move |ev| node_type_str.set(event_target_value(&ev))
@@ -173,19 +173,19 @@ pub fn CreateNodeModal(
 
                     // Body textarea (optional)
                     <div class="flex flex-col gap-1">
-                        <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                        <label class="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">
                             "Notes "
-                            <span class="normal-case font-normal text-gray-400 dark:text-gray-500">"(optional)"</span>
+                            <span class="normal-case font-normal text-stone-400 dark:text-stone-500">"(optional)"</span>
                         </label>
                         <textarea
                             rows="4"
                             placeholder="Start writing… (Markdown supported)"
                             class="w-full px-3 py-2 rounded-lg text-sm resize-none
-                                   bg-gray-50 dark:bg-gray-800
-                                   border border-gray-200 dark:border-gray-700
-                                   text-gray-900 dark:text-gray-100
-                                   placeholder-gray-400 dark:placeholder-gray-500
-                                   focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400
+                                   bg-stone-50 dark:bg-stone-800
+                                   border border-stone-200 dark:border-stone-700
+                                   text-stone-900 dark:text-stone-100
+                                   placeholder-stone-400 dark:placeholder-stone-500
+                                   focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400
                                    transition-colors font-mono"
                             prop:value=move || body.get()
                             on:input=move |ev| body.set(event_target_value(&ev))
@@ -199,14 +199,14 @@ pub fn CreateNodeModal(
 
                     // Actions
                     <div class="flex items-center justify-between pt-1">
-                        <span class="text-xs text-gray-400 dark:text-gray-500">
+                        <span class="text-xs text-stone-400 dark:text-stone-500">
                             "Ctrl+Enter to save · Esc to cancel"
                         </span>
                         <div class="flex gap-2">
                             <button
                                 class="px-4 py-2 text-sm rounded-lg
-                                       text-gray-600 dark:text-gray-400
-                                       hover:bg-gray-100 dark:hover:bg-gray-800
+                                       text-stone-600 dark:text-stone-400
+                                       hover:bg-stone-100 dark:hover:bg-stone-800
                                        transition-colors"
                                 on:click=move |_| on_close.run(())
                                 disabled=move || loading.get()
@@ -215,7 +215,7 @@ pub fn CreateNodeModal(
                             </button>
                             <button
                                 class="px-4 py-2 text-sm font-medium rounded-lg
-                                       bg-blue-600 hover:bg-blue-700
+                                       bg-amber-600 hover:bg-amber-700
                                        text-white
                                        disabled:opacity-50 disabled:cursor-not-allowed
                                        transition-colors flex items-center gap-1.5"

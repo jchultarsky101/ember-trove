@@ -187,18 +187,18 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     view! {
         <div class="flex flex-col h-full">
             // Header
-            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-800">
                 <div class="flex items-center gap-3 flex-1">
                     <button
-                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        class="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
                         on:click=move |_| current_view.set(View::NodeList)
                     >
                         <span class="material-symbols-outlined">"arrow_back"</span>
                     </button>
                     <input
                         type="text"
-                        class="flex-1 text-lg font-semibold bg-transparent text-gray-900 dark:text-gray-100
-                            focus:outline-none placeholder-gray-400"
+                        class="flex-1 text-lg font-semibold bg-transparent text-stone-900 dark:text-stone-100
+                            focus:outline-none placeholder-stone-400"
                         placeholder="Node title..."
                         prop:value=move || title.get()
                         on:input=move |ev| title.set(event_target_value(&ev))
@@ -206,7 +206,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                 </div>
                 <div class="flex items-center gap-2">
                     <select
-                        class="text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300
+                        class="text-sm bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300
                             rounded-lg px-2 py-1.5 focus:outline-none"
                         prop:value=move || node_type.get()
                         on:change=move |ev| node_type.set(event_target_value(&ev))
@@ -218,7 +218,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         <option value="reference">"Reference"</option>
                     </select>
                     <select
-                        class="text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300
+                        class="text-sm bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300
                             rounded-lg px-2 py-1.5 focus:outline-none"
                         prop:value=move || status.get()
                         on:change=move |ev| status.set(event_target_value(&ev))
@@ -228,7 +228,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         <option value="archived">"Archived"</option>
                     </select>
                     <button
-                        class="p-1.5 rounded-lg text-gray-400 hover:text-green-600 dark:hover:text-green-400
+                        class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
                             hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
                         on:click=on_save
                         disabled=move || saving.get()
@@ -239,8 +239,8 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         </span>
                     </button>
                     <button
-                        class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
-                            hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                            hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
                         on:click=move |_| current_view.set(View::NodeList)
                         title="Cancel"
                     >
@@ -255,13 +255,13 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                 </div>
             })}
             // Split editor + preview
-            <div class="flex flex-1 divide-x divide-gray-200 dark:divide-gray-700 min-h-0">
+            <div class="flex flex-1 divide-x divide-stone-200 dark:divide-stone-700 min-h-0">
                 // Editor pane (relative so the autocomplete dropdown can be positioned)
                 <div class="flex-1 flex flex-col relative">
                     <textarea
                         node_ref=textarea_ref
                         class="flex-1 p-4 font-mono text-sm resize-none bg-transparent
-                            text-gray-900 dark:text-gray-100 focus:outline-none"
+                            text-stone-900 dark:text-stone-100 focus:outline-none"
                         placeholder="Write in Markdown… use [[Node Title]] to link nodes"
                         prop:value=move || body.get()
                         on:input=on_body_input
@@ -288,10 +288,10 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         }
                         Some(view! {
                             <div class="absolute bottom-4 left-4 z-50 w-72
-                                bg-white dark:bg-gray-900
-                                border border-gray-200 dark:border-gray-700
+                                bg-white dark:bg-stone-900
+                                border border-stone-200 dark:border-stone-700
                                 rounded-lg shadow-xl overflow-hidden">
-                                <div class="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-100 dark:border-gray-800">
+                                <div class="px-3 py-1.5 text-xs text-stone-400 border-b border-stone-100 dark:border-stone-800">
                                     "Link to node — " {query.clone()}
                                 </div>
                                 {matches.into_iter().map(|t| {
@@ -301,9 +301,9 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                                         <button
                                             type="button"
                                             class="w-full text-left px-3 py-2 text-sm
-                                                text-gray-800 dark:text-gray-200
-                                                hover:bg-blue-50 dark:hover:bg-blue-900/30
-                                                hover:text-blue-700 dark:hover:text-blue-300
+                                                text-stone-800 dark:text-stone-200
+                                                hover:bg-amber-50 dark:hover:bg-amber-900/30
+                                                hover:text-amber-700 dark:hover:text-amber-300
                                                 transition-colors"
                                             on:click=move |ev| {
                                                 ev.prevent_default();
