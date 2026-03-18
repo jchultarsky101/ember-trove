@@ -2,6 +2,7 @@ use common::{search::SearchResponse, tag::Tag};
 use leptos::prelude::*;
 
 use crate::app::View;
+use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
 
 /// Full-page search results view.
 ///
@@ -219,6 +220,13 @@ pub fn SearchView() -> impl IntoView {
                                         {resp.results.into_iter().map(|result| {
                                             let node_id = result.node_id;
                                             let rank_pct = (result.rank * 100.0).min(100.0);
+                                            let nt = result.node_type.clone();
+                                            let st = result.status.clone();
+                                            let t_icon  = type_icon(&nt);
+                                            let t_label = type_label(&nt);
+                                            let s_icon  = status_icon(&st);
+                                            let s_label = status_label(&st);
+                                            let s_color = status_color(&st);
 
                                             view! {
                                                 <button
@@ -229,17 +237,35 @@ pub fn SearchView() -> impl IntoView {
                                                         current_view.set(View::NodeDetail(node_id));
                                                     }
                                                 >
-                                                    <div class="flex items-center justify-between mb-1">
-                                                        <h3 class="text-sm font-medium text-stone-900 dark:text-stone-100">
+                                                    // Row 1: type icon · title · status icon · rank
+                                                    <div class="flex items-center gap-2 mb-1">
+                                                        <span
+                                                            class="material-symbols-outlined text-stone-400
+                                                                   dark:text-stone-500 flex-shrink-0"
+                                                            style="font-size: 15px;"
+                                                            title=t_label
+                                                        >
+                                                            {t_icon}
+                                                        </span>
+                                                        <h3 class="text-sm font-medium text-stone-900 dark:text-stone-100 truncate flex-1">
                                                             {result.title}
                                                         </h3>
-                                                        <span class="text-xs text-stone-400 dark:text-stone-500 ml-2 shrink-0">
+                                                        <span
+                                                            class="material-symbols-outlined flex-shrink-0"
+                                                            style=format!("font-size: 14px; {s_color}")
+                                                            title=s_label
+                                                        >
+                                                            {s_icon}
+                                                        </span>
+                                                        <span class="text-xs text-stone-400 dark:text-stone-500 shrink-0">
                                                             {format!("{rank_pct:.0}%")}
                                                         </span>
                                                     </div>
+                                                    // Row 2: slug
                                                     <p class="text-xs text-stone-500 dark:text-stone-400 mb-1 font-mono">
                                                         {result.slug}
                                                     </p>
+                                                    // Row 3: snippet (optional)
                                                     {result.snippet.map(|s| view! {
                                                         <p
                                                             class="text-xs text-stone-600 dark:text-stone-400 line-clamp-2"

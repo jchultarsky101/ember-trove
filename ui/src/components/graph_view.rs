@@ -30,6 +30,7 @@ use common::{
 use crate::{
     api::{fetch_all_edges, fetch_nodes, fetch_positions, save_position},
     app::View,
+    components::node_meta::{status_color_hex, status_label, type_label},
 };
 
 const W: f64 = 1000.0;
@@ -82,32 +83,6 @@ fn node_stroke_color(nt: &NodeType) -> &'static str {
         NodeType::Area      => "#166534",
         NodeType::Resource  => "#6b21a8",
         NodeType::Reference => "#991b1b",
-    }
-}
-
-fn type_label_for_str(nt: &str) -> &'static str {
-    match nt {
-        "project"   => "Project",
-        "area"      => "Area",
-        "resource"  => "Resource",
-        "reference" => "Reference",
-        _           => "Article",
-    }
-}
-
-fn status_label_for_str(st: &str) -> &'static str {
-    match st {
-        "published" => "Published",
-        "archived"  => "Archived",
-        _           => "Draft",
-    }
-}
-
-fn status_color_for_str(st: &str) -> &'static str {
-    match st {
-        "published" => "#16a34a",
-        "archived"  => "#d97706",
-        _           => "#a8a29e",
     }
 }
 
@@ -959,9 +934,9 @@ pub fn GraphView() -> impl IntoView {
                                     let pos = positions.get();
                                     let (nx, ny) = pos.get(&h.node_id).copied().unwrap_or((W / 2.0, H / 2.0));
 
-                                    let type_lbl = type_label_for_str(&h.node_type);
-                                    let status_lbl = status_label_for_str(&h.status);
-                                    let status_col = status_color_for_str(&h.status);
+                                    let type_lbl = type_label(&h.node_type);
+                                    let status_lbl = status_label(&h.status);
+                                    let status_col = status_color_hex(&h.status);
 
                                     // Card dimensions
                                     let card_w = (h.title.chars().count() as f64 * 6.0 + 20.0)

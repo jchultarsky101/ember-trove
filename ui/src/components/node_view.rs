@@ -9,56 +9,11 @@ use pulldown_cmark::{Options, Parser, html};
 use crate::app::View;
 use crate::components::attachment_panel::AttachmentPanel;
 use crate::components::modals::delete_confirm::DeleteConfirmModal;
+use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
 use crate::components::permission_dialog::PermissionPanel;
 use crate::components::tag_bar::TagBar;
 use crate::components::toast::{ToastLevel, push_toast};
 use crate::wikilink::preprocess_wikilinks;
-
-// ── Node-type / status icon helpers (mirrors node_list.rs) ──────────────────
-
-fn type_icon_for(nt: &str) -> &'static str {
-    match nt {
-        "project"   => "rocket_launch",
-        "area"      => "category",
-        "resource"  => "bookmarks",
-        "reference" => "menu_book",
-        _           => "description",
-    }
-}
-
-fn type_label_for(nt: &str) -> &'static str {
-    match nt {
-        "project"   => "Project",
-        "area"      => "Area",
-        "resource"  => "Resource",
-        "reference" => "Reference",
-        _           => "Article",
-    }
-}
-
-fn status_icon_for(st: &str) -> &'static str {
-    match st {
-        "published" => "check_circle",
-        "archived"  => "inventory_2",
-        _           => "edit_note",
-    }
-}
-
-fn status_label_for(st: &str) -> &'static str {
-    match st {
-        "published" => "Published",
-        "archived"  => "Archived",
-        _           => "Draft",
-    }
-}
-
-fn status_color_for(st: &str) -> &'static str {
-    match st {
-        "published" => "color: #16a34a;",
-        "archived"  => "color: #d97706;",
-        _           => "color: #a8a29e;",
-    }
-}
 
 /// Render markdown with wiki-link resolution.
 ///
@@ -183,18 +138,18 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                             <span
                                                 class="material-symbols-outlined text-stone-400 dark:text-stone-500"
                                                 style="font-size: 18px;"
-                                                title=type_label_for(&node_type)
+                                                title=type_label(&node_type)
                                             >
-                                                {type_icon_for(&node_type)}
+                                                {type_icon(&node_type)}
                                             </span>
                                             // Status icon — semantic colour, same as NodeList
                                             <span
                                                 class="material-symbols-outlined"
                                                 style=format!("font-size: 18px; {}",
-                                                    status_color_for(&status))
-                                                title=status_label_for(&status)
+                                                    status_color(&status))
+                                                title=status_label(&status)
                                             >
-                                                {status_icon_for(&status)}
+                                                {status_icon(&status)}
                                             </span>
                                         </div>
                                         <div class="flex items-center gap-1">

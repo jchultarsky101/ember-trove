@@ -31,6 +31,8 @@ struct SearchRow {
     slug: String,
     snippet: Option<String>,
     rank: f32,
+    node_type: String,
+    status: String,
 }
 
 impl SearchRow {
@@ -41,6 +43,8 @@ impl SearchRow {
             slug: self.slug,
             snippet: self.snippet,
             rank: self.rank,
+            node_type: self.node_type,
+            status: self.status,
         }
     }
 }
@@ -146,7 +150,9 @@ impl PgSearchRepo {
                 title,
                 slug,
                 NULL::text AS snippet,
-                1.0::float4 AS rank
+                1.0::float4 AS rank,
+                node_type::text AS node_type,
+                status::text AS status
             FROM nodes
             WHERE ($1::text IS NULL OR node_type = $1::node_type)
               AND ($2::text IS NULL OR status = $2::node_status)
@@ -237,7 +243,9 @@ impl PgSearchRepo {
                     websearch_to_tsquery('english', $1),
                     'StartSel=<mark>, StopSel=</mark>, MaxFragments=2, MaxWords=30, MinWords=10'
                 ) AS snippet,
-                ts_rank_cd(search_vec, websearch_to_tsquery('english', $1)) AS rank
+                ts_rank_cd(search_vec, websearch_to_tsquery('english', $1)) AS rank,
+                node_type::text AS node_type,
+                status::text AS status
             FROM nodes
             WHERE search_vec @@ websearch_to_tsquery('english', $1)
               AND ($2::text IS NULL OR node_type = $2::node_type)
@@ -331,7 +339,9 @@ impl PgSearchRepo {
                     THEN substring(body FROM 1 FOR 200)
                     ELSE NULL
                 END AS snippet,
-                GREATEST(similarity(title, $1), 0.0) AS rank
+                GREATEST(similarity(title, $1), 0.0) AS rank,
+                node_type::text AS node_type,
+                status::text AS status
             FROM nodes
             WHERE (similarity(title, $1) > 0.1 OR body ILIKE $2)
               AND ($3::text IS NULL OR node_type = $3::node_type)

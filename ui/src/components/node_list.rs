@@ -2,6 +2,7 @@ use common::{node::Node, tag::Tag};
 use leptos::prelude::*;
 
 use crate::app::View;
+use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
 
 // ── Sorting ────────────────────────────────────────────────────────────────────
 
@@ -51,54 +52,6 @@ const SORT_OPTIONS: &[SortKey] = &[
     SortKey::NameAsc,
     SortKey::NameDesc,
 ];
-
-// ── Node-type icon & label ──────────────────────────────────────────────────────
-
-fn type_icon(node_type: &str) -> &'static str {
-    match node_type {
-        "project"   => "rocket_launch",
-        "area"      => "category",
-        "resource"  => "bookmarks",
-        "reference" => "menu_book",
-        _           => "description",   // article (default)
-    }
-}
-
-fn type_label(node_type: &str) -> &'static str {
-    match node_type {
-        "project"   => "Project",
-        "area"      => "Area",
-        "resource"  => "Resource",
-        "reference" => "Reference",
-        _           => "Article",
-    }
-}
-
-// ── Status icon, label & CSS colour ────────────────────────────────────────────
-
-fn status_icon(status: &str) -> &'static str {
-    match status {
-        "published" => "check_circle",
-        "archived"  => "inventory_2",
-        _           => "edit_note",   // draft
-    }
-}
-
-fn status_label(status: &str) -> &'static str {
-    match status {
-        "published" => "Published",
-        "archived"  => "Archived",
-        _           => "Draft",
-    }
-}
-
-fn status_color(status: &str) -> &'static str {
-    match status {
-        "published" => "color: #16a34a;",   // green-600
-        "archived"  => "color: #d97706;",   // amber-600
-        _           => "color: #a8a29e;",   // stone-400 (draft = neutral)
-    }
-}
 
 // ── Preview helper ─────────────────────────────────────────────────────────────
 
