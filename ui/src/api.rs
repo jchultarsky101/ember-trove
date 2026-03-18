@@ -663,3 +663,69 @@ pub async fn fetch_notes_feed() -> Result<Vec<FeedNote>, UiError> {
 
 #[allow(dead_code)]
 pub fn _use_note_id(_: NoteId) {}
+
+// ── Backup endpoints ──────────────────────────────────────────────────────────
+
+pub async fn list_backups() -> Result<Vec<common::backup::BackupJob>, UiError> {
+    let resp = Request::get(&api_url("/admin/backups"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn create_backup_api() -> Result<common::backup::BackupJob, UiError> {
+    let resp = Request::post(&api_url("/admin/backups"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn delete_backup(id: uuid::Uuid) -> Result<(), UiError> {
+    let resp = Request::delete(&api_url(&format!("/admin/backups/{id}")))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    if resp.ok() {
+        Ok(())
+    } else {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        Err(UiError::api(status, text))
+    }
+}
+
+pub async fn download_backup_url(id: uuid::Uuid) -> Result<String, UiError> {
+    let resp = Request::get(&api_url(&format!("/admin/backups/{id}/download")))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    let val: serde_json::Value = parse_json(resp).await?;
+    val["url"]
+        .as_str()
+        .map(String::from)
+        .ok_or_else(|| UiError::Parse("missing 'url' field in download response".to_string()))
+}
+
+pub async fn preview_backup_restore(id: uuid::Uuid) -> Result<common::backup::BackupPreview, UiError> {
+    let resp = Request::get(&api_url(&format!("/admin/backups/{id}/preview")))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn restore_backup(id: uuid::Uuid) -> Result<(), UiError> {
+    let resp = Request::post(&api_url(&format!("/admin/backups/{id}/restore")))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    if resp.ok() {
+        Ok(())
+    } else {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        Err(UiError::api(status, text))
+    }
+}

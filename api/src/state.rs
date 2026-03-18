@@ -9,9 +9,9 @@ use crate::{
     config::Config,
     object_store::ObjectStore,
     repo::{
-        attachment::AttachmentRepo, edge::EdgeRepo, graph::GraphRepo, node::NodeRepo,
-        note::NoteRepo, permission::PermissionRepo, search::SearchRepo, tag::TagRepo,
-        task::TaskRepo,
+        attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo, graph::GraphRepo,
+        node::NodeRepo, note::NoteRepo, permission::PermissionRepo, search::SearchRepo,
+        tag::TagRepo, task::TaskRepo,
     },
 };
 
@@ -27,6 +27,7 @@ pub struct AppState {
     pub permissions: Arc<dyn PermissionRepo>,
     pub search: Arc<dyn SearchRepo>,
     pub graph: Arc<dyn GraphRepo>,
+    pub backup: Arc<dyn BackupRepo>,
     pub object_store: Arc<dyn ObjectStore>,
     pub oidc: Option<Arc<OidcClient>>,
     /// Keycloak Admin client — `None` when `KEYCLOAK_ADMIN_USER` / `KEYCLOAK_ADMIN_PASSWORD`

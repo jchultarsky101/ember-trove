@@ -297,6 +297,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         placeholder="Write in Markdown… use [[Node Title]] to link nodes"
                         prop:value=move || body.get()
                         on:input=on_body_input
+                        spellcheck="true"
                         // Close dropdown on Escape
                         on:keydown=move |ev: leptos::ev::KeyboardEvent| {
                             if ev.key() == "Escape" {
