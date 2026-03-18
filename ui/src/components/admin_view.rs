@@ -14,8 +14,8 @@ use crate::api;
 fn role_chip_class(role: &str) -> &'static str {
     match role {
         "admin" => "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-        "user" => "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-        _ => "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+        "user" => "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+        _ => "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400",
     }
 }
 
@@ -97,16 +97,16 @@ pub fn AdminView() -> impl IntoView {
             // ── Page header ───────────────────────────────────────────────────
             <div class="flex items-center justify-between mb-6">
                 <div>
-                    <h1 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    <h1 class="text-xl font-semibold text-stone-900 dark:text-stone-100">
                         "User Management"
                     </h1>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                    <p class="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
                         "Create and manage Keycloak users and realm roles."
                     </p>
                 </div>
                 <button
-                    class="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600
-                        text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-600
+                        text-white text-sm font-medium hover:bg-amber-700 transition-colors"
                     on:click=move |_| {
                         create_error.set(None);
                         show_create.update(|v| *v = !*v);
@@ -123,34 +123,34 @@ pub fn AdminView() -> impl IntoView {
             {move || show_create.get().then(|| {
                 let roles_snapshot = available_roles.get().unwrap_or_default();
                 view! {
-                    <div class="mb-6 p-5 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-4">
-                        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <div class="mb-6 p-5 bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-700 shadow-sm space-y-4">
+                        <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                             "New User"
                         </h2>
 
                         // Row 1: username + email
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                <label class="block text-xs text-stone-500 dark:text-stone-400 mb-1">
                                     "Username *"
                                 </label>
                                 <input
                                     type="text"
-                                    class="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600
-                                        bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    class="w-full px-3 py-1.5 text-sm rounded-lg border border-stone-300 dark:border-stone-600
+                                        bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
                                     placeholder="jdoe"
                                     prop:value=move || form_username.get()
                                     on:input=move |ev| form_username.set(event_target_value(&ev))
                                 />
                             </div>
                             <div>
-                                <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                <label class="block text-xs text-stone-500 dark:text-stone-400 mb-1">
                                     "Email *"
                                 </label>
                                 <input
                                     type="email"
-                                    class="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600
-                                        bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    class="w-full px-3 py-1.5 text-sm rounded-lg border border-stone-300 dark:border-stone-600
+                                        bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
                                     placeholder="j.doe@example.com"
                                     prop:value=move || form_email.get()
                                     on:input=move |ev| form_email.set(event_target_value(&ev))
@@ -161,26 +161,26 @@ pub fn AdminView() -> impl IntoView {
                         // Row 2: first + last name
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                <label class="block text-xs text-stone-500 dark:text-stone-400 mb-1">
                                     "First Name"
                                 </label>
                                 <input
                                     type="text"
-                                    class="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600
-                                        bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    class="w-full px-3 py-1.5 text-sm rounded-lg border border-stone-300 dark:border-stone-600
+                                        bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
                                     placeholder="Jane"
                                     prop:value=move || form_first_name.get()
                                     on:input=move |ev| form_first_name.set(event_target_value(&ev))
                                 />
                             </div>
                             <div>
-                                <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                <label class="block text-xs text-stone-500 dark:text-stone-400 mb-1">
                                     "Last Name"
                                 </label>
                                 <input
                                     type="text"
-                                    class="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600
-                                        bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    class="w-full px-3 py-1.5 text-sm rounded-lg border border-stone-300 dark:border-stone-600
+                                        bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
                                     placeholder="Doe"
                                     prop:value=move || form_last_name.get()
                                     on:input=move |ev| form_last_name.set(event_target_value(&ev))
@@ -190,7 +190,7 @@ pub fn AdminView() -> impl IntoView {
 
                         // Row 3: roles
                         <div>
-                            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            <label class="block text-xs text-stone-500 dark:text-stone-400 mb-1">
                                 "Initial Roles"
                             </label>
                             <div class="flex flex-wrap gap-2">
@@ -203,7 +203,7 @@ pub fn AdminView() -> impl IntoView {
                                         <label class="flex items-center gap-1.5 cursor-pointer select-none">
                                             <input
                                                 type="checkbox"
-                                                class="rounded border-gray-300 dark:border-gray-600"
+                                                class="rounded border-stone-300 dark:border-stone-600"
                                                 prop:checked=checked
                                                 on:change=move |_| {
                                                     form_roles.update(|roles| {
@@ -226,10 +226,10 @@ pub fn AdminView() -> impl IntoView {
 
                         // Row 4: send welcome email toggle + submit
                         <div class="flex items-center justify-between pt-1">
-                            <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-600 dark:text-gray-400">
+                            <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-stone-600 dark:text-stone-400">
                                 <input
                                     type="checkbox"
-                                    class="rounded border-gray-300 dark:border-gray-600"
+                                    class="rounded border-stone-300 dark:border-stone-600"
                                     prop:checked=move || form_send_email.get()
                                     on:change=move |ev| {
                                         use wasm_bindgen::JsCast;
@@ -243,8 +243,8 @@ pub fn AdminView() -> impl IntoView {
                                 "Send password-setup email"
                             </label>
                             <button
-                                class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium
-                                    hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                                class="px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium
+                                    hover:bg-amber-700 disabled:opacity-40 transition-colors"
                                 on:click=on_create
                                 disabled=move || creating.get()
                             >
@@ -264,7 +264,7 @@ pub fn AdminView() -> impl IntoView {
             <Suspense fallback=|| view! {
                 <div class="space-y-2">
                     {(0..4).map(|_| view! {
-                        <div class="h-12 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                        <div class="h-12 rounded-lg bg-stone-100 dark:bg-stone-800 animate-pulse" />
                     }).collect::<Vec<_>>()}
                 </div>
             }>
@@ -278,20 +278,20 @@ pub fn AdminView() -> impl IntoView {
                         }.into_any(),
                         Ok(list) if list.is_empty() => view! {
                             <div class="flex flex-col items-center gap-3 py-16 text-center">
-                                <span class="material-symbols-outlined text-gray-300 dark:text-gray-700"
+                                <span class="material-symbols-outlined text-stone-300 dark:text-stone-700"
                                     style="font-size: 48px;">"person_off"</span>
-                                <p class="text-sm text-gray-400 dark:text-gray-600">
+                                <p class="text-sm text-stone-400 dark:text-stone-600">
                                     "No users found in this realm."
                                 </p>
                             </div>
                         }.into_any(),
                         Ok(list) => view! {
-                            <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200
-                                dark:border-gray-700 shadow-sm overflow-hidden">
+                            <div class="bg-white dark:bg-stone-900 rounded-xl border border-stone-200
+                                dark:border-stone-700 shadow-sm overflow-hidden">
                                 // Table header
                                 <div class="grid grid-cols-[1fr_1fr_auto_auto] gap-4 px-4 py-2.5
-                                    border-b border-gray-200 dark:border-gray-800
-                                    text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                                    border-b border-stone-200 dark:border-stone-800
+                                    text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">
                                     <span>"User"</span>
                                     <span>"Email"</span>
                                     <span>"Roles"</span>
@@ -338,33 +338,33 @@ fn UserRow(
     let user_id_for_roles = user_id.clone();
 
     view! {
-        <div class="border-b border-gray-100 dark:border-gray-800 last:border-0">
+        <div class="border-b border-stone-100 dark:border-stone-800 last:border-0">
             // Main row
-            <div class="grid grid-cols-[1fr_1fr_auto_auto] gap-4 items-center px-4 py-3 group hover:bg-gray-50 dark:hover:bg-gray-800/40">
+            <div class="grid grid-cols-[1fr_1fr_auto_auto] gap-4 items-center px-4 py-3 group hover:bg-stone-50 dark:hover:bg-stone-800/40">
                 // Name + status
                 <div class="flex items-center gap-2 min-w-0">
                     <div class={format!(
                         "flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold {}",
                         if enabled {
-                            "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
+                            "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
                         } else {
-                            "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600"
+                            "bg-stone-100 text-stone-400 dark:bg-stone-800 dark:text-stone-600"
                         }
                     )}>
                         {display_name.chars().next().unwrap_or('?').to_uppercase().to_string()}
                     </div>
                     <div class="min-w-0">
-                        <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate block">
+                        <span class="text-sm font-medium text-stone-900 dark:text-stone-100 truncate block">
                             {display_name.clone()}
                         </span>
-                        <span class="text-xs text-gray-400 dark:text-gray-500 truncate block">
+                        <span class="text-xs text-stone-400 dark:text-stone-500 truncate block">
                             {format!("@{}", user.username)}
                         </span>
                     </div>
                 </div>
 
                 // Email
-                <span class="text-sm text-gray-600 dark:text-gray-400 truncate">{email}</span>
+                <span class="text-sm text-stone-600 dark:text-stone-400 truncate">{email}</span>
 
                 // Role chips
                 <div class="flex flex-wrap gap-1">
@@ -382,8 +382,8 @@ fn UserRow(
                 <div class="flex items-center gap-1">
                     // Edit roles button
                     <button
-                        class="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 dark:hover:text-blue-400
-                            hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                        class="p-1.5 rounded-lg text-stone-400 hover:text-amber-600 dark:hover:text-amber-400
+                            hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
                         title="Edit roles"
                         on:click=move |_| {
                             roles_error.set(None);
@@ -423,8 +423,8 @@ fn UserRow(
                                         <span class="material-symbols-outlined" style="font-size: 14px;">"check"</span>
                                     </button>
                                     <button
-                                        class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
-                                            hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                                            hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
                                         on:click=move |_| confirm_delete.set(false)
                                     >
                                         <span class="material-symbols-outlined" style="font-size: 14px;">"close"</span>
@@ -434,7 +434,7 @@ fn UserRow(
                         } else {
                             view! {
                                 <button
-                                    class="p-1.5 rounded-lg text-gray-300 dark:text-gray-700
+                                    class="p-1.5 rounded-lg text-stone-300 dark:text-stone-700
                                         hover:text-red-500 dark:hover:text-red-400
                                         hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                     title="Delete user"
@@ -452,7 +452,7 @@ fn UserRow(
             {move || show_roles.get().then(|| {
                 let available = available_roles.get().unwrap_or_default();
                 view! {
-                    <div class="px-4 pb-4 pt-2 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-800">
+                    <div class="px-4 pb-4 pt-2 bg-stone-50 dark:bg-stone-800/50 border-t border-stone-100 dark:border-stone-800">
                         <div class="flex flex-wrap gap-2 mb-3">
                             {available.into_iter().map(|role: String| {
                                 let role_clone = role.clone();
@@ -463,7 +463,7 @@ fn UserRow(
                                     <label class="flex items-center gap-1.5 cursor-pointer select-none">
                                         <input
                                             type="checkbox"
-                                            class="rounded border-gray-300 dark:border-gray-600"
+                                            class="rounded border-stone-300 dark:border-stone-600"
                                             prop:checked=checked
                                             on:change=move |_| {
                                                 edited_roles.update(|roles| {
@@ -484,8 +484,8 @@ fn UserRow(
                         </div>
                         <div class="flex items-center gap-2">
                             <button
-                                class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium
-                                    hover:bg-blue-700 disabled:opacity-40 transition-colors"
+                                class="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-medium
+                                    hover:bg-amber-700 disabled:opacity-40 transition-colors"
                                 on:click={
                                     let uid_r = user_id_for_roles.clone();
                                     move |_| {
@@ -511,8 +511,8 @@ fn UserRow(
                                 {move || if saving_roles.get() { "Saving…" } else { "Save Roles" }}
                             </button>
                             <button
-                                class="px-3 py-1.5 rounded-lg text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300
-                                    hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                class="px-3 py-1.5 rounded-lg text-xs text-stone-500 hover:text-stone-700 dark:hover:text-stone-300
+                                    hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors"
                                 on:click=move |_| show_roles.set(false)
                             >
                                 "Cancel"

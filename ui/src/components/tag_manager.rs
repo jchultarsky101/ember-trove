@@ -6,7 +6,7 @@ use leptos::prelude::*;
 pub fn TagManager() -> impl IntoView {
     let refresh = RwSignal::new(0u32);
     let new_name = RwSignal::new(String::new());
-    let new_color = RwSignal::new("#3b82f6".to_string());
+    let new_color = RwSignal::new("#d97706".to_string());
     let error_msg = RwSignal::new(Option::<String>::None);
     let editing_id = RwSignal::new(Option::<common::id::TagId>::None);
     let edit_name = RwSignal::new(String::new());
@@ -30,7 +30,7 @@ pub fn TagManager() -> impl IntoView {
             match crate::api::create_tag(&req).await {
                 Ok(_) => {
                     new_name.set(String::new());
-                    new_color.set("#3b82f6".to_string());
+                    new_color.set("#d97706".to_string());
                     refresh.update(|n| *n += 1);
                 }
                 Err(e) => error_msg.set(Some(format!("{e}"))),
@@ -70,18 +70,18 @@ pub fn TagManager() -> impl IntoView {
 
     view! {
         <div class="flex flex-col h-full">
-            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-                <h1 class="text-lg font-semibold text-gray-900 dark:text-gray-100">"Tags"</h1>
+            <div class="px-6 py-4 border-b border-stone-200 dark:border-stone-800">
+                <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">"Tags"</h1>
             </div>
 
             // Create form
-            <div class="px-6 py-3 border-b border-gray-200 dark:border-gray-800">
+            <div class="px-6 py-3 border-b border-stone-200 dark:border-stone-800">
                 <div class="flex items-center gap-2">
                     <input
                         type="text"
-                        class="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600
-                            bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none
-                            focus:ring-1 focus:ring-blue-500"
+                        class="flex-1 px-3 py-1.5 text-sm rounded-lg border border-stone-300 dark:border-stone-600
+                            bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none
+                            focus:ring-1 focus:ring-amber-500"
                         placeholder="New tag name..."
                         prop:value=move || new_name.get()
                         on:input=move |ev| new_name.set(event_target_value(&ev))
@@ -94,7 +94,7 @@ pub fn TagManager() -> impl IntoView {
                         on:input=move |ev| new_color.set(event_target_value(&ev))
                     />
                     <button
-                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium
+                        class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium
                             rounded-lg transition-colors"
                         on:click=move |_| do_create()
                     >
@@ -109,25 +109,25 @@ pub fn TagManager() -> impl IntoView {
             // Tag list
             <div class="flex-1 overflow-auto">
                 <Suspense fallback=|| view! {
-                    <div class="p-6 text-gray-400 text-sm">"Loading tags..."</div>
+                    <div class="p-6 text-stone-400 text-sm">"Loading tags..."</div>
                 }>
                     {move || {
                         tags.get().map(|result| {
                             match result {
                                 Ok(tag_list) if tag_list.is_empty() => {
                                     view! {
-                                        <div class="p-6 text-gray-400 text-sm">"No tags yet. Create one above."</div>
+                                        <div class="p-6 text-stone-400 text-sm">"No tags yet. Create one above."</div>
                                     }.into_any()
                                 }
                                 Ok(tag_list) => {
                                     view! {
-                                        <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                                        <div class="divide-y divide-stone-100 dark:divide-stone-800">
                                             {tag_list.into_iter().map(|tag| {
                                                 let tag_id = tag.id;
                                                 let name = tag.name.clone();
                                                 let color = tag.color.clone();
                                                 view! {
-                                                    <div class="flex items-center justify-between px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-900/50 group">
+                                                    <div class="flex items-center justify-between px-6 py-3 hover:bg-stone-50 dark:hover:bg-stone-900/50 group">
                                                         {move || {
                                                             if editing_id.get() == Some(tag_id) {
                                                                 // Edit mode
@@ -141,21 +141,21 @@ pub fn TagManager() -> impl IntoView {
                                                                         />
                                                                         <input
                                                                             type="text"
-                                                                            class="flex-1 px-2 py-1 text-sm rounded border border-gray-300
-                                                                                dark:border-gray-600 bg-transparent text-gray-900
-                                                                                dark:text-gray-100 focus:outline-none focus:ring-1
-                                                                                focus:ring-blue-500"
+                                                                            class="flex-1 px-2 py-1 text-sm rounded border border-stone-300
+                                                                                dark:border-stone-600 bg-transparent text-stone-900
+                                                                                dark:text-stone-100 focus:outline-none focus:ring-1
+                                                                                focus:ring-amber-500"
                                                                             prop:value=move || edit_name.get()
                                                                             on:input=move |ev| edit_name.set(event_target_value(&ev))
                                                                         />
                                                                         <button
-                                                                            class="px-2 py-1 text-xs bg-blue-600 text-white rounded"
+                                                                            class="px-2 py-1 text-xs bg-amber-600 text-white rounded"
                                                                             on:click=on_save_edit
                                                                         >
                                                                             "Save"
                                                                         </button>
                                                                         <button
-                                                                            class="px-2 py-1 text-xs text-gray-500 hover:text-gray-700"
+                                                                            class="px-2 py-1 text-xs text-stone-500 hover:text-stone-700"
                                                                             on:click=move |_| editing_id.set(None)
                                                                         >
                                                                             "Cancel"
@@ -174,13 +174,13 @@ pub fn TagManager() -> impl IntoView {
                                                                             class="w-4 h-4 rounded-full flex-shrink-0"
                                                                             style:background-color=display_color
                                                                         />
-                                                                        <span class="text-sm text-gray-900 dark:text-gray-100">
+                                                                        <span class="text-sm text-stone-900 dark:text-stone-100">
                                                                             {display_name}
                                                                         </span>
                                                                     </div>
                                                                     <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                         <button
-                                                                            class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                                                            class="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
                                                                             on:click=move |_| {
                                                                                 editing_id.set(Some(tag_id));
                                                                                 edit_name.set(edit_name_val.clone());

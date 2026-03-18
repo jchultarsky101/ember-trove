@@ -91,9 +91,9 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
     };
 
     view! {
-        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+        <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-6">
             <div class="mb-4">
-                <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300 mb-3">
                     "Attachments"
                 </h2>
                 // Upload row — hidden native input, icon buttons
@@ -105,9 +105,9 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                         class="hidden"
                     />
                     <button
-                        class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
-                            dark:hover:text-gray-300 hover:bg-gray-100
-                            dark:hover:bg-gray-800 transition-colors"
+                        class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                            dark:hover:text-stone-300 hover:bg-stone-100
+                            dark:hover:bg-stone-800 transition-colors"
                         on:click=on_pick
                         title="Choose file"
                     >
@@ -115,13 +115,13 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                             "folder_open"
                         </span>
                     </button>
-                    <span class="flex-1 text-xs text-gray-500 dark:text-gray-400 truncate">
+                    <span class="flex-1 text-xs text-stone-500 dark:text-stone-400 truncate">
                         {move || selected_filename.get().unwrap_or_else(|| "No file chosen".to_string())}
                     </span>
                     <button
-                        class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
-                            dark:hover:text-gray-300 hover:bg-gray-100
-                            dark:hover:bg-gray-800 transition-colors disabled:opacity-30"
+                        class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                            dark:hover:text-stone-300 hover:bg-stone-100
+                            dark:hover:bg-stone-800 transition-colors disabled:opacity-30"
                         on:click=on_upload
                         disabled=move || uploading.get()
                         title=move || if uploading.get() { "Uploading…" } else { "Upload" }
@@ -137,7 +137,7 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
             </div>
 
             <Suspense fallback=|| view! {
-                <div class="text-xs text-gray-400">"Loading attachments..."</div>
+                <div class="text-xs text-stone-400">"Loading attachments..."</div>
             }>
                 {move || {
                     attachments.get().map(|result| {
@@ -145,12 +145,12 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                             Ok(list) if list.is_empty() => view! {
                                 <div class="flex flex-col items-center gap-2 py-6">
                                     <span
-                                        class="material-symbols-outlined text-gray-300 dark:text-gray-700"
+                                        class="material-symbols-outlined text-stone-300 dark:text-stone-700"
                                         style="font-size: 32px;"
                                     >
                                         "attach_file"
                                     </span>
-                                    <p class="text-xs text-gray-400 dark:text-gray-600">
+                                    <p class="text-xs text-stone-400 dark:text-stone-600">
                                         "No attachments yet."
                                     </p>
                                 </div>
@@ -165,18 +165,18 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                                         let download_url = api::attachment_download_url(att_id);
                                         view! {
                                             <div class="flex items-center justify-between py-1.5 px-2 rounded
-                                                hover:bg-gray-50 dark:hover:bg-gray-800/50 group">
+                                                hover:bg-stone-50 dark:hover:bg-stone-800/50 group">
                                                 <a
                                                     href=download_url
                                                     target="_blank"
-                                                    class="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400
+                                                    class="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400
                                                         hover:underline min-w-0"
                                                 >
                                                     <span class="material-symbols-outlined text-[14px] shrink-0">
                                                         "attach_file"
                                                     </span>
                                                     <span class="truncate max-w-[200px]">{filename}</span>
-                                                    <span class="text-gray-400 dark:text-gray-500 shrink-0">
+                                                    <span class="text-stone-400 dark:text-stone-500 shrink-0">
                                                         {format!("({content_type}, {size_kb} KB)")}
                                                     </span>
                                                 </a>
