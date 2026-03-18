@@ -106,9 +106,10 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                             let node_type = format!("{:?}", n.node_type).to_lowercase();
                             let status = format!("{:?}", n.status).to_lowercase();
                             let edit_id = n.id;
+                            // Single-user mode: any authenticated user can act as owner.
                             let is_owner = matches!(
                                 auth_state.get_untracked(),
-                                AuthStatus::Authenticated(ref u) if u.sub == n.owner_id
+                                AuthStatus::Authenticated(_)
                             );
 
                             // Click delegation: intercept clicks on `.wikilink` anchors and

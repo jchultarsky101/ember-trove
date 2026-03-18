@@ -34,14 +34,24 @@ pub async fn parse_json<T: serde::de::DeserializeOwned>(
     } else {
         let status = response.status();
         if status == 401 {
-            // Only reload if the token refresh actually succeeds. Reloading
-            // unconditionally causes an infinite loop when the refresh token
-            // is also invalid (e.g. after a server restart with new signing
-            // keys) — every reload gets 401 again, triggers another reload.
-            if refresh_session().await.is_ok()
-                && let Some(win) = web_sys::window()
-            {
-                let _ = win.location().reload();
+            // Try a silent token refresh first. If it succeeds, a full-page
+            // reload picks up the new access token and retries all pending
+            // API calls without the user noticing.
+            if refresh_session().await.is_ok() {
+                if let Some(win) = web_sys::window() {
+                    let _ = win.location().reload();
+                }
+            } else {
+                // Refresh token also expired (long idle, server restart, etc.).
+                // Redirect to login rather than leaving the user with a blank
+                // screen or a confusing "server error 401" message.
+                wasm_bindgen_futures::spawn_local(async {
+                    if let Ok(url) = fetch_login_url().await
+                        && let Some(win) = web_sys::window()
+                    {
+                        let _ = win.location().set_href(&url);
+                    }
+                });
             }
         }
         let text = response

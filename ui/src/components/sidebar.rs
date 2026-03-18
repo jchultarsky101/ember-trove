@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[component]
-pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoView {
+pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
 
     let on_logout = move |_| {
@@ -52,6 +52,7 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                 on_click=move || {
                     node_type_filter.set(None);
                     current_view.set(View::NodeList);
+                    on_nav.run(());
                 }
                 collapsed=collapsed
             />
@@ -60,60 +61,45 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                 if collapsed.get() { return None; }
                 Some(view! {
                     <div class="ml-3 border-l border-stone-200 dark:border-stone-700 pl-2 space-y-0.5">
-                        <TypeFilterLink
-                            icon="description" label="Articles" value="article"
-                            node_type_filter=node_type_filter
-                            current_view=current_view
-                        />
-                        <TypeFilterLink
-                            icon="rocket_launch" label="Projects" value="project"
-                            node_type_filter=node_type_filter
-                            current_view=current_view
-                        />
-                        <TypeFilterLink
-                            icon="category" label="Areas" value="area"
-                            node_type_filter=node_type_filter
-                            current_view=current_view
-                        />
-                        <TypeFilterLink
-                            icon="bookmarks" label="Resources" value="resource"
-                            node_type_filter=node_type_filter
-                            current_view=current_view
-                        />
-                        <TypeFilterLink
-                            icon="menu_book" label="References" value="reference"
-                            node_type_filter=node_type_filter
-                            current_view=current_view
-                        />
+                        <TypeFilterLink icon="description" label="Articles" value="article"
+                            node_type_filter=node_type_filter current_view=current_view on_nav=on_nav />
+                        <TypeFilterLink icon="rocket_launch" label="Projects" value="project"
+                            node_type_filter=node_type_filter current_view=current_view on_nav=on_nav />
+                        <TypeFilterLink icon="category" label="Areas" value="area"
+                            node_type_filter=node_type_filter current_view=current_view on_nav=on_nav />
+                        <TypeFilterLink icon="bookmarks" label="Resources" value="resource"
+                            node_type_filter=node_type_filter current_view=current_view on_nav=on_nav />
+                        <TypeFilterLink icon="menu_book" label="References" value="reference"
+                            node_type_filter=node_type_filter current_view=current_view on_nav=on_nav />
                     </div>
                 }.into_any())
             }}
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             <SidebarLink
                 icon="label" label="Tags"
-                on_click=move || current_view.set(View::TagManager)
+                on_click=move || { current_view.set(View::TagManager); on_nav.run(()); }
                 collapsed=collapsed
             />
             <SidebarLink
                 icon="sticky_note_2" label="Notes"
-                on_click=move || current_view.set(View::Notes)
+                on_click=move || { current_view.set(View::Notes); on_nav.run(()); }
                 collapsed=collapsed
             />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             <SidebarLink
                 icon="wb_sunny" label="My Day"
-                on_click=move || current_view.set(View::MyDay)
+                on_click=move || { current_view.set(View::MyDay); on_nav.run(()); }
                 collapsed=collapsed
             />
             <SidebarLink
                 icon="dashboard" label="Dashboard"
-                on_click=move || current_view.set(View::ProjectDashboard)
+                on_click=move || { current_view.set(View::ProjectDashboard); on_nav.run(()); }
                 collapsed=collapsed
             />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             <SidebarLink
                 icon="share" label="Graph"
-                on_click=move || current_view.set(View::Graph)
+                on_click=move || { current_view.set(View::Graph); on_nav.run(()); }
                 collapsed=collapsed
             />
             {move || {
@@ -125,12 +111,12 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
                             <SidebarLink
                                 icon="admin_panel_settings" label="Admin"
-                                on_click=move || current_view.set(View::Admin)
+                                on_click=move || { current_view.set(View::Admin); on_nav.run(()); }
                                 collapsed=collapsed
                             />
                             <SidebarLink
                                 icon="backup" label="Backup"
-                                on_click=move || current_view.set(View::Backup)
+                                on_click=move || { current_view.set(View::Backup); on_nav.run(()); }
                                 collapsed=collapsed
                             />
                         </div>
@@ -191,6 +177,7 @@ fn TypeFilterLink(
     value: &'static str,
     node_type_filter: RwSignal<Option<String>>,
     current_view: RwSignal<View>,
+    on_nav: Callback<()>,
 ) -> impl IntoView {
     view! {
         <button
@@ -210,6 +197,7 @@ fn TypeFilterLink(
             on:click=move |_| {
                 node_type_filter.set(Some(value.to_string()));
                 current_view.set(View::NodeList);
+                on_nav.run(());
             }
             title=label
         >

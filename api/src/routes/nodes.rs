@@ -43,8 +43,11 @@ pub fn router() -> Router<AppState> {
 
 async fn list_nodes(
     State(state): State<AppState>,
-    Query(params): Query<NodeListParams>,
+    Query(mut params): Query<NodeListParams>,
 ) -> Result<Json<NodeListResponse>, ApiError> {
+    // Single-user mode: all authenticated users see all nodes.
+    // The owner_id filter is dropped regardless of what the client sends.
+    params.owner_id = None;
     let page = params.page.unwrap_or(1).max(1);
     let per_page = params.per_page.unwrap_or(50).min(200);
     let (nodes, total) = state.nodes.list(params).await?;
