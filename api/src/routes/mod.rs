@@ -1,4 +1,5 @@
 pub mod admin;
+pub mod backup;
 pub mod notes;
 pub mod attachments;
 pub mod auth;
@@ -61,6 +62,7 @@ pub fn build_router(state: AppState) -> Router {
         .nest("/search", search::router())
         .nest("/graph", graph::router())
         .nest("/admin", admin::router())
+        .nest("/admin/backups", backup::router())
         .layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
     // Public routes — no auth required.

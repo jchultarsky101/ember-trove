@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod attachment;
 pub mod auth;
+pub mod backup;
 pub mod edge;
 pub mod error;
 pub mod graph;

@@ -1,4 +1,5 @@
 pub mod admin_view;
+pub mod backup_view;
 pub mod attachment_panel;
 pub mod dark_mode_toggle;
 pub mod graph_view;

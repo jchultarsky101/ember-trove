@@ -1,4 +1,5 @@
 pub mod attachment;
+pub mod backup;
 pub mod note;
 pub mod edge;
 pub mod graph;
