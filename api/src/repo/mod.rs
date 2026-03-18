@@ -1,4 +1,5 @@
 pub mod attachment;
+pub mod note;
 pub mod edge;
 pub mod graph;
 pub mod node;

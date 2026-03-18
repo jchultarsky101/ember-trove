@@ -12,6 +12,8 @@ use crate::components::modals::delete_confirm::DeleteConfirmModal;
 use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
 use crate::components::permission_dialog::PermissionPanel;
 use crate::components::tag_bar::TagBar;
+use crate::auth::{AuthStatus, use_auth_state};
+use crate::components::note_panel::NotePanel;
 use crate::components::task_panel::TaskPanel;
 use crate::components::toast::{ToastLevel, push_toast};
 use crate::wikilink::preprocess_wikilinks;
@@ -53,6 +55,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
     // Fetch all node titles for wiki-link resolution.
     let titles = LocalResource::new(|| async move { crate::api::fetch_node_titles().await });
 
+    let auth_state = use_auth_state();
     let deleting = RwSignal::new(false);
     let show_delete_confirm = RwSignal::new(false);
 
@@ -103,6 +106,10 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                             let node_type = format!("{:?}", n.node_type).to_lowercase();
                             let status = format!("{:?}", n.status).to_lowercase();
                             let edit_id = n.id;
+                            let is_owner = matches!(
+                                auth_state.get_untracked(),
+                                AuthStatus::Authenticated(ref u) if u.sub == n.owner_id
+                            );
 
                             // Click delegation: intercept clicks on `.wikilink` anchors and
                             // navigate in-app instead of following the href.
@@ -190,6 +197,8 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         />
                                         // Task panel — shown for all node types
                                         <TaskPanel node_id=id />
+                                        // Note panel — append-only; owner can add, everyone can read
+                                        <NotePanel node_id=id is_owner=is_owner />
                                         <EdgePanel node_id=id />
                                         <BacklinksPanel node_id=id />
                                         <AttachmentPanel node_id=id />
