@@ -146,8 +146,8 @@ async fn logout(
     jar: PrivateCookieJar,
 ) -> (PrivateCookieJar, Json<RedirectResponse>) {
     let updated_jar = jar
-        .remove(Cookie::from(SESSION_COOKIE))
-        .remove(Cookie::from(REFRESH_COOKIE));
+        .remove(Cookie::build((SESSION_COOKIE, "")).path("/").build())
+        .remove(Cookie::build((REFRESH_COOKIE, "")).path("/api/auth/refresh").build());
     let redirect = RedirectResponse {
         redirect_url: state.auth.frontend_url.clone(),
     };
