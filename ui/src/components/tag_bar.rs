@@ -45,7 +45,7 @@ pub fn TagBar(node_id: NodeId) -> impl IntoView {
                 // Create new tag
                 let req = CreateTagRequest {
                     name,
-                    color: "#3b82f6".to_string(),
+                    color: "#d97706".to_string(),
                 };
                 match crate::api::create_tag(&req).await {
                     Ok(t) => t.id,
@@ -82,7 +82,7 @@ pub fn TagBar(node_id: NodeId) -> impl IntoView {
                         match result {
                             Ok(tags) if tags.is_empty() && !show_input.get_untracked() => {
                                 view! {
-                                    <span class="text-xs text-gray-400 dark:text-gray-600">"No tags"</span>
+                                    <span class="text-xs text-stone-400 dark:text-stone-600">"No tags"</span>
                                 }.into_any()
                             }
                             Ok(tags) => {
@@ -139,9 +139,9 @@ pub fn TagBar(node_id: NodeId) -> impl IntoView {
                     view! {
                         <input
                             type="text"
-                            class="w-24 px-2 py-0.5 text-xs rounded-full border border-gray-300 dark:border-gray-600
-                                bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none
-                                focus:ring-1 focus:ring-blue-500"
+                            class="w-24 px-2 py-0.5 text-xs rounded-full border border-stone-300 dark:border-stone-600
+                                bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none
+                                focus:ring-1 focus:ring-amber-500"
                             placeholder="Tag name..."
                             prop:value=move || input_value.get()
                             on:input=move |ev| input_value.set(event_target_value(&ev))
@@ -157,9 +157,9 @@ pub fn TagBar(node_id: NodeId) -> impl IntoView {
                     view! {
                         <button
                             class="inline-flex items-center px-2 py-0.5 rounded-full text-xs
-                                text-gray-500 dark:text-gray-400 border border-dashed
-                                border-gray-300 dark:border-gray-600 hover:border-gray-400
-                                dark:hover:border-gray-500 transition-colors"
+                                text-stone-500 dark:text-stone-400 border border-dashed
+                                border-stone-300 dark:border-stone-600 hover:border-stone-400
+                                dark:hover:border-stone-500 transition-colors"
                             on:click=move |_| show_input.set(true)
                         >
                             "+ Tag"

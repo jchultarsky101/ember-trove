@@ -88,13 +88,13 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
     };
 
     view! {
-        <div class="mt-8 border-t border-gray-200 dark:border-gray-700 pt-6">
+        <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-6">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">"Sharing"</h2>
+                <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">"Sharing"</h2>
                 <button
-                    class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
-                        dark:hover:text-gray-300 hover:bg-gray-100
-                        dark:hover:bg-gray-800 transition-colors"
+                    class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                        dark:hover:text-stone-300 hover:bg-stone-100
+                        dark:hover:bg-stone-800 transition-colors"
                     on:click=on_toggle_add
                     title=move || if show_add.get() { "Cancel" } else { "Add permission" }
                 >
@@ -106,7 +106,7 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
 
             // Add permission form
             {move || show_add.get().then(|| view! {
-                <div class="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-2">
+                <div class="mb-4 p-3 bg-stone-50 dark:bg-stone-900 rounded-lg space-y-2">
                     <div class="flex gap-2">
                         // User picker: dropdown if admin API available, text input as fallback.
                         {move || {
@@ -114,7 +114,7 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                             match users_opt {
                                 // Still loading
                                 None => view! {
-                                    <div class="flex-1 flex items-center px-2 py-1 text-xs text-gray-400">
+                                    <div class="flex-1 flex items-center px-2 py-1 text-xs text-stone-400">
                                         <span class="material-symbols-outlined mr-1"
                                             style="font-size: 14px;">"hourglass_empty"</span>
                                         "Loading users\u{2026}"
@@ -124,9 +124,9 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                                 Some(users) if admin_api_available.get() && !users.is_empty() => {
                                     view! {
                                         <select
-                                            class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600
-                                                bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300
-                                                focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            class="flex-1 px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
+                                                bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300
+                                                focus:outline-none focus:ring-1 focus:ring-amber-500"
                                             prop:value=move || subject_input.get()
                                             on:change=move |ev| subject_input.set(event_target_value(&ev))
                                         >
@@ -152,9 +152,9 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                                 _ => view! {
                                     <input
                                         type="text"
-                                        class="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600
-                                            bg-transparent text-gray-900 dark:text-gray-100 focus:outline-none
-                                            focus:ring-1 focus:ring-blue-500"
+                                        class="flex-1 px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
+                                            bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none
+                                            focus:ring-1 focus:ring-amber-500"
                                         placeholder="User subject ID (OIDC sub)\u{2026}"
                                         prop:value=move || subject_input.get()
                                         on:input=move |ev| subject_input.set(event_target_value(&ev))
@@ -163,8 +163,8 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                             }
                         }}
                         <select
-                            class="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600
-                                bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300
+                            class="px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
+                                bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300
                                 focus:outline-none"
                             prop:value=move || role_input.get()
                             on:change=move |ev| role_input.set(event_target_value(&ev))
@@ -176,9 +176,9 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                     </div>
                     <div class="flex items-center gap-2">
                         <button
-                            class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600
-                                dark:hover:text-gray-300 hover:bg-gray-100
-                                dark:hover:bg-gray-800 transition-colors disabled:opacity-30"
+                            class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                                dark:hover:text-stone-300 hover:bg-stone-100
+                                dark:hover:bg-stone-800 transition-colors disabled:opacity-30"
                             on:click=on_grant
                             disabled=move || saving.get()
                             title=move || if saving.get() { "Saving\u{2026}" } else { "Grant" }
@@ -196,7 +196,7 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
 
             // Permission list
             <Suspense fallback=|| view! {
-                <div class="text-xs text-gray-400">"Loading..."</div>
+                <div class="text-xs text-stone-400">"Loading..."</div>
             }>
                 {move || {
                     permissions.get().map(|result| {
@@ -204,12 +204,12 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                             Ok(list) if list.is_empty() => view! {
                                 <div class="flex flex-col items-center gap-2 py-6">
                                     <span
-                                        class="material-symbols-outlined text-gray-300 dark:text-gray-700"
+                                        class="material-symbols-outlined text-stone-300 dark:text-stone-700"
                                         style="font-size: 32px;"
                                     >
                                         "lock"
                                     </span>
-                                    <p class="text-xs text-gray-400 dark:text-gray-600">
+                                    <p class="text-xs text-stone-400 dark:text-stone-600">
                                         "Only you have access."
                                     </p>
                                 </div>
@@ -246,18 +246,18 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                                             PermissionRole::Owner =>
                                                 "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
                                             PermissionRole::Editor =>
-                                                "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+                                                "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
                                             PermissionRole::Viewer =>
-                                                "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+                                                "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400",
                                         };
                                         view! {
                                             <div class="flex items-center justify-between py-1.5 px-2 rounded
-                                                hover:bg-gray-50 dark:hover:bg-gray-800/50 group">
+                                                hover:bg-stone-50 dark:hover:bg-stone-800/50 group">
                                                 <div class="flex items-center gap-2 min-w-0">
-                                                    <span class="material-symbols-outlined text-gray-400 dark:text-gray-600 text-[16px] shrink-0">
+                                                    <span class="material-symbols-outlined text-stone-400 dark:text-stone-600 text-[16px] shrink-0">
                                                         "person"
                                                     </span>
-                                                    <span class="text-xs text-gray-700 dark:text-gray-300 truncate max-w-[180px]"
+                                                    <span class="text-xs text-stone-700 dark:text-stone-300 truncate max-w-[180px]"
                                                         title={subject.clone()}>
                                                         {display_subject}
                                                     </span>

@@ -22,10 +22,10 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
 
     view! {
         <AuthGate auth_state=auth_state>
-            <div class="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
+            <div class="flex h-screen overflow-hidden bg-stone-50 dark:bg-stone-950">
                 // Left sidebar — `relative` allows the floating toggle to be positioned on the border
                 <aside
-                    class="relative flex-shrink-0 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-all duration-200"
+                    class="relative flex-shrink-0 border-r border-stone-200 dark:border-stone-800 flex flex-col transition-all duration-200"
                     class:w-64=move || !collapsed.get()
                     class:w-16=move || collapsed.get()
                 >
@@ -37,11 +37,11 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                         on:click=move |_| collapsed.update(|c| *c = !*c)
                         class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20
                             w-5 h-5 rounded-full
-                            bg-white dark:bg-gray-900
-                            border border-gray-200 dark:border-gray-700
+                            bg-white dark:bg-stone-900
+                            border border-stone-200 dark:border-stone-700
                             shadow-sm flex items-center justify-center
-                            text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
-                            hover:border-gray-400 dark:hover:border-gray-500
+                            text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                            hover:border-stone-400 dark:hover:border-stone-500
                             hover:shadow-md transition-all cursor-pointer"
                         title=move || if collapsed.get() { "Expand sidebar" } else { "Collapse sidebar" }
                     >
@@ -90,7 +90,7 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
 #[component]
 fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
     view! {
-        <div class="flex items-center border-b border-gray-200 dark:border-gray-800 px-3 py-4 gap-2">
+        <div class="flex items-center border-b border-stone-200 dark:border-stone-800 px-3 py-4 gap-2">
             // Banner icon — inline SVG ember flame
             <div class="flex-shrink-0 w-8 h-8">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="w-full h-full">
@@ -119,7 +119,7 @@ fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
                 class="flex-1 flex items-center justify-between min-w-0 overflow-hidden"
                 class:hidden=move || collapsed.get()
             >
-                <span class="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                <span class="font-semibold text-stone-900 dark:text-stone-100 truncate">
                     "Ember Trove"
                 </span>
                 <DarkModeToggle />
@@ -155,8 +155,8 @@ fn AuthGate(auth_state: AuthState, children: Children) -> impl IntoView {
         }>
             {move || match auth_state.get() {
                 AuthStatus::Loading => view! {
-                    <div class="flex items-center justify-center h-screen bg-gray-50 dark:bg-gray-950">
-                        <div class="text-gray-400 dark:text-gray-500 text-sm">"Loading..."</div>
+                    <div class="flex items-center justify-center h-screen bg-stone-50 dark:bg-stone-950">
+                        <div class="text-stone-400 dark:text-stone-500 text-sm">"Loading..."</div>
                     </div>
                 }.into_any(),
                 AuthStatus::Unauthenticated => {
@@ -168,8 +168,8 @@ fn AuthGate(auth_state: AuthState, children: Children) -> impl IntoView {
                         }
                     });
                     view! {
-                        <div class="flex items-center justify-center h-screen bg-gray-50 dark:bg-gray-950">
-                            <div class="text-gray-400 dark:text-gray-500 text-sm">"Redirecting to login..."</div>
+                        <div class="flex items-center justify-center h-screen bg-stone-50 dark:bg-stone-950">
+                            <div class="text-stone-400 dark:text-stone-500 text-sm">"Redirecting to login..."</div>
                         </div>
                     }.into_any()
                 }

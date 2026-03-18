@@ -41,12 +41,12 @@ const ARROW_OFFSET: f64 = NODE_R + 4.0;
 
 fn edge_color(et: &EdgeType) -> &'static str {
     match et {
-        EdgeType::References  => "#3b82f6",
+        EdgeType::References  => "#d97706",
         EdgeType::Contains    => "#22c55e",
         EdgeType::RelatedTo   => "#a855f7",
         EdgeType::DependsOn   => "#f97316",
         EdgeType::DerivedFrom => "#ec4899",
-        EdgeType::WikiLink    => "#60a5fa",
+        EdgeType::WikiLink    => "#fb923c",
     }
 }
 
@@ -93,12 +93,12 @@ fn inject_svg_markers() {
     let Ok(defs) = doc.create_element_ns(Some(ns), "defs") else { return };
 
     const ARROWS: &[(&str, &str)] = &[
-        ("arrow-references",  "#3b82f6"),
+        ("arrow-references",  "#d97706"),
         ("arrow-contains",    "#22c55e"),
         ("arrow-related-to",  "#a855f7"),
         ("arrow-depends-on",  "#f97316"),
         ("arrow-derived-from","#ec4899"),
-        ("arrow-wiki-link",   "#60a5fa"),
+        ("arrow-wiki-link",   "#fb923c"),
     ];
 
     for (id, color) in ARROWS {
@@ -268,11 +268,11 @@ pub fn GraphView() -> impl IntoView {
     });
 
     view! {
-        <div class="relative w-full h-full overflow-hidden bg-gray-50 dark:bg-gray-950 select-none">
+        <div class="relative w-full h-full overflow-hidden bg-stone-50 dark:bg-stone-950 select-none">
             {move || {
                 if loading.get() {
                     return view! {
-                        <div class="flex items-center justify-center h-full text-gray-400 dark:text-gray-600">
+                        <div class="flex items-center justify-center h-full text-stone-400 dark:text-stone-600">
                             <span class="text-sm">"Loading graph\u{2026}"</span>
                         </div>
                     }
@@ -289,7 +289,7 @@ pub fn GraphView() -> impl IntoView {
                 let nodes = nodes_sig.get();
                 if nodes.is_empty() {
                     return view! {
-                        <div class="flex items-center justify-center h-full text-gray-400 dark:text-gray-600">
+                        <div class="flex items-center justify-center h-full text-stone-400 dark:text-stone-600">
                             <span class="text-sm">
                                 "No nodes yet. Create some notes to see the graph."
                             </span>
