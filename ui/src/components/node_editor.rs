@@ -8,6 +8,7 @@ use leptos::prelude::*;
 use pulldown_cmark::{Options, Parser, html};
 
 use crate::app::View;
+use crate::templates::template_for_type;
 use crate::wikilink::preprocess_wikilinks;
 
 fn render_markdown(source: &str, title_map: &HashMap<String, NodeId>) -> String {
@@ -60,7 +61,6 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
 
     let title = RwSignal::new(String::new());
-    let body = RwSignal::new(String::new());
     // In create mode, pre-select the type from the active node_type_filter so
     // that opening the editor from e.g. the Projects list defaults to Project.
     // In edit mode the spawn_local block below will override this immediately.
@@ -72,7 +72,15 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     } else {
         "article".to_string()
     };
-    let node_type = RwSignal::new(default_type);
+    let node_type = RwSignal::new(default_type.clone());
+    // In create mode, pre-populate the body with the template for the selected
+    // type. In edit mode spawn_local below will overwrite this with the real body.
+    let initial_body = if node.is_none() {
+        template_for_type(&default_type).to_string()
+    } else {
+        String::new()
+    };
+    let body = RwSignal::new(initial_body);
     let status = RwSignal::new("draft".to_string());
     let saving = RwSignal::new(false);
     let error_msg = RwSignal::new(Option::<String>::None);
@@ -220,7 +228,20 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         class="text-sm bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300
                             rounded-lg px-2 py-1.5 focus:outline-none"
                         prop:value=move || node_type.get()
-                        on:change=move |ev| node_type.set(event_target_value(&ev))
+                        on:change=move |ev| {
+                            let new_type = event_target_value(&ev);
+                            // In create mode, swap the body template when the type
+                            // changes — but only if the user hasn't modified it yet
+                            // (body still equals the previous type's template).
+                            if node.is_none() {
+                                let current_body = body.get_untracked();
+                                let old_tmpl = template_for_type(&node_type.get_untracked());
+                                if current_body == old_tmpl {
+                                    body.set(template_for_type(&new_type).to_string());
+                                }
+                            }
+                            node_type.set(new_type);
+                        }
                     >
                         <option value="article">"Article"</option>
                         <option value="project">"Project"</option>
