@@ -43,6 +43,16 @@ const TEXT_Y_OFFSET: f64 = 33.0;
 
 // ── Hover card data ──────────────────────────────────────────────────────────
 
+/// Data for the node summary card shown on hover.
+#[derive(Clone)]
+struct NodeHoverInfo {
+    title: String,
+    node_type: String,
+    status: String,
+    body_preview: Option<String>,
+    node_id: Uuid,
+}
+
 #[derive(Clone)]
 struct EdgeHover {
     type_label: &'static str,
@@ -72,6 +82,32 @@ fn node_stroke_color(nt: &NodeType) -> &'static str {
         NodeType::Area      => "#166534",
         NodeType::Resource  => "#6b21a8",
         NodeType::Reference => "#991b1b",
+    }
+}
+
+fn type_label_for_str(nt: &str) -> &'static str {
+    match nt {
+        "project"   => "Project",
+        "area"      => "Area",
+        "resource"  => "Resource",
+        "reference" => "Reference",
+        _           => "Article",
+    }
+}
+
+fn status_label_for_str(st: &str) -> &'static str {
+    match st {
+        "published" => "Published",
+        "archived"  => "Archived",
+        _           => "Draft",
+    }
+}
+
+fn status_color_for_str(st: &str) -> &'static str {
+    match st {
+        "published" => "#16a34a",
+        "archived"  => "#d97706",
+        _           => "#a8a29e",
     }
 }
 
@@ -231,6 +267,26 @@ fn truncate(s: &str, n: usize) -> String {
     }
 }
 
+/// Strip Markdown syntax and return up to 100 chars as a plain-text preview.
+fn node_body_preview(body: &str) -> Option<String> {
+    let text: String = body
+        .lines()
+        .map(str::trim)
+        .filter(|l| {
+            !l.is_empty()
+                && !l.starts_with('#')
+                && !l.starts_with("```")
+                && !l.starts_with("---")
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    if text.is_empty() {
+        return None;
+    }
+    let clean = text.replace("**", "").replace("__", "").replace('`', "");
+    Some(truncate(&clean, 100))
+}
+
 /// Compute the SVG path `d` for an edge: starts at the source shape boundary,
 /// ends just before the target so the arrowhead is visible.
 fn compute_path(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
@@ -353,6 +409,7 @@ pub fn GraphView() -> impl IntoView {
     let did_drag = RwSignal::new(false);
 
     let edge_hover: RwSignal<Option<EdgeHover>> = RwSignal::new(None);
+    let node_hover: RwSignal<Option<NodeHoverInfo>> = RwSignal::new(None);
 
     Effect::new(move |_| {
         spawn_local(async move {
@@ -531,6 +588,15 @@ pub fn GraphView() -> impl IntoView {
                         let fill = node_fill(&node_type);
                         let stroke_c = node_stroke_color(&node_type);
 
+                        // Data for the hover summary card.
+                        let hover_info = NodeHoverInfo {
+                            title: node.title.clone(),
+                            node_type: format!("{:?}", node.node_type).to_lowercase(),
+                            status: format!("{:?}", node.status).to_lowercase(),
+                            body_preview: node.body.as_deref().and_then(node_body_preview),
+                            node_id: node.id.0,
+                        };
+
                         // Estimate background-pill width from title char count.
                         let bg_w = (title.chars().count() as f64 * 5.4 + 10.0_f64).max(32.0_f64);
 
@@ -635,14 +701,21 @@ pub fn GraphView() -> impl IntoView {
                             <g
                                 style="cursor: grab;"
                                 on:click=move |ev: MouseEvent| {
+                                    // Suppress the click that follows a drag.
                                     if did_drag.get_untracked() {
                                         did_drag.set(false);
                                         ev.stop_propagation();
-                                        return;
                                     }
+                                }
+                                on:dblclick=move |ev: MouseEvent| {
                                     ev.stop_propagation();
                                     current_view.set(View::NodeDetail(node_id));
                                 }
+                                on:mouseover=move |ev: MouseEvent| {
+                                    ev.stop_propagation();
+                                    node_hover.set(Some(hover_info.clone()));
+                                }
+                                on:mouseout=move |_| node_hover.set(None)
                                 on:mousedown=move |ev: MouseEvent| {
                                     ev.stop_propagation();
                                     ev.prevent_default();
@@ -880,6 +953,92 @@ pub fn GraphView() -> impl IntoView {
                             {edge_svgs}
                             {node_svgs}
                             {hover_card}
+                            // Node summary card — shown on hover, rendered last so it's on top.
+                            {move || {
+                                node_hover.get().map(|h| {
+                                    let pos = positions.get();
+                                    let (nx, ny) = pos.get(&h.node_id).copied().unwrap_or((W / 2.0, H / 2.0));
+
+                                    let type_lbl = type_label_for_str(&h.node_type);
+                                    let status_lbl = status_label_for_str(&h.status);
+                                    let status_col = status_color_for_str(&h.status);
+
+                                    // Card dimensions
+                                    let card_w = (h.title.chars().count() as f64 * 6.0 + 20.0)
+                                        .clamp(120.0_f64, 240.0_f64);
+                                    let has_preview = h.body_preview.is_some();
+                                    let card_h = if has_preview { 66.0_f64 } else { 50.0_f64 };
+                                    let cx = nx;
+                                    let cy = ny - NODE_R - card_h - 8.0;
+
+                                    let cx_s  = format!("{:.1}", cx);
+                                    let card_x = format!("{:.1}", cx - card_w / 2.0);
+                                    let card_y = format!("{:.1}", cy);
+                                    let y_title  = format!("{:.1}", cy + 13.0);
+                                    let y_meta   = format!("{:.1}", cy + 27.0);
+                                    let y_prev   = format!("{:.1}", cy + 41.0);
+                                    let meta_txt = format!("{type_lbl}  ·  {status_lbl}");
+
+                                    let preview_text = h.body_preview.clone();
+
+                                    view! {
+                                        <g style="pointer-events: none;">
+                                            // Card background
+                                            <rect
+                                                x=card_x
+                                                y=card_y
+                                                width=format!("{:.1}", card_w)
+                                                height=format!("{:.1}", card_h)
+                                                rx="6"
+                                                style="fill: rgba(12,12,12,0.92); \
+                                                       stroke: rgba(255,255,255,0.18); \
+                                                       stroke-width: 0.5;"
+                                            />
+                                            // Title
+                                            <text
+                                                x=cx_s.clone()
+                                                y=y_title
+                                                style="text-anchor: middle; font-size: 10.5px; \
+                                                       font-weight: 700; fill: #f5f5f4;"
+                                            >
+                                                {h.title.clone()}
+                                            </text>
+                                            // Type · Status meta line
+                                            <text
+                                                x=cx_s.clone()
+                                                y=y_meta
+                                                style=format!(
+                                                    "text-anchor: middle; font-size: 8px; fill: {};",
+                                                    status_col
+                                                )
+                                            >
+                                                {meta_txt}
+                                            </text>
+                                            // Body preview (optional)
+                                            {preview_text.map(|preview| view! {
+                                                <text
+                                                    x=cx_s
+                                                    y=y_prev
+                                                    style="text-anchor: middle; font-size: 7.5px; \
+                                                           fill: #a8a29e;"
+                                                >
+                                                    {preview}
+                                                </text>
+                                            })}
+                                            // "Double-click to open" hint
+                                            <text
+                                                x=format!("{:.1}", cx)
+                                                y=format!("{:.1}", cy + card_h - 5.0)
+                                                style="text-anchor: middle; font-size: 7px; \
+                                                       fill: rgba(255,255,255,0.3);"
+                                            >
+                                                "double-click to open"
+                                            </text>
+                                        </g>
+                                    }
+                                    .into_any()
+                                })
+                            }}
                         </g>
                     </svg>
                 }
