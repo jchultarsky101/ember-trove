@@ -45,20 +45,6 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                     view! {
                         <div class="px-1 mb-1">
                             <SearchBar />
-                            // Shortcut: jump to Search view filtered by tag (no text needed)
-                            <button
-                                class="w-full text-left mt-1 px-2 py-1 text-xs
-                                    text-amber-500 dark:text-amber-400
-                                    hover:text-amber-700 dark:hover:text-amber-300
-                                    transition-colors"
-                                on:click=move |_| {
-                                    tag_filter.set(None);
-                                    current_view.set(View::Search);
-                                }
-                                title="Open full search / browse by tag"
-                            >
-                                "\u{1f3f7}\u{fe0f} Browse by tag \u{2192}"
-                            </button>
                         </div>
                     }.into_any()
                 }
@@ -110,6 +96,14 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
             <SidebarLink
                 icon="label" label="Tags"
                 on_click=move || current_view.set(View::TagManager)
+                collapsed=collapsed
+            />
+            <SidebarLink
+                icon="filter_list" label="Browse by Tag"
+                on_click=move || {
+                    tag_filter.set(None);
+                    current_view.set(View::Search);
+                }
                 collapsed=collapsed
             />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />

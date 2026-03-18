@@ -26,6 +26,10 @@ pub struct SearchResult {
     pub slug: String,
     pub snippet: Option<String>,
     pub rank: f32,
+    /// Lowercase node type string, e.g. `"article"`, `"project"`.
+    pub node_type: String,
+    /// Lowercase status string, e.g. `"draft"`, `"published"`, `"archived"`.
+    pub status: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
