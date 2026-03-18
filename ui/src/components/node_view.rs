@@ -12,6 +12,7 @@ use crate::components::modals::delete_confirm::DeleteConfirmModal;
 use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
 use crate::components::permission_dialog::PermissionPanel;
 use crate::components::tag_bar::TagBar;
+use crate::components::task_panel::TaskPanel;
 use crate::components::toast::{ToastLevel, push_toast};
 use crate::wikilink::preprocess_wikilinks;
 
@@ -187,6 +188,8 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                             inner_html=body_html
                                             on:click=handle_wikilink_click
                                         />
+                                        // Task panel — shown for all node types
+                                        <TaskPanel node_id=id />
                                         <EdgePanel node_id=id />
                                         <BacklinksPanel node_id=id />
                                         <AttachmentPanel node_id=id />
