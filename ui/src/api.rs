@@ -34,13 +34,14 @@ pub async fn parse_json<T: serde::de::DeserializeOwned>(
     } else {
         let status = response.status();
         if status == 401 {
-            // Attempt a silent token refresh. On success reload the page so
-            // all resources re-fetch with the new session cookie. On failure
-            // the reload still happens, which causes init_auth to detect an
-            // unauthenticated state and show the login screen.
-            let _ = refresh_session().await;
-            if let Some(win) = web_sys::window() {
-                let _ = win.location().reload();
+            // Only reload if the token refresh actually succeeds. Reloading
+            // unconditionally causes an infinite loop when the refresh token
+            // is also invalid (e.g. after a server restart with new signing
+            // keys) — every reload gets 401 again, triggers another reload.
+            if refresh_session().await.is_ok() {
+                if let Some(win) = web_sys::window() {
+                    let _ = win.location().reload();
+                }
             }
         }
         let text = response
