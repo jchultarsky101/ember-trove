@@ -151,51 +151,8 @@ pub fn SearchView() -> impl IntoView {
                     })}
                 </Suspense>
 
-                // Tag picker dropdown — shows only tags not yet selected
-                <Suspense fallback=|| ()>
-                    {move || all_tags.get().map(|tags| {
-                        let active_ids: Vec<_> = tag_filters.get().iter().map(|t| t.id).collect();
-                        let available: Vec<Tag> = tags
-                            .into_iter()
-                            .filter(|t| !active_ids.contains(&t.id))
-                            .collect();
-
-                        view! {
-                            <select
-                                class="text-xs rounded-md border border-stone-300 dark:border-stone-600
-                                    bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300
-                                    px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                on:change=move |ev| {
-                                    let val = event_target_value(&ev);
-                                    if !val.is_empty()
-                                        && let Ok(uid) = val.parse::<uuid::Uuid>()
-                                    {
-                                        // Find the Tag from the full list via another read.
-                                        let found = all_tags.get()
-                                            .and_then(|ts| ts.into_iter().find(|t| t.id.0 == uid));
-                                        if let Some(tag) = found {
-                                            tag_filters.update(|v| {
-                                                if !v.iter().any(|t| t.id == tag.id) {
-                                                    v.push(tag);
-                                                }
-                                            });
-                                        }
-                                    }
-                                }
-                                // Always reset to placeholder after selection
-                                prop:value=""
-                            >
-                                <option value="">"+ Add tag filter"</option>
-                                {available.into_iter().map(|tag| {
-                                    let id_str = tag.id.0.to_string();
-                                    view! {
-                                        <option value=id_str>{tag.name}</option>
-                                    }
-                                }).collect::<Vec<_>>()}
-                            </select>
-                        }
-                    })}
-                </Suspense>
+                // Custom tag picker — replaces native <select> which is unreliable in CSR/dark mode
+                <TagPicker all_tags=all_tags tag_filters=tag_filters />
 
                 <div class="flex items-center gap-3 ml-auto">
                     {move || loading.get().then_some(view! {
@@ -324,6 +281,101 @@ pub fn SearchView() -> impl IntoView {
                     }
                 }}
             </div>
+        </div>
+    }
+}
+
+// ── Custom tag picker ─────────────────────────────────────────────────────────
+
+/// Replaces the native `<select>` for adding tag filters.
+///
+/// Renders a button that opens a custom dropdown listing unselected tags.
+/// A click-away backdrop closes the menu without selecting anything.
+#[component]
+fn TagPicker(
+    all_tags: LocalResource<Vec<Tag>>,
+    tag_filters: RwSignal<Vec<Tag>>,
+) -> impl IntoView {
+    let open = RwSignal::new(false);
+
+    view! {
+        <div class="relative">
+            <button
+                class="flex items-center gap-1 px-2 py-0.5 text-xs rounded-md
+                       border border-stone-300 dark:border-stone-600
+                       bg-white dark:bg-stone-800
+                       text-stone-500 dark:text-stone-400
+                       hover:border-amber-400 dark:hover:border-amber-500
+                       hover:text-stone-700 dark:hover:text-stone-200
+                       transition-colors"
+                on:click=move |_| open.update(|v| *v = !*v)
+            >
+                <span class="material-symbols-outlined" style="font-size: 13px;">"label"</span>
+                "+ Add tag filter"
+                <span class="material-symbols-outlined" style="font-size: 13px;">
+                    {move || if open.get() { "expand_less" } else { "expand_more" }}
+                </span>
+            </button>
+
+            {move || open.get().then(|| {
+                let tags_now = all_tags.get().unwrap_or_default();
+                let active_ids: Vec<_> = tag_filters.get().iter().map(|t| t.id).collect();
+                let available: Vec<Tag> = tags_now
+                    .into_iter()
+                    .filter(|t| !active_ids.contains(&t.id))
+                    .collect();
+
+                view! {
+                    // Click-away backdrop
+                    <div
+                        class="fixed inset-0 z-10"
+                        on:click=move |_| open.set(false)
+                    />
+                    <div class="absolute left-0 top-full mt-1 z-20 min-w-36
+                                bg-white dark:bg-stone-900 rounded-xl shadow-xl
+                                border border-stone-200 dark:border-stone-700 overflow-hidden">
+                        {if available.is_empty() {
+                            view! {
+                                <p class="px-3 py-2 text-xs text-stone-400 dark:text-stone-500 italic">
+                                    "All tags selected"
+                                </p>
+                            }.into_any()
+                        } else {
+                            view! {
+                                <div>
+                                    {available.into_iter().map(|tag| {
+                                        let color = tag.color.clone();
+                                        let name = tag.name.clone();
+                                        view! {
+                                            <button
+                                                class="w-full text-left flex items-center gap-2 px-3 py-2 text-xs
+                                                       text-stone-700 dark:text-stone-300
+                                                       hover:bg-stone-50 dark:hover:bg-stone-800
+                                                       transition-colors"
+                                                on:click=move |_| {
+                                                    let t = tag.clone();
+                                                    tag_filters.update(|v| {
+                                                        if !v.iter().any(|x| x.id == t.id) {
+                                                            v.push(t);
+                                                        }
+                                                    });
+                                                    open.set(false);
+                                                }
+                                            >
+                                                <span
+                                                    class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                                    style=format!("background-color: {color}")
+                                                />
+                                                {name}
+                                            </button>
+                                        }
+                                    }).collect::<Vec<_>>()}
+                                </div>
+                            }.into_any()
+                        }}
+                    </div>
+                }
+            })}
         </div>
     }
 }
