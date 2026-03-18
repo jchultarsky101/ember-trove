@@ -54,7 +54,7 @@ pub fn MyDayView() -> impl IntoView {
             </div>
 
             // Content
-            <div class="flex-1 overflow-auto p-6 max-w-2xl flex flex-col">
+            <div class="flex-1 overflow-auto p-6 flex flex-col">
                 <Suspense fallback=move || view! {
                     <p class="text-sm text-stone-400">"Loading…"</p>
                 }>
@@ -88,7 +88,7 @@ pub fn MyDayView() -> impl IntoView {
                         }
 
                         view! {
-                            <div class="space-y-6">
+                            <div class="space-y-6 max-w-2xl mx-auto w-full">
                                 {grouped.into_iter().map(|(_, node_title, tasks)| {
                                     let node_id = tasks[0].node_id;
                                     view! {
