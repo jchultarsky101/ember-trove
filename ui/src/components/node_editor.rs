@@ -61,7 +61,18 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
 
     let title = RwSignal::new(String::new());
     let body = RwSignal::new(String::new());
-    let node_type = RwSignal::new("article".to_string());
+    // In create mode, pre-select the type from the active node_type_filter so
+    // that opening the editor from e.g. the Projects list defaults to Project.
+    // In edit mode the spawn_local block below will override this immediately.
+    let node_type_filter = use_context::<RwSignal<Option<String>>>();
+    let default_type = if node.is_none() {
+        node_type_filter
+            .and_then(|f| f.get_untracked())
+            .unwrap_or_else(|| "article".to_string())
+    } else {
+        "article".to_string()
+    };
+    let node_type = RwSignal::new(default_type);
     let status = RwSignal::new("draft".to_string());
     let saving = RwSignal::new(false);
     let error_msg = RwSignal::new(Option::<String>::None);
