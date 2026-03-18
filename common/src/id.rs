@@ -46,3 +46,4 @@ uuid_newtype!(EdgeId);
 uuid_newtype!(TagId);
 uuid_newtype!(AttachmentId);
 uuid_newtype!(PermissionId);
+uuid_newtype!(TaskId);
