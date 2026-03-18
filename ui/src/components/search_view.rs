@@ -227,6 +227,8 @@ pub fn SearchView() -> impl IntoView {
                                             let s_icon  = status_icon(&st);
                                             let s_label = status_label(&st);
                                             let s_color = status_color(&st);
+                                            let match_src = result.match_source.clone();
+                                            let snippet = result.snippet.clone();
 
                                             view! {
                                                 <button
@@ -265,8 +267,34 @@ pub fn SearchView() -> impl IntoView {
                                                     <p class="text-xs text-stone-500 dark:text-stone-400 mb-1 font-mono">
                                                         {result.slug}
                                                     </p>
+                                                    // Row 2.5: match source badge (notes / tasks only)
+                                                    {match match_src.as_deref() {
+                                                        Some("note") => Some(view! {
+                                                            <span class="inline-flex items-center gap-1 mb-1 px-1.5 py-0.5
+                                                                text-xs rounded
+                                                                bg-blue-50 dark:bg-blue-900/20
+                                                                text-blue-600 dark:text-blue-400
+                                                                border border-blue-200 dark:border-blue-800">
+                                                                <span class="material-symbols-outlined"
+                                                                    style="font-size: 11px;">"sticky_note_2"</span>
+                                                                "matched in note"
+                                                            </span>
+                                                        }.into_any()),
+                                                        Some("task") => Some(view! {
+                                                            <span class="inline-flex items-center gap-1 mb-1 px-1.5 py-0.5
+                                                                text-xs rounded
+                                                                bg-amber-50 dark:bg-amber-900/20
+                                                                text-amber-700 dark:text-amber-400
+                                                                border border-amber-200 dark:border-amber-800">
+                                                                <span class="material-symbols-outlined"
+                                                                    style="font-size: 11px;">"task_alt"</span>
+                                                                "matched in task"
+                                                            </span>
+                                                        }.into_any()),
+                                                        _ => None,
+                                                    }}
                                                     // Row 3: snippet (optional)
-                                                    {result.snippet.map(|s| view! {
+                                                    {snippet.map(|s| view! {
                                                         <p
                                                             class="text-xs text-stone-600 dark:text-stone-400 line-clamp-2"
                                                             inner_html=s
