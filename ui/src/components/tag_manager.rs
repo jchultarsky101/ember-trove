@@ -1,6 +1,9 @@
 use common::tag::{CreateTagRequest, UpdateTagRequest};
 use leptos::prelude::*;
 
+use crate::components::modals::delete_confirm::DeleteConfirmModal;
+use crate::components::toast::{ToastLevel, push_toast};
+
 /// Full-page tag management: list all tags, create new, edit name/color, delete.
 #[component]
 pub fn TagManager() -> impl IntoView {
@@ -11,6 +14,10 @@ pub fn TagManager() -> impl IntoView {
     let editing_id = RwSignal::new(Option::<common::id::TagId>::None);
     let edit_name = RwSignal::new(String::new());
     let edit_color = RwSignal::new(String::new());
+
+    // Delete confirmation
+    let delete_confirm_id: RwSignal<Option<common::id::TagId>> = RwSignal::new(None);
+    let delete_confirm_name = RwSignal::new(String::new());
 
     let tags = LocalResource::new(move || {
         let _ = refresh.get();
@@ -26,12 +33,13 @@ pub fn TagManager() -> impl IntoView {
         error_msg.set(None);
 
         wasm_bindgen_futures::spawn_local(async move {
-            let req = CreateTagRequest { name, color };
+            let req = CreateTagRequest { name: name.clone(), color };
             match crate::api::create_tag(&req).await {
                 Ok(_) => {
                     new_name.set(String::new());
                     new_color.set("#d97706".to_string());
                     refresh.update(|n| *n += 1);
+                    push_toast(ToastLevel::Success, format!("Tag \"{name}\" created."));
                 }
                 Err(e) => error_msg.set(Some(format!("{e}"))),
             }
@@ -48,13 +56,14 @@ pub fn TagManager() -> impl IntoView {
 
         wasm_bindgen_futures::spawn_local(async move {
             let req = UpdateTagRequest {
-                name: if name.is_empty() { None } else { Some(name) },
+                name: if name.is_empty() { None } else { Some(name.clone()) },
                 color: Some(color),
             };
             match crate::api::update_tag(id, &req).await {
                 Ok(_) => {
                     editing_id.set(None);
                     refresh.update(|n| *n += 1);
+                    push_toast(ToastLevel::Success, "Tag updated.");
                 }
                 Err(e) => error_msg.set(Some(format!("{e}"))),
             }
@@ -109,14 +118,32 @@ pub fn TagManager() -> impl IntoView {
             // Tag list
             <div class="flex-1 overflow-auto">
                 <Suspense fallback=|| view! {
-                    <div class="p-6 text-stone-400 text-sm">"Loading tags..."</div>
+                    // Skeleton rows
+                    <div class="divide-y divide-stone-100 dark:divide-stone-800">
+                        {(0..4).map(|_| view! {
+                            <div class="flex items-center gap-3 px-6 py-3">
+                                <div class="w-4 h-4 rounded-full bg-stone-200 dark:bg-stone-700 animate-pulse flex-shrink-0" />
+                                <div class="h-3.5 rounded bg-stone-200 dark:bg-stone-700 animate-pulse w-28" />
+                            </div>
+                        }).collect::<Vec<_>>()}
+                    </div>
                 }>
                     {move || {
                         tags.get().map(|result| {
                             match result {
                                 Ok(tag_list) if tag_list.is_empty() => {
                                     view! {
-                                        <div class="p-6 text-stone-400 text-sm">"No tags yet. Create one above."</div>
+                                        <div class="flex flex-col items-center justify-center gap-3 py-16">
+                                            <span
+                                                class="material-symbols-outlined text-stone-300 dark:text-stone-700"
+                                                style="font-size: 48px;"
+                                            >
+                                                "label_off"
+                                            </span>
+                                            <p class="text-sm text-stone-400 dark:text-stone-600">
+                                                "No tags yet. Create one above."
+                                            </p>
+                                        </div>
                                     }.into_any()
                                 }
                                 Ok(tag_list) => {
@@ -168,6 +195,7 @@ pub fn TagManager() -> impl IntoView {
                                                                 let display_color = color.clone();
                                                                 let edit_name_val = name.clone();
                                                                 let edit_color_val = color.clone();
+                                                                let del_name = name.clone();
                                                                 view! {
                                                                     <div class="flex items-center gap-3 flex-1">
                                                                         <span
@@ -192,10 +220,8 @@ pub fn TagManager() -> impl IntoView {
                                                                         <button
                                                                             class="text-xs text-red-400 hover:text-red-600"
                                                                             on:click=move |_| {
-                                                                                wasm_bindgen_futures::spawn_local(async move {
-                                                                                    let _ = crate::api::delete_tag(tag_id).await;
-                                                                                    refresh.update(|n| *n += 1);
-                                                                                });
+                                                                                delete_confirm_id.set(Some(tag_id));
+                                                                                delete_confirm_name.set(del_name.clone());
                                                                             }
                                                                         >
                                                                             "Delete"
@@ -219,5 +245,26 @@ pub fn TagManager() -> impl IntoView {
                 </Suspense>
             </div>
         </div>
+
+        // Delete confirmation modal — outside the list so it overlays everything
+        <DeleteConfirmModal
+            show=Signal::derive(move || delete_confirm_id.get().is_some())
+            item_name=Signal::derive(move || delete_confirm_name.get())
+            on_confirm=Callback::new(move |_| {
+                let Some(id) = delete_confirm_id.get_untracked() else { return; };
+                let name = delete_confirm_name.get_untracked();
+                delete_confirm_id.set(None);
+                wasm_bindgen_futures::spawn_local(async move {
+                    match crate::api::delete_tag(id).await {
+                        Ok(_) => {
+                            push_toast(ToastLevel::Success, format!("Tag \"{name}\" deleted."));
+                            refresh.update(|n| *n += 1);
+                        }
+                        Err(e) => push_toast(ToastLevel::Error, format!("Delete failed: {e}")),
+                    }
+                });
+            })
+            on_cancel=Callback::new(move |_| delete_confirm_id.set(None))
+        />
     }
 }
