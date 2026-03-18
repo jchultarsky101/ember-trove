@@ -30,13 +30,20 @@ pub fn CreateNodeModal(
     let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
     let current_view =
         use_context::<RwSignal<View>>().expect("View signal must be provided");
+    // Pre-select the active node-type filter so "Add" respects the current view.
+    let node_type_filter: Option<RwSignal<Option<String>>> =
+        use_context::<RwSignal<Option<String>>>();
 
     // Reset fields every time the modal opens.
     Effect::new(move |_| {
         if show.get() {
             title.set(String::new());
             body.set(String::new());
-            node_type_str.set("article".to_string());
+            // Pre-select type from the active filter (falls back to "article").
+            let default_type = node_type_filter
+                .and_then(|f| f.get_untracked())
+                .unwrap_or_else(|| "article".to_string());
+            node_type_str.set(default_type);
             error.set(None);
             loading.set(false);
         }
