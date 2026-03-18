@@ -1,7 +1,7 @@
 use common::task::{MyDayTask, Task, TaskStatus, UpdateTaskRequest};
 use leptos::prelude::*;
 
-use crate::app::View;
+use crate::app::{TaskRefresh, View};
 
 fn status_done(s: &TaskStatus) -> bool {
     matches!(s, TaskStatus::Done | TaskStatus::Cancelled)
@@ -28,7 +28,9 @@ fn status_value(s: &TaskStatus) -> &'static str {
 #[component]
 pub fn MyDayView() -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
-    let refresh = RwSignal::new(0u32);
+    let refresh = use_context::<TaskRefresh>()
+        .expect("TaskRefresh context must be provided")
+        .0;
 
     let today = chrono::Utc::now().date_naive();
     let date_label = today.format("%A, %B %-d").to_string();

@@ -24,6 +24,14 @@ pub fn storage_set(key: &str, value: &str) {
     }
 }
 
+// ── Global task refresh signal ─────────────────────────────────────────────
+// Shared between TaskPanel and MyDayView so toggling a task in either view
+// causes the other to re-fetch. Wrapped in a newtype to avoid collision with
+// the nodes-list `refresh: RwSignal<u32>` already in context.
+
+#[derive(Clone, Copy)]
+pub struct TaskRefresh(pub RwSignal<u32>);
+
 // ── Current view ───────────────────────────────────────────────────────────
 
 #[allow(dead_code)]
@@ -97,6 +105,10 @@ pub fn App() -> impl IntoView {
     // Shared search query — written by SearchBar, read by SearchView.
     let search_query: RwSignal<String> = RwSignal::new(String::new());
     provide_context(search_query);
+
+    // Global task refresh — shared by TaskPanel and MyDayView.
+    let task_refresh = TaskRefresh(RwSignal::new(0u32));
+    provide_context(task_refresh);
 
     // Toast notification state.
     let toast_state = ToastState::new();

@@ -34,7 +34,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
-    command: start-dev
+    command: start-dev --import-realm
     environment:
       KC_DB: dev-file
       KEYCLOAK_ADMIN: admin
@@ -43,6 +43,7 @@ services:
       - "8180:8080"
     volumes:
       - ./keycloak-theme/ember-trove:/opt/keycloak/themes/ember-trove
+      - ./keycloak-realm.json:/opt/keycloak/data/import/ember-trove-realm.json
 
   api:
     build:
