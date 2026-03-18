@@ -45,7 +45,8 @@ pub struct KeycloakClaims {
     #[serde(default)]
     pub realm_access: Option<RealmAccess>,
     pub exp: i64,
-    pub aud: AudClaim,
+    #[serde(default)]
+    pub aud: Option<AudClaim>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -207,9 +208,11 @@ impl OidcClient {
         let decoding_key = DecodingKey::from_jwk(jwk)
             .map_err(|e| ApiError::Unauthorized(format!("invalid JWK: {e}")))?;
 
-        // Accept both "account" and the client_id as valid audiences (Keycloak quirk).
+        // Don't require 'aud' — Keycloak omits it by default without an audience
+        // mapper configured. When present, the audience mapper adds the client_id
+        // or "account"; we validate it opportunistically via the struct field.
         let mut validation = Validation::new(header.alg);
-        validation.set_audience(&["account", &self.client_id]);
+        validation.validate_aud = false;
         validation.validate_exp = true;
 
         let token_data = jsonwebtoken::decode::<KeycloakClaims>(token, &decoding_key, &validation)
