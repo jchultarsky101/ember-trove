@@ -6,8 +6,10 @@ use crate::{
     components::{
         admin_view::AdminView, dark_mode_toggle::DarkModeToggle, graph_view::GraphView,
         modals::create_node::CreateNodeModal,
+        my_day_view::MyDayView,
         node_editor::NodeEditor,
-        node_list::NodeList, node_view::NodeView, search_view::SearchView, sidebar::Sidebar,
+        node_list::NodeList, node_view::NodeView, project_dashboard::ProjectDashboard,
+        search_view::SearchView, sidebar::Sidebar,
         tag_manager::TagManager, toast::ToastOverlay,
     },
 };
@@ -144,6 +146,8 @@ fn ViewSwitch() -> impl IntoView {
         View::Graph => view! { <GraphView /> }.into_any(),
         View::Search => view! { <SearchView /> }.into_any(),
         View::Admin => view! { <AdminView /> }.into_any(),
+        View::ProjectDashboard => view! { <ProjectDashboard /> }.into_any(),
+        View::MyDay => view! { <MyDayView /> }.into_any(),
     }
 }
 

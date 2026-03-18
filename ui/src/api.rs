@@ -4,10 +4,11 @@ use common::{
     attachment::Attachment,
     auth::UserInfo,
     edge::{CreateEdgeRequest, Edge, EdgeWithTitles},
-    id::{AttachmentId, EdgeId, NodeId, TagId},
+    id::{AttachmentId, EdgeId, NodeId, TagId, TaskId},
     node::{CreateNodeRequest, Node, NodeListResponse, NodeTitleEntry, UpdateNodeRequest},
     search::SearchResponse,
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
+    task::{CreateTaskRequest, MyDayTask, ProjectDashboardEntry, Task, UpdateTaskRequest},
 };
 use gloo_net::http::Request;
 use serde::Deserialize;
@@ -569,4 +570,64 @@ pub async fn set_user_roles(id: &str, req: &UpdateUserRolesRequest) -> Result<()
             .unwrap_or_else(|_| "unknown error".to_string());
         Err(UiError::api(status, text))
     }
+}
+
+// ── Task endpoints ─────────────────────────────────────────────────────────────
+
+pub async fn fetch_tasks(node_id: NodeId) -> Result<Vec<Task>, UiError> {
+    let resp = Request::get(&api_url(&format!("/nodes/{node_id}/tasks")))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn create_task(node_id: NodeId, req: &CreateTaskRequest) -> Result<Task, UiError> {
+    let resp = Request::post(&api_url(&format!("/nodes/{node_id}/tasks")))
+        .json(req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn update_task(task_id: TaskId, req: &UpdateTaskRequest) -> Result<Task, UiError> {
+    let resp = Request::patch(&api_url(&format!("/tasks/{task_id}")))
+        .json(req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn delete_task(task_id: TaskId) -> Result<(), UiError> {
+    let resp = Request::delete(&api_url(&format!("/tasks/{task_id}")))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    if resp.ok() {
+        Ok(())
+    } else {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        Err(UiError::api(status, text))
+    }
+}
+
+pub async fn fetch_project_dashboard() -> Result<Vec<ProjectDashboardEntry>, UiError> {
+    let resp = Request::get(&api_url("/dashboard/projects"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn fetch_my_day() -> Result<Vec<MyDayTask>, UiError> {
+    let resp = Request::get(&api_url("/my-day"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
 }
