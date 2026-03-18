@@ -26,6 +26,10 @@ pub trait NoteRepo: Send + Sync {
     /// All notes by a given owner, newest first, with node titles (central feed).
     async fn feed_for_owner(&self, owner_id: &str) -> Result<Vec<FeedNote>, EmberTroveError>;
 
+    /// All notes across all owners, newest first, with node titles.
+    /// Used in single-user mode where every authenticated user sees everything.
+    async fn feed_all(&self) -> Result<Vec<FeedNote>, EmberTroveError>;
+
     /// All notes across all owners — used for full backup.
     async fn list_all(&self) -> Result<Vec<Note>, EmberTroveError>;
 }
@@ -147,6 +151,46 @@ impl NoteRepo for PgNoteRepo {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("feed notes failed: {e}")))?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| FeedNote {
+                note: Note {
+                    id: NoteId(r.id),
+                    node_id: NodeId(r.node_id),
+                    owner_id: r.owner_id,
+                    body: r.body,
+                    created_at: r.created_at,
+                },
+                node_title: r.node_title,
+            })
+            .collect())
+    }
+
+    async fn feed_all(&self) -> Result<Vec<FeedNote>, EmberTroveError> {
+        #[derive(sqlx::FromRow)]
+        struct FeedRow {
+            id: Uuid,
+            node_id: Uuid,
+            owner_id: String,
+            body: String,
+            created_at: DateTime<Utc>,
+            node_title: String,
+        }
+
+        let rows = sqlx::query_as::<_, FeedRow>(
+            r#"
+            SELECT
+                n.id, n.node_id, n.owner_id, n.body, n.created_at,
+                nd.title AS node_title
+            FROM node_notes n
+            JOIN nodes nd ON nd.id = n.node_id
+            ORDER BY n.created_at DESC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("feed_all notes failed: {e}")))?;
 
         Ok(rows
             .into_iter()

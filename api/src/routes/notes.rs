@@ -46,25 +46,17 @@ async fn create_note(
     req.validate()
         .map_err(|e| ApiError::Validation(e.to_string()))?;
 
-    // Verify the caller owns this node.
-    let node = state
-        .nodes
-        .get(NodeId(node_id))
-        .await
-        .map_err(|_| ApiError::Forbidden("node not found".into()))?;
-    if node.owner_id != claims.sub {
-        return Err(ApiError::Forbidden("only the node owner may add notes".into()));
-    }
-
+    // Single-user mode: any authenticated user may add notes to any node.
     let note = state.notes.create(NodeId(node_id), &claims.sub, req).await?;
     Ok((StatusCode::CREATED, Json(note)))
 }
 
-/// GET /notes/feed — all notes the caller has written, newest first, with node titles.
+/// GET /notes/feed — all notes, newest first, with node titles.
+/// Single-user mode: returns notes from all owners so the feed shows everything.
 async fn note_feed(
     State(state): State<AppState>,
-    Extension(claims): Extension<AuthClaims>,
+    Extension(_claims): Extension<AuthClaims>,
 ) -> Result<Json<Vec<FeedNote>>, ApiError> {
-    let feed = state.notes.feed_for_owner(&claims.sub).await?;
+    let feed = state.notes.feed_all().await?;
     Ok(Json(feed))
 }

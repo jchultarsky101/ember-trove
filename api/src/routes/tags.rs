@@ -22,9 +22,10 @@ pub fn router() -> Router<AppState> {
 
 async fn list_tags(
     State(state): State<AppState>,
-    Extension(claims): Extension<AuthClaims>,
+    Extension(_claims): Extension<AuthClaims>,
 ) -> Result<Json<Vec<Tag>>, ApiError> {
-    let tags = state.tags.list(&claims.sub).await?;
+    // Single-user mode: return all tags regardless of who created them.
+    let tags = state.tags.list_all().await?;
     Ok(Json(tags))
 }
 
