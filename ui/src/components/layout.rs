@@ -4,14 +4,11 @@ use crate::{
     app::View,
     auth::{AuthState, AuthStatus},
     components::{
-        admin_view::AdminView, dark_mode_toggle::DarkModeToggle, graph_view::GraphView,
-        modals::create_node::CreateNodeModal,
-        my_day_view::MyDayView,
-        node_editor::NodeEditor,
-        node_list::NodeList, node_view::NodeView, notes_view::NotesView,
-        project_dashboard::ProjectDashboard,
-        search_view::SearchView, sidebar::Sidebar,
-        tag_manager::TagManager, toast::ToastOverlay,
+        admin_view::AdminView, backup_view::BackupView, dark_mode_toggle::DarkModeToggle,
+        graph_view::GraphView, modals::create_node::CreateNodeModal, my_day_view::MyDayView,
+        node_editor::NodeEditor, node_list::NodeList, node_view::NodeView,
+        notes_view::NotesView, project_dashboard::ProjectDashboard, search_view::SearchView,
+        sidebar::Sidebar, tag_manager::TagManager, toast::ToastOverlay,
     },
 };
 
@@ -150,6 +147,7 @@ fn ViewSwitch() -> impl IntoView {
         View::ProjectDashboard => view! { <ProjectDashboard /> }.into_any(),
         View::MyDay => view! { <MyDayView /> }.into_any(),
         View::Notes => view! { <NotesView /> }.into_any(),
+        View::Backup => view! { <BackupView /> }.into_any(),
     }
 }
 

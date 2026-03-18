@@ -128,6 +128,11 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                                 on_click=move || current_view.set(View::Admin)
                                 collapsed=collapsed
                             />
+                            <SidebarLink
+                                icon="backup" label="Backup"
+                                on_click=move || current_view.set(View::Backup)
+                                collapsed=collapsed
+                            />
                         </div>
                     }.into_any())
                 } else {
