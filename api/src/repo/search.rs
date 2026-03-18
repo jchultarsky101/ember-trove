@@ -23,7 +23,7 @@ impl PgSearchRepo {
     }
 }
 
-/// Intermediate row type for full-text search results.
+/// Intermediate row type for all search result queries.
 #[derive(sqlx::FromRow)]
 struct SearchRow {
     id: Uuid,
@@ -33,6 +33,7 @@ struct SearchRow {
     rank: f32,
     node_type: String,
     status: String,
+    match_source: Option<String>,
 }
 
 impl SearchRow {
@@ -45,6 +46,7 @@ impl SearchRow {
             rank: self.rank,
             node_type: self.node_type,
             status: self.status,
+            match_source: self.match_source,
         }
     }
 }
@@ -152,7 +154,8 @@ impl PgSearchRepo {
                 NULL::text AS snippet,
                 1.0::float4 AS rank,
                 node_type::text AS node_type,
-                status::text AS status
+                status::text AS status,
+                NULL::text AS match_source
             FROM nodes
             WHERE ($1::text IS NULL OR node_type = $1::node_type)
               AND ($2::text IS NULL OR status = $2::node_status)
@@ -187,8 +190,12 @@ impl PgSearchRepo {
         })
     }
 
-    /// PostgreSQL full-text search using `search_vec` tsvector column with
-    /// `websearch_to_tsquery` for natural-language queries.
+    /// PostgreSQL full-text search across node title/body, note bodies, and task titles.
+    ///
+    /// Uses a `UNION ALL` of three candidate sets (node / note / task), then
+    /// `DISTINCT ON (id)` to deduplicate by node, keeping the highest-ranked
+    /// source.  A `valid_nodes` CTE applies type/status/tag filters once so
+    /// they are not repeated in every branch.
     #[allow(clippy::too_many_arguments)]
     async fn fulltext_search(
         &self,
@@ -206,18 +213,34 @@ impl PgSearchRepo {
 
         let count_row = sqlx::query_as::<_, CountRow>(
             r#"
-            SELECT COUNT(*)::bigint AS total
-            FROM nodes
-            WHERE search_vec @@ websearch_to_tsquery('english', $1)
-              AND ($2::text IS NULL OR node_type = $2::node_type)
-              AND ($3::text IS NULL OR status = $3::node_status)
+            WITH valid_nodes AS (
+                SELECT id FROM nodes
+                WHERE ($2::text IS NULL OR node_type = $2::node_type)
+                  AND ($3::text IS NULL OR status = $3::node_status)
+                  AND (
+                    array_length($4::uuid[], 1) IS NULL
+                    OR id IN (
+                        SELECT node_id FROM node_tags
+                        WHERE tag_id = ANY($4::uuid[])
+                        GROUP BY node_id
+                        HAVING (NOT $5) OR COUNT(DISTINCT tag_id) = array_length($4::uuid[], 1)
+                    )
+                  )
+            )
+            SELECT COUNT(DISTINCT n.id)::bigint AS total
+            FROM nodes n
+            WHERE n.id IN (SELECT id FROM valid_nodes)
               AND (
-                array_length($4::uuid[], 1) IS NULL
-                OR id IN (
-                    SELECT node_id FROM node_tags
-                    WHERE tag_id = ANY($4::uuid[])
-                    GROUP BY node_id
-                    HAVING (NOT $5) OR COUNT(DISTINCT tag_id) = array_length($4::uuid[], 1)
+                n.search_vec @@ websearch_to_tsquery('english', $1)
+                OR EXISTS (
+                    SELECT 1 FROM node_notes nn
+                    WHERE nn.node_id = n.id
+                      AND nn.search_vec @@ websearch_to_tsquery('english', $1)
+                )
+                OR EXISTS (
+                    SELECT 1 FROM node_tasks nt
+                    WHERE nt.node_id = n.id
+                      AND to_tsvector('english', nt.title) @@ websearch_to_tsquery('english', $1)
                 )
               )
             "#,
@@ -233,33 +256,91 @@ impl PgSearchRepo {
 
         let rows = sqlx::query_as::<_, SearchRow>(
             r#"
-            SELECT
-                id,
-                title,
-                slug,
-                ts_headline(
-                    'english',
-                    coalesce(body, ''),
-                    websearch_to_tsquery('english', $1),
-                    'StartSel=<mark>, StopSel=</mark>, MaxFragments=2, MaxWords=30, MinWords=10'
-                ) AS snippet,
-                ts_rank_cd(search_vec, websearch_to_tsquery('english', $1)) AS rank,
-                node_type::text AS node_type,
-                status::text AS status
-            FROM nodes
-            WHERE search_vec @@ websearch_to_tsquery('english', $1)
-              AND ($2::text IS NULL OR node_type = $2::node_type)
-              AND ($3::text IS NULL OR status = $3::node_status)
-              AND (
-                array_length($4::uuid[], 1) IS NULL
-                OR id IN (
-                    SELECT node_id FROM node_tags
-                    WHERE tag_id = ANY($4::uuid[])
-                    GROUP BY node_id
-                    HAVING (NOT $5) OR COUNT(DISTINCT tag_id) = array_length($4::uuid[], 1)
-                )
-              )
-            ORDER BY rank DESC, updated_at DESC
+            WITH valid_nodes AS (
+                SELECT id FROM nodes
+                WHERE ($2::text IS NULL OR node_type = $2::node_type)
+                  AND ($3::text IS NULL OR status = $3::node_status)
+                  AND (
+                    array_length($4::uuid[], 1) IS NULL
+                    OR id IN (
+                        SELECT node_id FROM node_tags
+                        WHERE tag_id = ANY($4::uuid[])
+                        GROUP BY node_id
+                        HAVING (NOT $5) OR COUNT(DISTINCT tag_id) = array_length($4::uuid[], 1)
+                    )
+                  )
+            ),
+            candidates AS (
+                -- Match from node title / body
+                SELECT
+                    n.id,
+                    n.title,
+                    n.slug,
+                    ts_headline(
+                        'english',
+                        coalesce(n.body, ''),
+                        websearch_to_tsquery('english', $1),
+                        'StartSel=<mark>, StopSel=</mark>, MaxFragments=2, MaxWords=30, MinWords=10'
+                    ) AS snippet,
+                    ts_rank_cd(n.search_vec, websearch_to_tsquery('english', $1)) AS rank,
+                    n.node_type::text AS node_type,
+                    n.status::text AS status,
+                    'node'::text AS match_source
+                FROM nodes n
+                WHERE n.id IN (SELECT id FROM valid_nodes)
+                  AND n.search_vec @@ websearch_to_tsquery('english', $1)
+
+                UNION ALL
+
+                -- Match from an attached note body
+                SELECT
+                    n.id,
+                    n.title,
+                    n.slug,
+                    ts_headline(
+                        'english',
+                        nn.body,
+                        websearch_to_tsquery('english', $1),
+                        'StartSel=<mark>, StopSel=</mark>, MaxFragments=2, MaxWords=30, MinWords=10'
+                    ) AS snippet,
+                    ts_rank_cd(nn.search_vec, websearch_to_tsquery('english', $1)) AS rank,
+                    n.node_type::text AS node_type,
+                    n.status::text AS status,
+                    'note'::text AS match_source
+                FROM node_notes nn
+                JOIN nodes n ON n.id = nn.node_id
+                WHERE n.id IN (SELECT id FROM valid_nodes)
+                  AND nn.search_vec @@ websearch_to_tsquery('english', $1)
+
+                UNION ALL
+
+                -- Match from an attached task title
+                SELECT
+                    n.id,
+                    n.title,
+                    n.slug,
+                    substring(nt.title FROM 1 FOR 200) AS snippet,
+                    ts_rank_cd(
+                        to_tsvector('english', nt.title),
+                        websearch_to_tsquery('english', $1)
+                    ) AS rank,
+                    n.node_type::text AS node_type,
+                    n.status::text AS status,
+                    'task'::text AS match_source
+                FROM node_tasks nt
+                JOIN nodes n ON n.id = nt.node_id
+                WHERE n.id IN (SELECT id FROM valid_nodes)
+                  AND to_tsvector('english', nt.title) @@ websearch_to_tsquery('english', $1)
+            ),
+            best AS (
+                SELECT DISTINCT ON (id)
+                    id, title, slug, snippet, rank, node_type, status, match_source
+                FROM candidates
+                ORDER BY id, rank DESC
+            )
+            SELECT id, title, slug, snippet, rank, node_type, status, match_source
+            FROM best
+            ORDER BY rank DESC, title
             LIMIT $6 OFFSET $7
             "#,
         )
@@ -282,8 +363,10 @@ impl PgSearchRepo {
         })
     }
 
-    /// Fuzzy trigram search using pg_trgm's `similarity()` function on the
-    /// title column, falling back to `ILIKE` on the body.
+    /// Fuzzy trigram search across node title/body, note bodies, and task titles.
+    ///
+    /// Uses `similarity()` / `ILIKE` predicates with the same `UNION ALL` +
+    /// `DISTINCT ON` deduplication strategy as `fulltext_search`.
     #[allow(clippy::too_many_arguments)]
     async fn fuzzy_search(
         &self,
@@ -302,18 +385,34 @@ impl PgSearchRepo {
 
         let count_row = sqlx::query_as::<_, CountRow>(
             r#"
-            SELECT COUNT(*)::bigint AS total
-            FROM nodes
-            WHERE (similarity(title, $1) > 0.1 OR body ILIKE $2)
-              AND ($3::text IS NULL OR node_type = $3::node_type)
-              AND ($4::text IS NULL OR status = $4::node_status)
+            WITH valid_nodes AS (
+                SELECT id FROM nodes
+                WHERE ($3::text IS NULL OR node_type = $3::node_type)
+                  AND ($4::text IS NULL OR status = $4::node_status)
+                  AND (
+                    array_length($5::uuid[], 1) IS NULL
+                    OR id IN (
+                        SELECT node_id FROM node_tags
+                        WHERE tag_id = ANY($5::uuid[])
+                        GROUP BY node_id
+                        HAVING (NOT $6) OR COUNT(DISTINCT tag_id) = array_length($5::uuid[], 1)
+                    )
+                  )
+            )
+            SELECT COUNT(DISTINCT n.id)::bigint AS total
+            FROM nodes n
+            WHERE n.id IN (SELECT id FROM valid_nodes)
               AND (
-                array_length($5::uuid[], 1) IS NULL
-                OR id IN (
-                    SELECT node_id FROM node_tags
-                    WHERE tag_id = ANY($5::uuid[])
-                    GROUP BY node_id
-                    HAVING (NOT $6) OR COUNT(DISTINCT tag_id) = array_length($5::uuid[], 1)
+                similarity(n.title, $1) > 0.1
+                OR n.body ILIKE $2
+                OR EXISTS (
+                    SELECT 1 FROM node_notes nn
+                    WHERE nn.node_id = n.id AND nn.body ILIKE $2
+                )
+                OR EXISTS (
+                    SELECT 1 FROM node_tasks nt
+                    WHERE nt.node_id = n.id
+                      AND (similarity(nt.title, $1) > 0.1 OR nt.title ILIKE $2)
                 )
               )
             "#,
@@ -330,32 +429,81 @@ impl PgSearchRepo {
 
         let rows = sqlx::query_as::<_, SearchRow>(
             r#"
-            SELECT
-                id,
-                title,
-                slug,
-                CASE
-                    WHEN body ILIKE $2
-                    THEN substring(body FROM 1 FOR 200)
-                    ELSE NULL
-                END AS snippet,
-                GREATEST(similarity(title, $1), 0.0) AS rank,
-                node_type::text AS node_type,
-                status::text AS status
-            FROM nodes
-            WHERE (similarity(title, $1) > 0.1 OR body ILIKE $2)
-              AND ($3::text IS NULL OR node_type = $3::node_type)
-              AND ($4::text IS NULL OR status = $4::node_status)
-              AND (
-                array_length($5::uuid[], 1) IS NULL
-                OR id IN (
-                    SELECT node_id FROM node_tags
-                    WHERE tag_id = ANY($5::uuid[])
-                    GROUP BY node_id
-                    HAVING (NOT $6) OR COUNT(DISTINCT tag_id) = array_length($5::uuid[], 1)
-                )
-              )
-            ORDER BY rank DESC, updated_at DESC
+            WITH valid_nodes AS (
+                SELECT id FROM nodes
+                WHERE ($3::text IS NULL OR node_type = $3::node_type)
+                  AND ($4::text IS NULL OR status = $4::node_status)
+                  AND (
+                    array_length($5::uuid[], 1) IS NULL
+                    OR id IN (
+                        SELECT node_id FROM node_tags
+                        WHERE tag_id = ANY($5::uuid[])
+                        GROUP BY node_id
+                        HAVING (NOT $6) OR COUNT(DISTINCT tag_id) = array_length($5::uuid[], 1)
+                    )
+                  )
+            ),
+            candidates AS (
+                -- Match from node title / body
+                SELECT
+                    n.id,
+                    n.title,
+                    n.slug,
+                    CASE WHEN n.body ILIKE $2
+                        THEN substring(n.body FROM 1 FOR 200)
+                        ELSE NULL
+                    END AS snippet,
+                    GREATEST(similarity(n.title, $1), 0.0) AS rank,
+                    n.node_type::text AS node_type,
+                    n.status::text AS status,
+                    'node'::text AS match_source
+                FROM nodes n
+                WHERE n.id IN (SELECT id FROM valid_nodes)
+                  AND (similarity(n.title, $1) > 0.1 OR n.body ILIKE $2)
+
+                UNION ALL
+
+                -- Match from an attached note body
+                SELECT
+                    n.id,
+                    n.title,
+                    n.slug,
+                    substring(nn.body FROM 1 FOR 200) AS snippet,
+                    0.1::float4 AS rank,
+                    n.node_type::text AS node_type,
+                    n.status::text AS status,
+                    'note'::text AS match_source
+                FROM node_notes nn
+                JOIN nodes n ON n.id = nn.node_id
+                WHERE n.id IN (SELECT id FROM valid_nodes)
+                  AND nn.body ILIKE $2
+
+                UNION ALL
+
+                -- Match from an attached task title
+                SELECT
+                    n.id,
+                    n.title,
+                    n.slug,
+                    substring(nt.title FROM 1 FOR 200) AS snippet,
+                    GREATEST(similarity(nt.title, $1), 0.0) AS rank,
+                    n.node_type::text AS node_type,
+                    n.status::text AS status,
+                    'task'::text AS match_source
+                FROM node_tasks nt
+                JOIN nodes n ON n.id = nt.node_id
+                WHERE n.id IN (SELECT id FROM valid_nodes)
+                  AND (similarity(nt.title, $1) > 0.1 OR nt.title ILIKE $2)
+            ),
+            best AS (
+                SELECT DISTINCT ON (id)
+                    id, title, slug, snippet, rank, node_type, status, match_source
+                FROM candidates
+                ORDER BY id, rank DESC
+            )
+            SELECT id, title, slug, snippet, rank, node_type, status, match_source
+            FROM best
+            ORDER BY rank DESC, title
             LIMIT $7 OFFSET $8
             "#,
         )
