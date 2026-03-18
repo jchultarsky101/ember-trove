@@ -25,7 +25,7 @@ pub fn ProjectDashboard() -> impl IntoView {
             </div>
 
             // Content
-            <div class="flex-1 overflow-auto p-6">
+            <div class="flex-1 overflow-auto p-6 flex flex-col">
                 <Suspense fallback=move || view! {
                     <p class="text-sm text-stone-400">"Loading projects…"</p>
                 }>
@@ -33,7 +33,7 @@ pub fn ProjectDashboard() -> impl IntoView {
                         let data = entries.get().and_then(|r| r.ok()).unwrap_or_default();
                         if data.is_empty() {
                             return view! {
-                                <div class="flex flex-col items-center gap-3 py-16">
+                                <div class="flex-1 flex flex-col items-center justify-center gap-3">
                                     <span class="material-symbols-outlined text-stone-300 dark:text-stone-700"
                                         style="font-size: 48px;">{"rocket_launch"}</span>
                                     <p class="text-stone-400 dark:text-stone-500 text-sm">

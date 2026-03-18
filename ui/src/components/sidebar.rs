@@ -106,7 +106,7 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed) -> impl IntoV
                 collapsed=collapsed
             />
             <SidebarLink
-                icon="dashboard" label="Projects"
+                icon="dashboard" label="Dashboard"
                 on_click=move || current_view.set(View::ProjectDashboard)
                 collapsed=collapsed
             />

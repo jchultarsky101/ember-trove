@@ -54,7 +54,7 @@ pub fn MyDayView() -> impl IntoView {
             </div>
 
             // Content
-            <div class="flex-1 overflow-auto p-6 max-w-2xl">
+            <div class="flex-1 overflow-auto p-6 flex flex-col">
                 <Suspense fallback=move || view! {
                     <p class="text-sm text-stone-400">"Loading…"</p>
                 }>
@@ -63,7 +63,7 @@ pub fn MyDayView() -> impl IntoView {
 
                         if tasks.is_empty() {
                             return view! {
-                                <div class="flex flex-col items-center gap-3 py-16">
+                                <div class="flex-1 flex flex-col items-center justify-center gap-3">
                                     <span class="material-symbols-outlined text-stone-300 dark:text-stone-700"
                                         style="font-size: 48px;">{"wb_sunny"}</span>
                                     <p class="text-stone-400 dark:text-stone-500 text-sm text-center">
@@ -88,7 +88,7 @@ pub fn MyDayView() -> impl IntoView {
                         }
 
                         view! {
-                            <div class="space-y-6">
+                            <div class="space-y-6 max-w-2xl mx-auto w-full">
                                 {grouped.into_iter().map(|(_, node_title, tasks)| {
                                     let node_id = tasks[0].node_id;
                                     view! {
