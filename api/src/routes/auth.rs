@@ -69,11 +69,18 @@ async fn callback(
         .exchange_code(&params.code, &redirect_uri)
         .await?;
 
-    let access_cookie = Cookie::build((SESSION_COOKIE, token_resp.access_token))
+    // Prefer the ID token for the session cookie — it carries email, name, and
+    // cognito:groups which the auth middleware needs.  Fall back to access_token
+    // for providers that don't issue a separate ID token.
+    let session_token = token_resp.id_token.unwrap_or(token_resp.access_token);
+
+    let secure = state.auth.cookie_secure;
+
+    let access_cookie = Cookie::build((SESSION_COOKIE, session_token))
         .path("/")
         .http_only(true)
         .same_site(SameSite::Lax)
-        .secure(false)
+        .secure(secure)
         .build();
 
     let mut updated_jar = jar.add(access_cookie);
@@ -83,7 +90,7 @@ async fn callback(
             .path("/api/auth/refresh")
             .http_only(true)
             .same_site(SameSite::Lax)
-            .secure(false)
+            .secure(secure)
             .build();
         updated_jar = updated_jar.add(refresh_cookie);
     }
@@ -114,22 +121,25 @@ async fn refresh(
 
     let token_resp = oidc.exchange_refresh_token(&refresh_token).await?;
 
-    let access_cookie = Cookie::build((SESSION_COOKIE, token_resp.access_token))
+    let session_token = token_resp.id_token.unwrap_or(token_resp.access_token);
+    let secure = state.auth.cookie_secure;
+
+    let access_cookie = Cookie::build((SESSION_COOKIE, session_token))
         .path("/")
         .http_only(true)
         .same_site(SameSite::Lax)
-        .secure(false)
+        .secure(secure)
         .build();
 
     let mut updated_jar = jar.add(access_cookie);
 
-    // Keycloak rotates the refresh token — update the cookie with the new one.
+    // Cognito rotates the refresh token — update the cookie with the new one.
     if let Some(new_refresh) = token_resp.refresh_token {
         let refresh_cookie = Cookie::build((REFRESH_COOKIE, new_refresh))
             .path("/api/auth/refresh")
             .http_only(true)
             .same_site(SameSite::Lax)
-            .secure(false)
+            .secure(secure)
             .build();
         updated_jar = updated_jar.add(refresh_cookie);
     }

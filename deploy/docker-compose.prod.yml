@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ember_trove
+      POSTGRES_USER: ember_trove
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ember_trove"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    environment:
+      DATABASE_URL: postgres://ember_trove:${POSTGRES_PASSWORD}@postgres/ember_trove
+      # Lightsail Object Storage (S3-compatible; no S3_ENDPOINT = native AWS S3)
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_REGION: us-east-2
+      # Cognito OIDC
+      OIDC_ISSUER: https://cognito-idp.us-east-2.amazonaws.com/us-east-2_4RQfxhKqn
+      OIDC_CLIENT_ID: eogq2sehdad3uc8nmar7aneol
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      # Cognito Admin (ember-trove-api IAM user)
+      COGNITO_USER_POOL_ID: us-east-2_4RQfxhKqn
+      COGNITO_REGION: us-east-2
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      # Security
+      COOKIE_KEY: ${COOKIE_KEY}
+      COOKIE_SECURE: "true"
+      # URLs
+      FRONTEND_URL: https://trove.chultarsky.me
+      API_EXTERNAL_URL: https://trove.chultarsky.me
+      HOST: "0.0.0.0"
+      PORT: "3003"
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.ui
+    restart: unless-stopped
+
+  proxy:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on:
+      - api
+      - ui
+    restart: unless-stopped
+
+volumes:
+  pgdata:
