@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Ember glow background -->
+  <circle cx="16" cy="18" r="13" fill="#7c2d12" opacity="0.25"/>
+  <!-- Outer flame -->
+  <path d="M16 2 C16 2 8 10 8 18 C8 23.5 11.5 28 16 28 C20.5 28 24 23.5 24 18 C24 10 16 2 16 2 Z"
+        fill="#ea580c"/>
+  <!-- Inner flame -->
+  <path d="M16 8 C16 8 11 14 11 19 C11 22 13.2 25 16 25 C18.8 25 21 22 21 19 C21 14 16 8 16 8 Z"
+        fill="#fb923c"/>
+  <!-- Hot core -->
+  <path d="M16 14 C16 14 13 17.5 13 20 C13 21.7 14.3 23 16 23 C17.7 23 19 21.7 19 20 C19 17.5 16 14 16 14 Z"
+        fill="#fbbf24"/>
+  <!-- Bright tip -->
+  <ellipse cx="16" cy="19.5" rx="2" ry="2.5" fill="#fef3c7" opacity="0.8"/>
+</svg>
