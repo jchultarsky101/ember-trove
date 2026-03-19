@@ -131,7 +131,9 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
             {move || {
                 let is_collapsed = collapsed.get();
                 if let AuthStatus::Authenticated(ref user) = auth_state.get() {
-                    let name = user.name.clone().unwrap_or_else(|| user.sub.clone());
+                    let name = user.name.clone()
+                        .or_else(|| user.email.clone())
+                        .unwrap_or_else(|| user.sub.clone());
                     if is_collapsed {
                         // Collapsed: icon-only logout with tooltip showing username
                         Some(view! {
