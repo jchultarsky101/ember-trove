@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Multipart, Path, Query, State},
+    extract::{DefaultBodyLimit, Multipart, Path, Query, State},
     http::StatusCode,
     routing::{delete, get, post},
     Extension, Json, Router,
@@ -32,7 +32,8 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/tags/{tag_id}", post(attach_tag).delete(detach_tag))
         .route(
             "/{id}/attachments",
-            get(list_attachments).post(upload_attachment),
+            get(list_attachments).post(upload_attachment)
+                .layer(DefaultBodyLimit::max(50 * 1024 * 1024)), // 50 MiB upload cap
         )
         .route(
             "/{id}/permissions",
@@ -209,10 +210,7 @@ async fn upload_attachment(
         .map_err(|e| ApiError::Validation(format!("multipart error: {e}")))?
         .ok_or_else(|| ApiError::Validation("no file field in request".to_string()))?;
 
-    let filename = field
-        .file_name()
-        .unwrap_or("upload")
-        .to_string();
+    let filename = sanitize_filename(field.file_name().unwrap_or("upload"));
     let content_type = field
         .content_type()
         .unwrap_or("application/octet-stream")
@@ -273,6 +271,22 @@ async fn grant_permission(
         .grant(NodeId(id), &claims.sub, req)
         .await?;
     Ok((StatusCode::CREATED, Json(perm)))
+}
+
+/// Strip characters that could inject HTTP headers or break Content-Disposition.
+/// Keeps ASCII letters, digits, dots, dashes, underscores, and spaces.
+/// Truncates to 200 chars and falls back to "upload" if the result is empty.
+fn sanitize_filename(raw: &str) -> String {
+    let clean: String = raw
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ' '))
+        .take(200)
+        .collect();
+    if clean.trim().is_empty() {
+        "upload".to_string()
+    } else {
+        clean
+    }
 }
 
 async fn revoke_permission(

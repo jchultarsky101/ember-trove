@@ -37,9 +37,9 @@ struct RedirectResponse {
     redirect_url: String,
 }
 
-async fn login(State(state): State<AppState>) -> Json<RedirectResponse> {
+async fn login(State(state): State<AppState>) -> Result<Json<RedirectResponse>, ApiError> {
     let oidc = state.oidc.as_ref()
-        .expect("OIDC not configured — auth is disabled");
+        .ok_or_else(|| ApiError::Internal("OIDC not configured — auth is disabled".to_string()))?;
 
     let redirect_uri = format!("{}/api/auth/callback", state.auth.api_external_url);
     let url = format!(
@@ -48,7 +48,7 @@ async fn login(State(state): State<AppState>) -> Json<RedirectResponse> {
         state.auth.client_id,
         urlencoding::encode(&redirect_uri),
     );
-    Json(RedirectResponse { redirect_url: url })
+    Ok(Json(RedirectResponse { redirect_url: url }))
 }
 
 #[derive(Deserialize)]

@@ -34,7 +34,14 @@ async fn download(
         .header(header::CONTENT_TYPE, &attachment.content_type)
         .header(
             header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}\"", attachment.filename),
+            format!(
+                "attachment; filename=\"{}\"",
+                attachment.filename
+                    .chars()
+                    .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ' '))
+                    .take(200)
+                    .collect::<String>()
+            ),
         )
         .header(header::CONTENT_LENGTH, data.len().to_string())
         .body(Body::from(data))
