@@ -29,8 +29,10 @@ axum-extra         = { workspace = true }
 urlencoding        = { workspace = true }
 hex                = { workspace = true }
 
-# S3-compatible object storage (MinIO / AWS S3)
+# AWS SDKs — S3 object storage + Cognito user management
+aws-config = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-s3 = "1"
+aws-sdk-cognitoidentityprovider = "1"
 
 # Backup archive (tar + gzip)
 tar    = "0.4"

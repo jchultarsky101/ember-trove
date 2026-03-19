@@ -24,16 +24,15 @@ pub struct Config {
     pub oidc_issuer: Option<String>,
     pub oidc_client_id: Option<String>,
     pub oidc_client_secret: Option<String>,
-    /// Optional external base URL for Keycloak (e.g. `http://localhost:8180`).
-    /// When set, rewrites the `authorization_endpoint` from OIDC discovery so
-    /// browser redirects point to the externally reachable host instead of an
-    /// internal Docker hostname.
-    pub oidc_external_url: Option<String>,
-    // Keycloak Admin API credentials — optional; enables /admin/* endpoints when set.
-    pub keycloak_admin_user: Option<String>,
-    pub keycloak_admin_password: Option<String>,
+    // Cognito Admin credentials — optional; enables /admin/* endpoints when set.
+    pub cognito_user_pool_id: Option<String>,
+    pub cognito_region: String,
+    pub aws_access_key_id: Option<String>,
+    pub aws_secret_access_key: Option<String>,
     // Cookie encryption key (128 hex chars → 64 bytes, required by cookie::Key)
     pub cookie_key: String,
+    /// Set `Secure` on session cookies. `true` in production (HTTPS), `false` in dev.
+    pub cookie_secure: bool,
     // URLs
     pub frontend_url: String,
     pub api_external_url: String,
@@ -69,33 +68,20 @@ impl Config {
             oidc_issuer: env::var("OIDC_ISSUER").ok(),
             oidc_client_id: env::var("OIDC_CLIENT_ID").ok(),
             oidc_client_secret: env::var("OIDC_CLIENT_SECRET").ok(),
-            oidc_external_url: env::var("OIDC_EXTERNAL_URL").ok(),
-            keycloak_admin_user: env::var("KEYCLOAK_ADMIN_USER").ok(),
-            keycloak_admin_password: env::var("KEYCLOAK_ADMIN_PASSWORD").ok(),
+            cognito_user_pool_id: env::var("COGNITO_USER_POOL_ID").ok(),
+            cognito_region: env::var("COGNITO_REGION")
+                .unwrap_or_else(|_| "us-east-2".to_string()),
+            aws_access_key_id: env::var("AWS_ACCESS_KEY_ID").ok(),
+            aws_secret_access_key: env::var("AWS_SECRET_ACCESS_KEY").ok(),
             cookie_key,
+            cookie_secure: env::var("COOKIE_SECURE")
+                .map(|v| v == "true" || v == "1")
+                .unwrap_or(false),
             frontend_url: require("FRONTEND_URL")?,
             api_external_url: require("API_EXTERNAL_URL")?,
             host: env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
             port,
         })
-    }
-}
-
-impl Config {
-    /// Derive `(base_url, realm)` from `OIDC_ISSUER`.
-    ///
-    /// Given `http://keycloak:8080/realms/ember-trove` returns
-    /// `("http://keycloak:8080", "ember-trove")`.
-    pub fn keycloak_base_and_realm(&self) -> Option<(String, String)> {
-        let issuer = self.oidc_issuer.as_deref()?;
-        let idx = issuer.find("/realms/")?;
-        let base = issuer[..idx].to_string();
-        let realm = issuer[idx + "/realms/".len()..].to_string();
-        if realm.is_empty() {
-            None
-        } else {
-            Some((base, realm))
-        }
     }
 }
 

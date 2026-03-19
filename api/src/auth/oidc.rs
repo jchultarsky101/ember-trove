@@ -23,12 +23,15 @@ struct OidcDiscovery {
     token_endpoint: String,
     jwks_uri: String,
     end_session_endpoint: String,
+    /// RFC 7009 token revocation endpoint — used for backchannel logout.
+    revocation_endpoint: Option<String>,
 }
 
 /// Token response from the OIDC token endpoint.
 #[derive(Debug, Deserialize)]
 pub struct TokenResponse {
     pub access_token: String,
+    /// ID token — present for `openid` scope; contains email, name, and group claims.
     #[serde(default)]
     pub id_token: Option<String>,
     #[serde(default)]
@@ -37,51 +40,29 @@ pub struct TokenResponse {
     pub expires_in: Option<i64>,
 }
 
-/// JWT claims with Keycloak-specific realm_access field.
+/// JWT claims — compatible with Cognito ID tokens.
+///
+/// Groups are read from `cognito:groups` (Cognito) which maps directly
+/// to roles in our `AuthClaims`.
 #[derive(Debug, Deserialize)]
-pub struct KeycloakClaims {
+pub struct OidcClaims {
     pub sub: String,
     pub email: Option<String>,
     pub name: Option<String>,
-    #[serde(default)]
-    pub realm_access: Option<RealmAccess>,
+    /// Cognito group memberships — used as roles in `AuthClaims`.
+    #[serde(rename = "cognito:groups", default)]
+    pub groups: Option<Vec<String>>,
     pub exp: i64,
-    #[serde(default)]
-    pub aud: Option<AudClaim>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct RealmAccess {
-    #[serde(default)]
-    pub roles: Vec<String>,
-}
-
-/// Keycloak can set `aud` as a single string or an array.
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum AudClaim {
-    Single(String),
-    Multiple(Vec<String>),
-}
-
-impl AudClaim {
-    pub fn contains(&self, value: &str) -> bool {
-        match self {
-            Self::Single(s) => s == value,
-            Self::Multiple(v) => v.iter().any(|s| s == value),
-        }
-    }
 }
 
 /// OIDC client that handles discovery, code exchange, and JWT validation.
 pub struct OidcClient {
-    /// Browser-facing authorization endpoint (may be rewritten to external URL).
+    /// Browser-facing authorization endpoint.
     pub authorization_endpoint: String,
-    /// Browser-facing end-session endpoint (may be rewritten to external URL).
+    /// Browser-facing end-session endpoint.
     pub end_session_endpoint: String,
-    /// Internal (container-reachable) logout endpoint for backchannel calls.
-    /// Derived from `token_endpoint` so it is never rewritten.
-    backchannel_logout_endpoint: String,
+    /// RFC 7009 revocation endpoint for backchannel logout (server-side only).
+    revocation_endpoint: String,
     token_endpoint: String,
     client_id: String,
     client_secret: String,
@@ -112,26 +93,32 @@ impl OidcClient {
             .await
             .map_err(|e| ApiError::Internal(format!("OIDC discovery parse failed: {e}")))?;
 
+        // Prefer the discovery doc's revocation_endpoint (RFC 7009).
+        // Fall back to deriving it from the token endpoint for providers that
+        // don't advertise it.
+        let revocation_endpoint = discovery
+            .revocation_endpoint
+            .clone()
+            .unwrap_or_else(|| {
+                discovery
+                    .token_endpoint
+                    .strip_suffix("/token")
+                    .map(|base| format!("{base}/revoke"))
+                    .unwrap_or_else(|| discovery.end_session_endpoint.clone())
+            });
+
         tracing::info!(
             authorization_endpoint = %discovery.authorization_endpoint,
             token_endpoint = %discovery.token_endpoint,
+            revocation_endpoint = %revocation_endpoint,
             jwks_uri = %discovery.jwks_uri,
             "OIDC discovery complete"
         );
 
-        // Derive the backchannel logout URL from the token endpoint by replacing
-        // the trailing "/token" with "/logout".  This is the internal URL and must
-        // NOT be overwritten by OIDC_EXTERNAL_URL (which is browser-facing only).
-        let backchannel_logout_endpoint = discovery
-            .token_endpoint
-            .strip_suffix("/token")
-            .map(|base| format!("{base}/logout"))
-            .unwrap_or_else(|| discovery.end_session_endpoint.clone());
-
         Ok(Self {
             authorization_endpoint: discovery.authorization_endpoint,
             end_session_endpoint: discovery.end_session_endpoint,
-            backchannel_logout_endpoint,
+            revocation_endpoint,
             token_endpoint: discovery.token_endpoint,
             client_id,
             client_secret,
@@ -174,29 +161,33 @@ impl OidcClient {
             .map_err(|e| ApiError::Internal(format!("token response parse failed: {e}")))
     }
 
-    /// Terminate the Keycloak SSO session server-side (backchannel logout).
-    /// POSTs directly to the end_session endpoint — no browser redirect needed.
-    /// Errors are non-fatal: a stale/expired refresh token still means the user
-    /// should be treated as logged out from our side.
+    /// Revoke the refresh token server-side (backchannel logout / RFC 7009).
+    ///
+    /// Errors are non-fatal: a stale/expired refresh token still means the
+    /// user should be treated as logged out from our side.
     pub async fn backchannel_logout(&self, refresh_token: &str) {
         let result = self
             .http
-            .post(&self.backchannel_logout_endpoint)
+            .post(&self.revocation_endpoint)
             .form(&[
+                ("token", refresh_token),
+                ("token_type_hint", "refresh_token"),
                 ("client_id", self.client_id.as_str()),
                 ("client_secret", self.client_secret.as_str()),
-                ("refresh_token", refresh_token),
             ])
             .send()
             .await;
 
         match result {
             Ok(resp) if resp.status().is_success() => {
-                tracing::info!("backchannel logout: Keycloak SSO session terminated");
+                tracing::info!("backchannel logout: refresh token revoked");
             }
             Ok(resp) => {
                 let status = resp.status();
-                tracing::warn!("backchannel logout: non-success status {status} (session may already be expired)");
+                tracing::warn!(
+                    "backchannel logout: non-success status {status} \
+                     (token may already be expired)"
+                );
             }
             Err(e) => {
                 tracing::warn!("backchannel logout: request failed: {e}");
@@ -235,8 +226,8 @@ impl OidcClient {
             .map_err(|e| ApiError::Internal(format!("refresh token response parse failed: {e}")))
     }
 
-    /// Validate an access token JWT, returning the decoded claims.
-    pub async fn validate_token(&self, token: &str) -> Result<KeycloakClaims, ApiError> {
+    /// Validate a JWT (typically the ID token), returning decoded claims.
+    pub async fn validate_token(&self, token: &str) -> Result<OidcClaims, ApiError> {
         let jwks = self.get_jwks().await?;
 
         let header = jsonwebtoken::decode_header(token)
@@ -256,14 +247,13 @@ impl OidcClient {
         let decoding_key = DecodingKey::from_jwk(jwk)
             .map_err(|e| ApiError::Unauthorized(format!("invalid JWK: {e}")))?;
 
-        // Don't require 'aud' — Keycloak omits it by default without an audience
-        // mapper configured. When present, the audience mapper adds the client_id
-        // or "account"; we validate it opportunistically via the struct field.
+        // Cognito ID tokens set `aud` to the app client ID — skip audience
+        // validation here; we trust the issuer + signature.
         let mut validation = Validation::new(header.alg);
         validation.validate_aud = false;
         validation.validate_exp = true;
 
-        let token_data = jsonwebtoken::decode::<KeycloakClaims>(token, &decoding_key, &validation)
+        let token_data = jsonwebtoken::decode::<OidcClaims>(token, &decoding_key, &validation)
             .map_err(|e| ApiError::Unauthorized(format!("JWT validation failed: {e}")))?;
 
         Ok(token_data.claims)
@@ -274,14 +264,12 @@ impl OidcClient {
         {
             let cached = self.jwks.read().await;
             if let Some(ref cached) = *cached {
-                // Return cached JWKS if still within TTL window.
                 if cached.fetched_at.elapsed() < JWKS_TTL {
                     return Ok(cached.jwks.clone());
                 }
             }
         }
 
-        // Fetch fresh JWKS from provider.
         let jwks: JwkSet = self
             .http
             .get(&self.jwks_uri)
@@ -292,7 +280,6 @@ impl OidcClient {
             .await
             .map_err(|e| ApiError::Internal(format!("JWKS parse failed: {e}")))?;
 
-        // Update cache with fresh JWKS and current timestamp.
         let mut cached = self.jwks.write().await;
         *cached = Some(CachedJwks {
             jwks: jwks.clone(),

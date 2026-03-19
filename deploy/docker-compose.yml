@@ -32,19 +32,6 @@ services:
       timeout: 5s
       retries: 5
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:latest
-    command: start-dev --import-realm
-    environment:
-      KC_DB: dev-file
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-    ports:
-      - "8180:8080"
-    volumes:
-      - ./keycloak-theme/ember-trove:/opt/keycloak/themes/ember-trove
-      - ./keycloak-realm.json:/opt/keycloak/data/import/ember-trove-realm.json
-
   api:
     build:
       context: ..
@@ -56,15 +43,16 @@ services:
       S3_ACCESS_KEY: ember_trove
       S3_SECRET_KEY: ember_trove_dev
       S3_REGION: us-east-1
-      OIDC_ISSUER: http://keycloak:8080/realms/ember-trove
-      OIDC_EXTERNAL_URL: "http://localhost:8180"
-      OIDC_CLIENT_ID: ember-trove-api
+      OIDC_ISSUER: https://cognito-idp.us-east-2.amazonaws.com/us-east-2_4RQfxhKqn
+      OIDC_CLIENT_ID: eogq2sehdad3uc8nmar7aneol
       OIDC_CLIENT_SECRET: change-me
+      # Cognito Admin — used by /api/admin/* endpoints.
+      COGNITO_USER_POOL_ID: us-east-2_4RQfxhKqn
+      COGNITO_REGION: us-east-2
+      AWS_ACCESS_KEY_ID: change-me
+      AWS_SECRET_ACCESS_KEY: change-me
       # 128-char hex key (64 bytes) for cookie encryption — CHANGE IN PRODUCTION
       COOKIE_KEY: "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-      # Keycloak Admin credentials — used by /api/admin/* endpoints.
-      KEYCLOAK_ADMIN_USER: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
       FRONTEND_URL: "http://localhost:8003"
       API_EXTERNAL_URL: "http://localhost:3003"
       HOST: "0.0.0.0"
@@ -77,8 +65,6 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      keycloak:
-        condition: service_started
 
   ui:
     build:
