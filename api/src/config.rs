@@ -31,6 +31,8 @@ pub struct Config {
     pub aws_secret_access_key: Option<String>,
     // Cookie encryption key (128 hex chars → 64 bytes, required by cookie::Key)
     pub cookie_key: String,
+    /// Set `Secure` on session cookies. `true` in production (HTTPS), `false` in dev.
+    pub cookie_secure: bool,
     // URLs
     pub frontend_url: String,
     pub api_external_url: String,
@@ -72,6 +74,9 @@ impl Config {
             aws_access_key_id: env::var("AWS_ACCESS_KEY_ID").ok(),
             aws_secret_access_key: env::var("AWS_SECRET_ACCESS_KEY").ok(),
             cookie_key,
+            cookie_secure: env::var("COOKIE_SECURE")
+                .map(|v| v == "true" || v == "1")
+                .unwrap_or(false),
             frontend_url: require("FRONTEND_URL")?,
             api_external_url: require("API_EXTERNAL_URL")?,
             host: env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),

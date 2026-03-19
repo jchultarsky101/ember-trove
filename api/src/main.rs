@@ -73,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
         client_secret: config.oidc_client_secret.clone().unwrap_or_default(),
         frontend_url: config.frontend_url.clone(),
         api_external_url: config.api_external_url.clone(),
+        cookie_secure: config.cookie_secure,
     };
 
     // Derive cookie encryption key from hex-encoded COOKIE_KEY.

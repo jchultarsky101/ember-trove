@@ -74,11 +74,13 @@ async fn callback(
     // for providers that don't issue a separate ID token.
     let session_token = token_resp.id_token.unwrap_or(token_resp.access_token);
 
+    let secure = state.auth.cookie_secure;
+
     let access_cookie = Cookie::build((SESSION_COOKIE, session_token))
         .path("/")
         .http_only(true)
         .same_site(SameSite::Lax)
-        .secure(false)
+        .secure(secure)
         .build();
 
     let mut updated_jar = jar.add(access_cookie);
@@ -88,7 +90,7 @@ async fn callback(
             .path("/api/auth/refresh")
             .http_only(true)
             .same_site(SameSite::Lax)
-            .secure(false)
+            .secure(secure)
             .build();
         updated_jar = updated_jar.add(refresh_cookie);
     }
@@ -120,12 +122,13 @@ async fn refresh(
     let token_resp = oidc.exchange_refresh_token(&refresh_token).await?;
 
     let session_token = token_resp.id_token.unwrap_or(token_resp.access_token);
+    let secure = state.auth.cookie_secure;
 
     let access_cookie = Cookie::build((SESSION_COOKIE, session_token))
         .path("/")
         .http_only(true)
         .same_site(SameSite::Lax)
-        .secure(false)
+        .secure(secure)
         .build();
 
     let mut updated_jar = jar.add(access_cookie);
@@ -136,7 +139,7 @@ async fn refresh(
             .path("/api/auth/refresh")
             .http_only(true)
             .same_site(SameSite::Lax)
-            .secure(false)
+            .secure(secure)
             .build();
         updated_jar = updated_jar.add(refresh_cookie);
     }
