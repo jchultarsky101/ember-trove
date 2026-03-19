@@ -247,10 +247,11 @@ impl OidcClient {
         let decoding_key = DecodingKey::from_jwk(jwk)
             .map_err(|e| ApiError::Unauthorized(format!("invalid JWK: {e}")))?;
 
-        // Cognito ID tokens set `aud` to the app client ID — skip audience
-        // validation here; we trust the issuer + signature.
+        // Cognito ID tokens set `aud` to the App Client ID.
+        // Validate it explicitly so tokens issued for other apps in the same
+        // User Pool are rejected.
         let mut validation = Validation::new(header.alg);
-        validation.validate_aud = false;
+        validation.set_audience(&[self.client_id.as_str()]);
         validation.validate_exp = true;
 
         let token_data = jsonwebtoken::decode::<OidcClaims>(token, &decoding_key, &validation)
