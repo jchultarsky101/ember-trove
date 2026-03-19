@@ -56,20 +56,19 @@ fn extract_token(jar: &PrivateCookieJar, request: &Request) -> Result<String, Ap
     Err(ApiError::Unauthorized("missing authentication".to_string()))
 }
 
-/// Validate the JWT and map Keycloak claims to our AuthClaims.
+/// Validate the JWT (ID token) and map OIDC claims to our `AuthClaims`.
+///
+/// `cognito:groups` becomes the roles list; absent means no groups (empty vec).
 async fn validate_and_map(oidc: &OidcClient, token: &str) -> Result<AuthClaims, ApiError> {
-    let kc_claims = oidc.validate_token(token).await?;
+    let claims = oidc.validate_token(token).await?;
 
-    let roles = kc_claims
-        .realm_access
-        .map(|ra| ra.roles)
-        .unwrap_or_default();
+    let roles = claims.groups.unwrap_or_default();
 
     Ok(AuthClaims {
-        sub: kc_claims.sub,
-        email: kc_claims.email,
-        name: kc_claims.name,
+        sub: claims.sub,
+        email: claims.email,
+        name: claims.name,
         roles,
-        exp: kc_claims.exp,
+        exp: claims.exp,
     })
 }

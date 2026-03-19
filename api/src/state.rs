@@ -4,7 +4,7 @@ use axum_extra::extract::cookie::Key;
 use sqlx::PgPool;
 
 use crate::{
-    admin::KeycloakAdminClient,
+    admin::CognitoAdminClient,
     auth::{AuthConfig, oidc::OidcClient},
     config::Config,
     object_store::ObjectStore,
@@ -30,15 +30,14 @@ pub struct AppState {
     pub backup: Arc<dyn BackupRepo>,
     pub object_store: Arc<dyn ObjectStore>,
     pub oidc: Option<Arc<OidcClient>>,
-    /// Keycloak Admin client — `None` when `KEYCLOAK_ADMIN_USER` / `KEYCLOAK_ADMIN_PASSWORD`
-    /// are not set in the environment.
-    pub keycloak_admin: Option<Arc<KeycloakAdminClient>>,
+    /// Cognito admin client — `None` when `COGNITO_USER_POOL_ID` is not set.
+    pub cognito_admin: Option<Arc<CognitoAdminClient>>,
     pub cookie_key: Key,
     pub auth: AuthConfig,
     pub config: Config,
 }
 
-/// PrivateCookieJar needs `FromRef<AppState>` for `Key` to derive
+/// `PrivateCookieJar` needs `FromRef<AppState>` for `Key` to derive
 /// the encryption key from shared state.
 impl axum::extract::FromRef<AppState> for Key {
     fn from_ref(state: &AppState) -> Self {

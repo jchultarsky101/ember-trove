@@ -1,3 +1,3 @@
-pub mod keycloak;
+pub mod cognito;
 
-pub use keycloak::KeycloakAdminClient;
+pub use cognito::CognitoAdminClient;

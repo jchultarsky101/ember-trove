@@ -18,7 +18,7 @@ use axum_extra::extract::cookie::Key;
 use sqlx::postgres::PgPoolOptions;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use admin::KeycloakAdminClient;
+use admin::CognitoAdminClient;
 use auth::{AuthConfig, oidc::OidcClient};
 use config::Config;
 use object_store::s3::S3ObjectStore;
@@ -58,24 +58,8 @@ async fn main() -> anyhow::Result<()> {
     let oidc = if let (Some(issuer), Some(client_id), Some(client_secret)) =
         (&config.oidc_issuer, &config.oidc_client_id, &config.oidc_client_secret)
     {
-        let mut client =
+        let client =
             OidcClient::discover(issuer, client_id.clone(), client_secret.clone()).await?;
-
-        // When running behind Docker the internal authorization_endpoint URL
-        // (e.g. http://keycloak:8080/...) is unreachable from the browser.
-        // OIDC_EXTERNAL_URL lets operators supply the browser-facing base URL
-        // (e.g. http://localhost:8180) so that the login redirect works.
-        if let Some(ref ext) = config.oidc_external_url {
-            let base = ext.trim_end_matches('/');
-            if let Some(path_start) = client.authorization_endpoint.find("/realms") {
-                client.authorization_endpoint =
-                    format!("{}{}", base, &client.authorization_endpoint[path_start..]);
-            }
-            if let Some(path_start) = client.end_session_endpoint.find("/realms") {
-                client.end_session_endpoint =
-                    format!("{}{}", base, &client.end_session_endpoint[path_start..]);
-            }
-        }
 
         Some(Arc::new(client))
     } else {
@@ -117,25 +101,14 @@ async fn main() -> anyhow::Result<()> {
             Arc::new(object_store::NullObjectStore)
         };
 
-    // Keycloak Admin client — optional; enabled when admin credentials are in the environment.
-    let keycloak_admin = if let (Some(user), Some(password)) = (
-        config.keycloak_admin_user.as_deref(),
-        config.keycloak_admin_password.as_deref(),
-    ) {
-        if let Some((base, realm)) = config.keycloak_base_and_realm() {
-            tracing::info!("Keycloak admin client enabled (realm: {realm})");
-            Some(Arc::new(KeycloakAdminClient::new(
-                base,
-                realm,
-                user.to_string(),
-                password.to_string(),
-            )))
-        } else {
-            tracing::warn!("KEYCLOAK_ADMIN_USER/PASSWORD set but OIDC_ISSUER missing — admin API disabled");
-            None
-        }
+    // Cognito Admin client — optional; enabled when COGNITO_USER_POOL_ID is set.
+    let cognito_admin = if let Some(pool_id) = config.cognito_user_pool_id.clone() {
+        tracing::info!("Cognito admin client enabled (pool: {pool_id})");
+        Some(Arc::new(
+            CognitoAdminClient::new(&config.cognito_region, pool_id).await,
+        ))
     } else {
-        tracing::info!("Keycloak admin credentials not set — /admin/* endpoints disabled");
+        tracing::info!("COGNITO_USER_POOL_ID not set — /admin/* endpoints disabled");
         None
     };
 
@@ -152,7 +125,7 @@ async fn main() -> anyhow::Result<()> {
         backup: Arc::new(PgBackupRepo::new(pool.clone())),
         object_store,
         oidc,
-        keycloak_admin,
+        cognito_admin,
         cookie_key,
         auth,
         config: config.clone(),
