@@ -4,7 +4,8 @@ use common::{
     attachment::Attachment,
     auth::UserInfo,
     edge::{CreateEdgeRequest, Edge, EdgeWithTitles},
-    id::{AttachmentId, EdgeId, NodeId, NoteId, TagId, TaskId},
+    favorite::{CreateFavoriteRequest, Favorite, ReorderFavoritesRequest},
+    id::{AttachmentId, EdgeId, FavoriteId, NodeId, NoteId, TagId, TaskId},
     node::{CreateNodeRequest, Node, NodeListResponse, NodeTitleEntry, UpdateNodeRequest},
     search::SearchResponse,
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
@@ -728,4 +729,48 @@ pub async fn restore_backup(id: uuid::Uuid) -> Result<(), UiError> {
         let text = resp.text().await.unwrap_or_default();
         Err(UiError::api(status, text))
     }
+}
+
+// ── Favorites ─────────────────────────────────────────────────────────────────
+
+pub async fn fetch_favorites() -> Result<Vec<Favorite>, UiError> {
+    let resp = Request::get(&api_url("/favorites"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn create_favorite(req: &CreateFavoriteRequest) -> Result<Favorite, UiError> {
+    let resp = Request::post(&api_url("/favorites"))
+        .json(req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn delete_favorite(id: FavoriteId) -> Result<(), UiError> {
+    let resp = Request::delete(&api_url(&format!("/favorites/{id}")))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    if resp.ok() {
+        Ok(())
+    } else {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        Err(UiError::api(status, text))
+    }
+}
+
+pub async fn reorder_favorites(req: &ReorderFavoritesRequest) -> Result<Vec<Favorite>, UiError> {
+    let resp = Request::patch(&api_url("/favorites/reorder"))
+        .json(req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
 }
