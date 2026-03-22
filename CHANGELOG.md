@@ -4,6 +4,18 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.10.0] - 2026-03-21
+
+### Added
+- **Sidebar Favorites**: pin any internal node or external URL to the sidebar for one-click access.
+  - Favorites section sits between the search bar and "All Nodes", visible in both expanded and collapsed sidebar modes.
+  - Add favorites via an in-modal picker: "Internal Node" tab (live search + select) or "External URL" tab (URL + label inputs).
+  - Node favorites navigate to the node's detail view on click; URL favorites open in a new browser tab.
+  - Reorder favorites with up/down arrow buttons (visible on hover).
+  - Remove any favorite with the trash icon (visible on hover).
+  - Favorites are user-scoped and persisted in PostgreSQL (`user_favorites` table, migration `009_favorites.sql`).
+  - New API endpoints: `GET /api/favorites`, `POST /api/favorites`, `DELETE /api/favorites/{id}`, `PATCH /api/favorites/reorder`.
+
 ## [1.9.2] - 2026-03-19
 
 ### Fixed
