@@ -99,7 +99,7 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
                     // Section header
                     <div class="flex items-center justify-between px-3 mb-1">
                         <span class="text-xs font-semibold uppercase tracking-wider
-                                     text-stone-400 dark:text-stone-500">
+                                     text-stone-500 dark:text-stone-400">
                             "Favorites"
                         </span>
                         <button
@@ -118,7 +118,7 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
                         let len = list.len();
                         if list.is_empty() {
                             return view! {
-                                <p class="px-3 py-1 text-xs text-stone-400 dark:text-stone-600 italic">
+                                <p class="px-3 py-1 text-xs text-stone-400 dark:text-stone-500 italic">
                                     "No favorites yet"
                                 </p>
                             }.into_any();
