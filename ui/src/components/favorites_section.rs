@@ -44,10 +44,10 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
 
     let move_up = Callback::new(move |id: FavoriteId| {
         favorites.update(|list| {
-            if let Some(idx) = list.iter().position(|f| f.id == id) {
-                if idx > 0 {
-                    list.swap(idx, idx - 1);
-                }
+            if let Some(idx) = list.iter().position(|f| f.id == id)
+                && idx > 0
+            {
+                list.swap(idx, idx - 1);
             }
         });
         let ids: Vec<uuid::Uuid> = favorites.get_untracked().iter().map(|f| f.id.0).collect();
@@ -61,10 +61,10 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
 
     let move_down = Callback::new(move |id: FavoriteId| {
         favorites.update(|list| {
-            if let Some(idx) = list.iter().position(|f| f.id == id) {
-                if idx + 1 < list.len() {
-                    list.swap(idx, idx + 1);
-                }
+            if let Some(idx) = list.iter().position(|f| f.id == id)
+                && idx + 1 < list.len()
+            {
+                list.swap(idx, idx + 1);
             }
         });
         let ids: Vec<uuid::Uuid> = favorites.get_untracked().iter().map(|f| f.id.0).collect();
@@ -183,10 +183,10 @@ fn FavoriteRow(
         if let Some(nid) = node_id {
             current_view.set(View::NodeDetail(nid));
             on_nav.run(());
-        } else if let Some(ref u) = url2 {
-            if let Some(win) = web_sys::window() {
-                let _ = win.open_with_url_and_target(u, "_blank");
-            }
+        } else if let Some(ref u) = url2
+            && let Some(win) = web_sys::window()
+        {
+            let _ = win.open_with_url_and_target(u, "_blank");
         }
     };
 
