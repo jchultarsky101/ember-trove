@@ -2,7 +2,7 @@ use axum::{
     Extension, Json, Router,
     extract::{Path, State},
     http::StatusCode,
-    routing::{delete, get, patch, post},
+    routing::{delete, get, patch},
 };
 use common::{
     auth::AuthClaims,
