@@ -386,6 +386,14 @@ pub fn GraphView() -> impl IntoView {
     let edge_hover: RwSignal<Option<EdgeHover>> = RwSignal::new(None);
     let node_hover: RwSignal<Option<NodeHoverInfo>> = RwSignal::new(None);
 
+    // ── Type-visibility filter signals ───────────────────────────────────────
+    // Each signal controls whether nodes of that type are rendered.
+    let show_articles:   RwSignal<bool> = RwSignal::new(true);
+    let show_projects:   RwSignal<bool> = RwSignal::new(true);
+    let show_areas:      RwSignal<bool> = RwSignal::new(true);
+    let show_resources:  RwSignal<bool> = RwSignal::new(true);
+    let show_references: RwSignal<bool> = RwSignal::new(true);
+
     Effect::new(move |_| {
         spawn_local(async move {
             match fetch_nodes().await {
@@ -424,21 +432,41 @@ pub fn GraphView() -> impl IntoView {
     view! {
         <div class="relative w-full h-full overflow-hidden bg-stone-50 dark:bg-stone-950 select-none">
             // ── Legend overlay ───────────────────────────────────────────────
-            <div class="absolute bottom-4 left-4 z-10 pointer-events-none
+            // ── Toolbar (top-right) ──────────────────────────────────────────
+            <div class="absolute top-3 right-3 z-10 flex items-center gap-2">
+                <button
+                    class="px-2.5 py-1 rounded-lg text-xs font-medium
+                           bg-white/80 dark:bg-stone-900/85 backdrop-blur-sm
+                           border border-stone-200 dark:border-stone-700
+                           text-stone-600 dark:text-stone-300
+                           hover:bg-stone-50 dark:hover:bg-stone-800 cursor-pointer transition-colors"
+                    title="Fit all nodes into view"
+                    on:click=move |_| {
+                        pan_x.set(0.0);
+                        pan_y.set(0.0);
+                        zoom.set(1.0);
+                    }
+                >
+                    "Fit"
+                </button>
+            </div>
+
+            // ── Legend + type filter overlay (bottom-left) ───────────────────
+            <div class="absolute bottom-4 left-4 z-10
                         bg-white/80 dark:bg-stone-900/85 backdrop-blur-sm
                         border border-stone-200 dark:border-stone-700
                         rounded-xl p-3 flex flex-col gap-2 text-xs">
-                // Node shapes
+                // Node type toggles — click to show/hide
                 <p class="font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide
-                           text-[10px] mb-0.5">"Nodes"</p>
+                           text-[10px] mb-0.5">"Nodes (click to filter)"</p>
                 <div class="flex flex-col gap-1">
-                    <LegendShape label="Article"   color="#d97706" shape="circle" />
-                    <LegendShape label="Project"   color="#2563eb" shape="diamond" />
-                    <LegendShape label="Area"      color="#16a34a" shape="rect" />
-                    <LegendShape label="Resource"  color="#9333ea" shape="hexagon" />
-                    <LegendShape label="Reference" color="#dc2626" shape="triangle" />
+                    <LegendToggle label="Article"   color="#d97706" shape="circle"   show=show_articles />
+                    <LegendToggle label="Project"   color="#2563eb" shape="diamond"  show=show_projects />
+                    <LegendToggle label="Area"      color="#16a34a" shape="rect"     show=show_areas />
+                    <LegendToggle label="Resource"  color="#9333ea" shape="hexagon"  show=show_resources />
+                    <LegendToggle label="Reference" color="#dc2626" shape="triangle" show=show_references />
                 </div>
-                // Edge line styles
+                // Edge line styles (non-interactive)
                 <p class="font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide
                            text-[10px] mt-1 mb-0.5">"Edges"</p>
                 <div class="flex flex-col gap-1">
@@ -467,8 +495,8 @@ pub fn GraphView() -> impl IntoView {
                     }
                     .into_any();
                 }
-                let nodes = nodes_sig.get();
-                if nodes.is_empty() {
+                let all_nodes = nodes_sig.get();
+                if all_nodes.is_empty() {
                     return view! {
                         <div class="flex items-center justify-center h-full text-stone-400 dark:text-stone-600">
                             <span class="text-sm">
@@ -478,7 +506,30 @@ pub fn GraphView() -> impl IntoView {
                     }
                     .into_any();
                 }
-                let edges = edges_sig.get();
+
+                // Apply type-visibility filter.
+                let nodes: Vec<Node> = all_nodes
+                    .into_iter()
+                    .filter(|n| match &n.node_type {
+                        NodeType::Article   => show_articles.get(),
+                        NodeType::Project   => show_projects.get(),
+                        NodeType::Area      => show_areas.get(),
+                        NodeType::Resource  => show_resources.get(),
+                        NodeType::Reference => show_references.get(),
+                    })
+                    .collect();
+
+                // Retain only edges where both endpoints are visible.
+                let visible_ids: std::collections::HashSet<Uuid> =
+                    nodes.iter().map(|n| n.id.0).collect();
+                let edges: Vec<Edge> = edges_sig
+                    .get()
+                    .into_iter()
+                    .filter(|e| {
+                        visible_ids.contains(&e.source_id.0)
+                            && visible_ids.contains(&e.target_id.0)
+                    })
+                    .collect();
 
                 // Title lookup map for hover cards.
                 let title_map: HashMap<Uuid, String> = nodes
@@ -1024,6 +1075,87 @@ pub fn GraphView() -> impl IntoView {
 }
 
 // ── Legend sub-components ────────────────────────────────────────────────────
+
+/// Clickable legend row that toggles node-type visibility.
+#[component]
+fn LegendToggle(
+    label: &'static str,
+    color: &'static str,
+    shape: &'static str,
+    show: RwSignal<bool>,
+) -> impl IntoView {
+    let icon_view = legend_shape_icon(color, shape);
+    view! {
+        <button
+            class=move || {
+                let dimmed = if show.get() { "" } else { " opacity-40" };
+                format!(
+                    "flex items-center gap-1.5 cursor-pointer select-none w-full text-left\
+                     hover:opacity-80 transition-opacity{dimmed}"
+                )
+            }
+            title=move || if show.get() { format!("Hide {label}") } else { format!("Show {label}") }
+            on:click=move |_| show.update(|v| *v = !*v)
+        >
+            {icon_view}
+            <span class="text-stone-700 dark:text-stone-300">{label}</span>
+            {move || (!show.get()).then(|| view! {
+                <span class="ml-auto text-stone-400 dark:text-stone-500 text-[10px]">"hidden"</span>
+            })}
+        </button>
+    }
+}
+
+/// Builds the small SVG icon used in legend rows (shared by LegendToggle and LegendShape).
+fn legend_shape_icon(color: &'static str, shape: &'static str) -> AnyView {
+    match shape {
+        "diamond" => view! {
+            <svg width="14" height="14" viewBox="0 0 14 14" style="flex-shrink:0;">
+                <polygon
+                    points="7,1 13,7 7,13 1,7"
+                    style=format!("fill:{color}; stroke:{color}; stroke-width:0.5;")
+                />
+            </svg>
+        }
+        .into_any(),
+        "rect" => view! {
+            <svg width="14" height="14" viewBox="0 0 14 14" style="flex-shrink:0;">
+                <rect
+                    x="1" y="3" width="12" height="8" rx="2"
+                    style=format!("fill:{color}; stroke:{color}; stroke-width:0.5;")
+                />
+            </svg>
+        }
+        .into_any(),
+        "hexagon" => view! {
+            <svg width="14" height="14" viewBox="0 0 14 14" style="flex-shrink:0;">
+                <polygon
+                    points="7,1 12.2,4 12.2,10 7,13 1.8,10 1.8,4"
+                    style=format!("fill:{color}; stroke:{color}; stroke-width:0.5;")
+                />
+            </svg>
+        }
+        .into_any(),
+        "triangle" => view! {
+            <svg width="14" height="14" viewBox="0 0 14 14" style="flex-shrink:0;">
+                <polygon
+                    points="7,1 13,13 1,13"
+                    style=format!("fill:{color}; stroke:{color}; stroke-width:0.5;")
+                />
+            </svg>
+        }
+        .into_any(),
+        _ => view! {
+            <svg width="14" height="14" viewBox="0 0 14 14" style="flex-shrink:0;">
+                <circle
+                    cx="7" cy="7" r="6"
+                    style=format!("fill:{color}; stroke:{color}; stroke-width:0.5;")
+                />
+            </svg>
+        }
+        .into_any(),
+    }
+}
 
 #[component]
 fn LegendShape(label: &'static str, color: &'static str, shape: &'static str) -> impl IntoView {
