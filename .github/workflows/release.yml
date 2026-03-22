@@ -38,3 +38,46 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --title "v${{ steps.notes.outputs.version }}" \
             --notes-file /tmp/release-notes.txt
+
+  deploy:
+    name: Deploy to production (Lightsail)
+    runs-on: ubuntu-latest
+    needs: release
+    # Only runs when LIGHTSAIL_SSH_KEY secret is configured.
+    # To enable: add LIGHTSAIL_SSH_KEY and LIGHTSAIL_HOST to repository secrets.
+    if: ${{ secrets.LIGHTSAIL_SSH_KEY != '' }}
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ubuntu
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          # Conservative timeout for Rust rebuild (api crate is large).
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+
+            cd ~/ember-trove
+
+            echo "=== Fetching latest main ==="
+            git fetch origin main
+            git checkout main
+            git pull origin main
+
+            echo "=== Rebuilding api and ui images ==="
+            docker compose -f deploy/docker-compose.prod.yml build api ui
+
+            echo "=== Restarting services ==="
+            docker compose -f deploy/docker-compose.prod.yml up -d --force-recreate api ui proxy
+
+            echo "=== Verifying health ==="
+            sleep 10
+            curl -sf http://localhost:3003/api/health | python3 -c "
+            import sys, json
+            d = json.load(sys.stdin)
+            print('Health:', json.dumps(d, indent=2))
+            assert d['status'] == 'ok', f'Health check failed: {d}'
+            print('Deploy successful!')
+            "
