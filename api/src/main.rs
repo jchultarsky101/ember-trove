@@ -114,6 +114,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let state = AppState {
+        started_at: std::time::Instant::now(),
         nodes: Arc::new(PgNodeRepo::new(pool.clone())),
         edges: Arc::new(PgEdgeRepo::new(pool.clone())),
         tags: Arc::new(PgTagRepo::new(pool.clone())),

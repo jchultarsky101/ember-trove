@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use axum_extra::extract::cookie::Key;
 use sqlx::PgPool;
@@ -36,6 +36,8 @@ pub struct AppState {
     pub cookie_key: Key,
     pub auth: AuthConfig,
     pub config: Config,
+    /// Process start time — used to compute uptime in the metrics endpoint.
+    pub started_at: Instant,
 }
 
 /// `PrivateCookieJar` needs `FromRef<AppState>` for `Key` to derive

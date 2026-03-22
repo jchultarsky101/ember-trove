@@ -4,6 +4,19 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.15.0] - 2026-03-21
+
+### Added
+- **Operational metrics endpoint**: `GET /api/metrics` (admin-only) returns a JSON snapshot for monitoring:
+  - `version` — API binary version.
+  - `uptime_secs` — process uptime since last restart.
+  - `db.pool_size` / `db.pool_idle` — PostgreSQL connection pool utilisation.
+  - `counts.*` — row counts for `nodes`, `edges`, `tags`, `notes`, `tasks`, `attachments`, `user_favorites`.
+- `AppState` now records `started_at: Instant` for uptime tracking.
+
+### Fixed
+- Removed unused `post` import from `api/src/routes/favorites.rs`.
+
 ## [1.14.0] - 2026-03-21
 
 ### Changed
