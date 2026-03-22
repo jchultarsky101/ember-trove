@@ -9,9 +9,9 @@ use crate::{
     config::Config,
     object_store::ObjectStore,
     repo::{
-        attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo, graph::GraphRepo,
-        node::NodeRepo, note::NoteRepo, permission::PermissionRepo, search::SearchRepo,
-        tag::TagRepo, task::TaskRepo,
+        attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo, favorite::FavoriteRepo,
+        graph::GraphRepo, node::NodeRepo, note::NoteRepo, permission::PermissionRepo,
+        search::SearchRepo, tag::TagRepo, task::TaskRepo,
     },
 };
 
@@ -28,6 +28,7 @@ pub struct AppState {
     pub search: Arc<dyn SearchRepo>,
     pub graph: Arc<dyn GraphRepo>,
     pub backup: Arc<dyn BackupRepo>,
+    pub favorites: Arc<dyn FavoriteRepo>,
     pub object_store: Arc<dyn ObjectStore>,
     pub oidc: Option<Arc<OidcClient>>,
     /// Cognito admin client — `None` when `COGNITO_USER_POOL_ID` is not set.

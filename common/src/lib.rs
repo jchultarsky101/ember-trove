@@ -11,6 +11,7 @@ pub mod permission;
 pub mod search;
 pub mod slug;
 pub mod tag;
+pub mod favorite;
 pub mod note;
 pub mod task;
 
