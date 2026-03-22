@@ -1,7 +1,7 @@
 use garde::Validate;
 use serde::{Deserialize, Serialize};
 
-/// A Keycloak user as returned by the Admin API, enriched with realm roles.
+/// A Cognito user as returned by the Admin API, enriched with group memberships.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AdminUser {
@@ -27,11 +27,10 @@ impl AdminUser {
     }
 }
 
-/// Request body for creating a new Keycloak user.
+/// Request body for creating a new Cognito user.
+/// The email address is used as the Cognito username.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 pub struct CreateAdminUserRequest {
-    #[garde(length(min = 1, max = 64))]
-    pub username: String,
     #[garde(length(min = 1, max = 254))]
     pub email: String,
     #[garde(length(max = 64))]
@@ -41,7 +40,7 @@ pub struct CreateAdminUserRequest {
     /// Realm roles to assign immediately after creation.
     #[garde(skip)]
     pub initial_roles: Vec<String>,
-    /// If true, Keycloak sends a "set initial password" email to the user.
+    /// If true, Cognito sends a temporary-password welcome email to the user.
     #[garde(skip)]
     pub send_welcome_email: bool,
 }

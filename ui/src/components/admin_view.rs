@@ -1,6 +1,6 @@
-//! Admin panel — user management via Keycloak Admin API.
+//! Admin panel — user management via Amazon Cognito Identity Provider API.
 //!
-//! Only accessible to users with the `admin` realm role.  The sidebar hides
+//! Only accessible to users with the `admin` group.  The sidebar hides
 //! the link for non-admins, but all API calls are independently protected by
 //! the backend.
 
@@ -27,7 +27,6 @@ pub fn AdminView() -> impl IntoView {
 
     // ── Create-user form state ────────────────────────────────────────────────
     let show_create = RwSignal::new(false);
-    let form_username = RwSignal::new(String::new());
     let form_email = RwSignal::new(String::new());
     let form_first_name = RwSignal::new(String::new());
     let form_last_name = RwSignal::new(String::new());
@@ -51,15 +50,14 @@ pub fn AdminView() -> impl IntoView {
 
     // ── Create handler ────────────────────────────────────────────────────────
     let on_create = move |_| {
-        let username = form_username.get_untracked().trim().to_string();
         let email = form_email.get_untracked().trim().to_string();
         let first_name = form_first_name.get_untracked().trim().to_string();
         let last_name = form_last_name.get_untracked().trim().to_string();
         let send_email = form_send_email.get_untracked();
         let initial_roles = form_roles.get_untracked();
 
-        if username.is_empty() || email.is_empty() {
-            create_error.set(Some("Username and email are required.".to_string()));
+        if email.is_empty() {
+            create_error.set(Some("Email is required.".to_string()));
             return;
         }
 
@@ -67,7 +65,6 @@ pub fn AdminView() -> impl IntoView {
         creating.set(true);
 
         let req = CreateAdminUserRequest {
-            username,
             email,
             first_name,
             last_name,
@@ -79,7 +76,6 @@ pub fn AdminView() -> impl IntoView {
             match api::create_admin_user(&req).await {
                 Ok(_) => {
                     show_create.set(false);
-                    form_username.set(String::new());
                     form_email.set(String::new());
                     form_first_name.set(String::new());
                     form_last_name.set(String::new());
@@ -101,7 +97,7 @@ pub fn AdminView() -> impl IntoView {
                         "User Management"
                     </h1>
                     <p class="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
-                        "Create and manage Keycloak users and realm roles."
+                        "Create and manage Cognito users and groups."
                     </p>
                 </div>
                 <button
@@ -128,34 +124,19 @@ pub fn AdminView() -> impl IntoView {
                             "New User"
                         </h2>
 
-                        // Row 1: username + email
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs text-stone-500 dark:text-stone-400 mb-1">
-                                    "Username *"
-                                </label>
-                                <input
-                                    type="text"
-                                    class="w-full px-3 py-1.5 text-sm rounded-lg border border-stone-300 dark:border-stone-600
-                                        bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                    placeholder="jdoe"
-                                    prop:value=move || form_username.get()
-                                    on:input=move |ev| form_username.set(event_target_value(&ev))
-                                />
-                            </div>
-                            <div>
-                                <label class="block text-xs text-stone-500 dark:text-stone-400 mb-1">
-                                    "Email *"
-                                </label>
-                                <input
-                                    type="email"
-                                    class="w-full px-3 py-1.5 text-sm rounded-lg border border-stone-300 dark:border-stone-600
-                                        bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                    placeholder="j.doe@example.com"
-                                    prop:value=move || form_email.get()
-                                    on:input=move |ev| form_email.set(event_target_value(&ev))
-                                />
-                            </div>
+                        // Row 1: email (used as Cognito username)
+                        <div>
+                            <label class="block text-xs text-stone-500 dark:text-stone-400 mb-1">
+                                "Email *"
+                            </label>
+                            <input
+                                type="email"
+                                class="w-full px-3 py-1.5 text-sm rounded-lg border border-stone-300 dark:border-stone-600
+                                    bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                placeholder="j.doe@example.com"
+                                prop:value=move || form_email.get()
+                                on:input=move |ev| form_email.set(event_target_value(&ev))
+                            />
                         </div>
 
                         // Row 2: first + last name
@@ -281,7 +262,7 @@ pub fn AdminView() -> impl IntoView {
                                 <span class="material-symbols-outlined text-stone-300 dark:text-stone-700"
                                     style="font-size: 48px;">"person_off"</span>
                                 <p class="text-sm text-stone-400 dark:text-stone-600">
-                                    "No users found in this realm."
+                                    "No users found in this pool."
                                 </p>
                             </div>
                         }.into_any(),
