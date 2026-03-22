@@ -4,6 +4,16 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.14.0] - 2026-03-21
+
+### Changed
+- **Admin user management migrated to Amazon Cognito**: replaced Keycloak Admin REST API client (`keycloak.rs`) with `CognitoAdminClient` (`cognito.rs`) backed by the AWS SDK.
+  - All admin endpoints (`GET/POST /api/admin/users`, `DELETE /api/admin/users/{id}`, `PUT /api/admin/users/{id}/roles`, `GET /api/admin/users/roles`) now operate against the Cognito User Pool.
+  - Users are identified by email; Cognito groups replace Keycloak realm roles.
+  - `CreateAdminUserRequest` no longer requires a separate `username` field — email is used as the Cognito username.
+  - Welcome email uses Cognito's built-in `AdminCreateUser` invite flow.
+  - Dead `api/src/admin/keycloak.rs` removed.
+
 ## [1.13.0] - 2026-03-21
 
 ### Added
