@@ -4,6 +4,17 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.13.0] - 2026-03-21
+
+### Added
+- **Automated backup script** (`deploy/backup.sh`): streams `pg_dump` output through gzip and uploads directly to S3-compatible object storage in a single pipeline.
+  - `list` subcommand shows all stored backups.
+  - `restore <file>` subcommand streams a backup from S3 back into PostgreSQL.
+  - Auto-prunes oldest backups once count exceeds `BACKUP_RETAIN` (default 30).
+  - Reads `deploy/.env.prod` automatically; all vars overridable via environment.
+  - Supports custom `S3_ENDPOINT` for MinIO/Lightsail Object Storage.
+  - Cron example: `0 2 * * * /home/ubuntu/ember-trove/deploy/backup.sh >> /var/log/ember-backup.log 2>&1`
+
 ## [1.12.0] - 2026-03-21
 
 ### Added
