@@ -23,9 +23,9 @@ use auth::{AuthConfig, oidc::OidcClient};
 use config::Config;
 use object_store::s3::S3ObjectStore;
 use repo::{
-    attachment::PgAttachmentRepo, backup::PgBackupRepo, edge::PgEdgeRepo, graph::PgGraphRepo,
-    node::PgNodeRepo, note::PgNoteRepo, permission::PgPermissionRepo, search::PgSearchRepo,
-    tag::PgTagRepo, task::PgTaskRepo,
+    attachment::PgAttachmentRepo, backup::PgBackupRepo, edge::PgEdgeRepo,
+    favorite::PgFavoriteRepo, graph::PgGraphRepo, node::PgNodeRepo, note::PgNoteRepo,
+    permission::PgPermissionRepo, search::PgSearchRepo, tag::PgTagRepo, task::PgTaskRepo,
 };
 use state::AppState;
 
@@ -124,6 +124,7 @@ async fn main() -> anyhow::Result<()> {
         search: Arc::new(PgSearchRepo::new(pool.clone())),
         graph: Arc::new(PgGraphRepo::new(pool.clone())),
         backup: Arc::new(PgBackupRepo::new(pool.clone())),
+        favorites: Arc::new(PgFavoriteRepo::new(pool.clone())),
         object_store,
         oidc,
         cognito_admin,

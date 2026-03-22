@@ -3,7 +3,11 @@ use leptos::prelude::*;
 use crate::{
     app::View,
     auth::{AuthState, AuthStatus},
-    components::{layout::SidebarCollapsed, search_bar::SearchBar},
+    components::{
+        favorites_section::FavoritesSection,
+        layout::SidebarCollapsed,
+        search_bar::SearchBar,
+    },
 };
 
 #[component]
@@ -45,6 +49,9 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                     }.into_any()
                 }
             }}
+            <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
+            // Favorites — pinned nodes and external URLs
+            <FavoritesSection collapsed=collapsed on_nav=on_nav />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             // "All Nodes" + per-type sub-links
             <SidebarLink
