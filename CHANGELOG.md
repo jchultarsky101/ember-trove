@@ -4,6 +4,18 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.11.0] - 2026-03-21
+
+### Added
+- **Inline attachment preview**: images (any `image/*` type) and PDFs render inline inside the Attachments panel via a toggle eye-icon button.
+  - Images: `<img>` with `max-h-96 object-contain` — respects aspect ratio, fits any width.
+  - PDFs: `<iframe>` at 500 px height for in-page browsing.
+  - Download and delete buttons remain visible for all attachment types.
+
+### Fixed
+- Clippy `collapsible_if` warnings in `favorites_section` resolved.
+- "Favorites" section header in dark mode uses `stone-400` for better legibility.
+
 ## [1.10.0] - 2026-03-21
 
 ### Added
