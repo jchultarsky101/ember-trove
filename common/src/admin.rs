@@ -50,3 +50,86 @@ pub struct CreateAdminUserRequest {
 pub struct UpdateUserRolesRequest {
     pub roles: Vec<String>,
 }
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_user(first: Option<&str>, last: Option<&str>, username: &str) -> AdminUser {
+        AdminUser {
+            id: "id".to_string(),
+            username: username.to_string(),
+            email: None,
+            first_name: first.map(str::to_string),
+            last_name: last.map(str::to_string),
+            enabled: true,
+            realm_roles: vec![],
+        }
+    }
+
+    #[test]
+    fn display_name_full_name() {
+        let u = make_user(Some("Jane"), Some("Doe"), "jdoe");
+        assert_eq!(u.display_name(), "Jane Doe");
+    }
+
+    #[test]
+    fn display_name_first_only() {
+        let u = make_user(Some("Jane"), None, "jdoe");
+        assert_eq!(u.display_name(), "Jane");
+    }
+
+    #[test]
+    fn display_name_first_only_last_empty() {
+        // last_name present but empty — first_name branch takes over.
+        let u = make_user(Some("Jane"), Some(""), "jdoe");
+        assert_eq!(u.display_name(), "Jane");
+    }
+
+    #[test]
+    fn display_name_falls_back_to_username_when_both_empty() {
+        let u = make_user(Some(""), Some(""), "jdoe");
+        assert_eq!(u.display_name(), "jdoe");
+    }
+
+    #[test]
+    fn display_name_falls_back_to_username_when_both_none() {
+        let u = make_user(None, None, "jdoe");
+        assert_eq!(u.display_name(), "jdoe");
+    }
+
+    #[test]
+    fn display_name_trims_trailing_space_when_last_empty() {
+        // first="Alice", last="" → format!("Alice ").trim() == "Alice"
+        let u = make_user(Some("Alice"), Some(""), "alice");
+        assert_eq!(u.display_name(), "Alice");
+    }
+
+    #[test]
+    fn create_request_validation_rejects_empty_email() {
+        use garde::Validate;
+        let req = CreateAdminUserRequest {
+            email: "".to_string(),
+            first_name: "Jane".to_string(),
+            last_name: "Doe".to_string(),
+            initial_roles: vec![],
+            send_welcome_email: false,
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn create_request_validation_accepts_valid_email() {
+        use garde::Validate;
+        let req = CreateAdminUserRequest {
+            email: "jane@example.com".to_string(),
+            first_name: "Jane".to_string(),
+            last_name: "Doe".to_string(),
+            initial_roles: vec!["user".to_string()],
+            send_welcome_email: true,
+        };
+        assert!(req.validate().is_ok());
+    }
+}

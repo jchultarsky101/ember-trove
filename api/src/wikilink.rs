@@ -59,4 +59,43 @@ mod tests {
     fn test_empty_body() {
         assert!(parse_wikilink_titles("").is_empty());
     }
+
+    #[test]
+    fn test_whitespace_trimmed() {
+        let titles = parse_wikilink_titles("[[ Rust Language ]]");
+        assert_eq!(titles, vec!["Rust Language"]);
+    }
+
+    #[test]
+    fn test_empty_target_skipped() {
+        // [[]] and [[  ]] should produce no titles.
+        let titles = parse_wikilink_titles("[[]] and [[  ]]");
+        assert!(titles.is_empty());
+    }
+
+    #[test]
+    fn test_empty_pipe_target_skipped() {
+        // [[|display]] — target is empty, should be skipped.
+        let titles = parse_wikilink_titles("[[|display text]]");
+        assert!(titles.is_empty());
+    }
+
+    #[test]
+    fn test_duplicate_titles_preserved() {
+        let titles = parse_wikilink_titles("[[Rust]] and [[Rust]]");
+        assert_eq!(titles.len(), 2);
+        assert_eq!(titles[0], "Rust");
+        assert_eq!(titles[1], "Rust");
+    }
+
+    #[test]
+    fn test_adjacent_wikilinks() {
+        let titles = parse_wikilink_titles("[[A]][[B]][[C]]");
+        assert_eq!(titles, vec!["A", "B", "C"]);
+    }
+
+    #[test]
+    fn test_no_wikilinks() {
+        assert!(parse_wikilink_titles("No links here.").is_empty());
+    }
 }
