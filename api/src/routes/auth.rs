@@ -8,14 +8,21 @@ use axum_extra::extract::{
     PrivateCookieJar,
     cookie::{Cookie, SameSite},
 };
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use common::auth::{AuthClaims, UserInfo};
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::{auth::middleware::SESSION_COOKIE, error::ApiError, state::AppState};
 
 /// Cookie that holds the encrypted refresh token.
 /// Scoped to `/api/auth/refresh` so the browser never sends it on other requests.
 const REFRESH_COOKIE: &str = "ember_trove_refresh";
+
+/// Short-lived cookie that holds the PKCE `code_verifier`.
+/// Consumed once in the callback; path restricted to the callback endpoint.
+const PKCE_COOKIE: &str = "ember_trove_pkce";
 
 /// Public auth routes (no JWT required).
 pub fn public_router() -> Router<AppState> {
@@ -37,18 +44,38 @@ struct RedirectResponse {
     redirect_url: String,
 }
 
-async fn login(State(state): State<AppState>) -> Result<Json<RedirectResponse>, ApiError> {
+async fn login(
+    State(state): State<AppState>,
+    jar: PrivateCookieJar,
+) -> Result<(PrivateCookieJar, Json<RedirectResponse>), ApiError> {
     let oidc = state.oidc.as_ref()
         .ok_or_else(|| ApiError::Internal("OIDC not configured — auth is disabled".to_string()))?;
 
+    // PKCE: generate a 32-byte random code_verifier and derive the S256 challenge.
+    let mut raw = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut raw);
+    let code_verifier = URL_SAFE_NO_PAD.encode(raw);
+    let code_challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(code_verifier.as_bytes()));
+
     let redirect_uri = format!("{}/api/auth/callback", state.auth.api_external_url);
     let url = format!(
-        "{}?client_id={}&redirect_uri={}&response_type=code&scope=openid+email+profile",
+        "{}?client_id={}&redirect_uri={}&response_type=code&scope=openid+email+profile\
+         &code_challenge={}&code_challenge_method=S256",
         oidc.authorization_endpoint,
         state.auth.client_id,
         urlencoding::encode(&redirect_uri),
+        code_challenge,
     );
-    Ok(Json(RedirectResponse { redirect_url: url }))
+
+    let secure = state.auth.cookie_secure;
+    let pkce_cookie = Cookie::build((PKCE_COOKIE, code_verifier))
+        .path("/api/auth/callback")
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .secure(secure)
+        .build();
+
+    Ok((jar.add(pkce_cookie), Json(RedirectResponse { redirect_url: url })))
 }
 
 #[derive(Deserialize)]
@@ -64,9 +91,15 @@ async fn callback(
     let oidc = state.oidc.as_ref()
         .ok_or_else(|| ApiError::Internal("OIDC not configured — auth is disabled".to_string()))?;
 
+    // Consume the PKCE verifier cookie (single-use).
+    let code_verifier = jar
+        .get(PKCE_COOKIE)
+        .map(|c| c.value().to_string());
+    let jar = jar.remove(Cookie::build((PKCE_COOKIE, "")).path("/api/auth/callback").build());
+
     let redirect_uri = format!("{}/api/auth/callback", state.auth.api_external_url);
     let token_resp = oidc
-        .exchange_code(&params.code, &redirect_uri)
+        .exchange_code(&params.code, &redirect_uri, code_verifier.as_deref())
         .await?;
 
     // Prefer the ID token for the session cookie — it carries email, name, and

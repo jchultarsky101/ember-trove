@@ -43,6 +43,9 @@ reqwest      = { version = "0.12", features = ["json"] }
 axum-extra   = { version = "0.10", features = ["cookie-private"] }
 urlencoding  = "2"
 hex          = "0.4"
+rand         = "0.8"
+sha2         = "0.10"
+base64       = { version = "0.22", features = ["alloc"] }
 
 # Common domain types
 uuid   = { version = "1", features = ["v4", "serde"] }

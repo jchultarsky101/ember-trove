@@ -28,6 +28,9 @@ reqwest            = { workspace = true }
 axum-extra         = { workspace = true }
 urlencoding        = { workspace = true }
 hex                = { workspace = true }
+rand               = { workspace = true }
+sha2               = { workspace = true }
+base64             = { workspace = true }
 
 # AWS SDKs — S3 object storage + Cognito user management
 aws-config = { version = "1", features = ["behavior-version-latest"] }

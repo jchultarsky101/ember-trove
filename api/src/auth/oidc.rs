@@ -129,21 +129,29 @@ impl OidcClient {
     }
 
     /// Exchange an authorization code for tokens.
+    ///
+    /// `code_verifier` must be supplied when the authorization request used PKCE
+    /// (required for Cognito app clients created after November 2024).
     pub async fn exchange_code(
         &self,
         code: &str,
         redirect_uri: &str,
+        code_verifier: Option<&str>,
     ) -> Result<TokenResponse, ApiError> {
+        let mut params: Vec<(&str, &str)> = vec![
+            ("grant_type", "authorization_code"),
+            ("code", code),
+            ("redirect_uri", redirect_uri),
+            ("client_id", &self.client_id),
+            ("client_secret", &self.client_secret),
+        ];
+        if let Some(cv) = code_verifier {
+            params.push(("code_verifier", cv));
+        }
         let resp = self
             .http
             .post(&self.token_endpoint)
-            .form(&[
-                ("grant_type", "authorization_code"),
-                ("code", code),
-                ("redirect_uri", redirect_uri),
-                ("client_id", &self.client_id),
-                ("client_secret", &self.client_secret),
-            ])
+            .form(&params)
             .send()
             .await
             .map_err(|e| ApiError::Internal(format!("token exchange request failed: {e}")))?;
