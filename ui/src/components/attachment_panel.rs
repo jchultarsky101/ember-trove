@@ -1,9 +1,14 @@
-/// Attachment panel — list, upload, and delete files attached to a node.
+/// Attachment panel — list, upload, delete, and inline-preview files attached to a node.
 use common::id::NodeId;
 use leptos::{html::Input, prelude::*};
 use wasm_bindgen::JsCast;
 
 use crate::api;
+
+/// Returns true for MIME types the browser can display inline.
+fn is_previewable(content_type: &str) -> bool {
+    content_type.starts_with("image/") || content_type == "application/pdf"
+}
 
 #[component]
 pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
@@ -172,42 +177,110 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                                 </div>
                             }.into_any(),
                             Ok(list) => view! {
-                                <div class="space-y-1">
+                                <div class="space-y-2">
                                     {list.into_iter().map(|att| {
                                         let att_id = att.id;
                                         let filename = att.filename.clone();
                                         let content_type = att.content_type.clone();
                                         let size_kb = att.size_bytes / 1024;
                                         let download_url = api::attachment_download_url(att_id);
+                                        let previewable = is_previewable(&content_type);
+                                        let is_image = content_type.starts_with("image/");
+                                        let preview_open = RwSignal::new(false);
+                                        let url_for_preview = download_url.clone();
                                         view! {
-                                            <div class="flex items-center justify-between py-1.5 px-2 rounded
-                                                hover:bg-stone-50 dark:hover:bg-stone-800/50 group">
-                                                <a
-                                                    href=download_url
-                                                    target="_blank"
-                                                    class="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400
-                                                        hover:underline min-w-0"
-                                                >
-                                                    <span class="material-symbols-outlined text-[14px] shrink-0">
-                                                        "attach_file"
+                                            <div class="rounded-lg border border-stone-200 dark:border-stone-700
+                                                        bg-stone-50 dark:bg-stone-800/30">
+                                                // Header row: icon + name + meta + actions
+                                                <div class="flex items-center gap-2 px-3 py-2 group">
+                                                    <span class="material-symbols-outlined text-stone-400
+                                                                 dark:text-stone-500 shrink-0"
+                                                          style="font-size: 16px;">
+                                                        {if is_image { "image" } else if content_type == "application/pdf" { "picture_as_pdf" } else { "attach_file" }}
                                                     </span>
-                                                    <span class="truncate max-w-[200px]">{filename}</span>
-                                                    <span class="text-stone-400 dark:text-stone-500 shrink-0">
-                                                        {format!("({content_type}, {size_kb} KB)")}
+                                                    <span class="flex-1 text-xs text-stone-700 dark:text-stone-300
+                                                                 truncate min-w-0">
+                                                        {filename.clone()}
                                                     </span>
-                                                </a>
-                                                <button
-                                                    class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600
-                                                        text-xs transition-opacity shrink-0"
-                                                    on:click=move |_| {
-                                                        wasm_bindgen_futures::spawn_local(async move {
-                                                            let _ = api::delete_attachment(att_id).await;
-                                                            refresh.update(|n| *n += 1);
-                                                        });
-                                                    }
-                                                >
-                                                    "\u{00d7}"
-                                                </button>
+                                                    <span class="text-xs text-stone-400 dark:text-stone-500 shrink-0">
+                                                        {format!("{size_kb} KB")}
+                                                    </span>
+                                                    // Preview toggle (only for previewable types)
+                                                    {previewable.then(|| view! {
+                                                        <button
+                                                            class="p-0.5 text-stone-400 hover:text-amber-500
+                                                                   dark:hover:text-amber-400 cursor-pointer
+                                                                   transition-colors"
+                                                            title=move || if preview_open.get() { "Hide preview" } else { "Show preview" }
+                                                            on:click=move |_| preview_open.update(|v| *v = !*v)
+                                                        >
+                                                            <span class="material-symbols-outlined"
+                                                                  style="font-size: 16px;">
+                                                                {move || if preview_open.get() { "visibility_off" } else { "visibility" }}
+                                                            </span>
+                                                        </button>
+                                                    })}
+                                                    // Download link
+                                                    <a
+                                                        href=download_url
+                                                        target="_blank"
+                                                        class="p-0.5 text-stone-400 hover:text-amber-500
+                                                               dark:hover:text-amber-400 transition-colors"
+                                                        title="Download"
+                                                    >
+                                                        <span class="material-symbols-outlined"
+                                                              style="font-size: 16px;">
+                                                            "download"
+                                                        </span>
+                                                    </a>
+                                                    // Delete button
+                                                    <button
+                                                        class="p-0.5 text-stone-400 hover:text-red-500
+                                                               cursor-pointer transition-colors"
+                                                        title="Delete attachment"
+                                                        on:click=move |_| {
+                                                            wasm_bindgen_futures::spawn_local(async move {
+                                                                let _ = api::delete_attachment(att_id).await;
+                                                                refresh.update(|n| *n += 1);
+                                                            });
+                                                        }
+                                                    >
+                                                        <span class="material-symbols-outlined"
+                                                              style="font-size: 16px;">
+                                                            "delete"
+                                                        </span>
+                                                    </button>
+                                                </div>
+
+                                                // Inline preview (toggled)
+                                                {move || {
+                                                    if !preview_open.get() { return None; }
+                                                    Some(if is_image {
+                                                        view! {
+                                                            <div class="px-3 pb-3">
+                                                                <img
+                                                                    src=url_for_preview.clone()
+                                                                    alt=filename.clone()
+                                                                    class="max-w-full max-h-96 rounded-lg object-contain
+                                                                           border border-stone-200 dark:border-stone-700"
+                                                                />
+                                                            </div>
+                                                        }.into_any()
+                                                    } else {
+                                                        // PDF
+                                                        view! {
+                                                            <div class="px-3 pb-3">
+                                                                <iframe
+                                                                    src=url_for_preview.clone()
+                                                                    class="w-full rounded-lg border border-stone-200
+                                                                           dark:border-stone-700"
+                                                                    style="height: 500px;"
+                                                                    title=filename.clone()
+                                                                />
+                                                            </div>
+                                                        }.into_any()
+                                                    })
+                                                }}
                                             </div>
                                         }
                                     }).collect::<Vec<_>>()}
