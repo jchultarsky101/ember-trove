@@ -3,7 +3,25 @@
 ui/dist/
 /.sqlx
 .claude/
+
+# ── Secrets & environment ─────────────────────────────────────────────────────
 *.env
 .env.*
 !.env.example
 !deploy/.env.prod.template
+
+# ── SSH keys & certificates ───────────────────────────────────────────────────
+.ssh/
+*.pem
+*.key
+!*.key.pub
+
+# ── Editor / OS ───────────────────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
