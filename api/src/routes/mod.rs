@@ -14,9 +14,13 @@ pub mod tags;
 pub mod tasks;
 
 use axum::{extract::State, middleware, routing::get, Json, Router};
-use axum::http::{header, Method};
+use axum::http::{header, Method, StatusCode};
+use chrono::Utc;
 use serde_json::{json, Value};
+use std::time::Duration;
 use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
+use tower_http::timeout::TimeoutLayer;
 
 use crate::{auth::middleware::require_auth, state::AppState};
 
@@ -46,6 +50,8 @@ pub fn build_router(state: AppState) -> Router {
             header::ACCEPT,
             header::COOKIE,
         ])
+        // Expose X-Request-Id so clients can correlate logs with server traces.
+        .expose_headers([header::HeaderName::from_static("x-request-id")])
         .allow_credentials(true);
 
     // Protected routes — require a valid JWT.
@@ -75,6 +81,11 @@ pub fn build_router(state: AppState) -> Router {
         .merge(auth::public_router())
         .merge(protected)
         .layer(cors)
+        // 30-second request timeout — returns 408 Request Timeout.
+        .layer(TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, Duration::from_secs(30)))
+        // Propagate X-Request-Id from requests; generate one if absent.
+        .layer(PropagateRequestIdLayer::x_request_id())
+        .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
         .with_state(state)
 }
 
@@ -84,10 +95,13 @@ async fn health(State(state): State<AppState>) -> Json<Value> {
         .await
         .map(|r| if r.is_some() { "ok" } else { "error" })
         .unwrap_or("error");
-    
-    Json(json!({ 
+
+    Json(json!({
         "status": if db_status == "ok" { "ok" } else { "degraded" },
         "service": "ember-trove-api",
+        "version": env!("CARGO_PKG_VERSION"),
+        "timestamp": Utc::now().to_rfc3339(),
         "database": db_status
     }))
 }
+

@@ -4,6 +4,17 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.17.0] - 2026-03-22
+
+### Added
+- **`version` and `timestamp` fields on `GET /health`**: health response now includes the running binary version and a UTC timestamp, enabling CI/CD pipelines to verify the deployed version without admin credentials.
+- **30-second request timeout**: all API requests now return `408 Request Timeout` if processing exceeds 30 seconds, preventing hung connections under load.
+- **`X-Request-Id` middleware**: every response carries a `X-Request-Id` UUID header (generated server-side if not provided by the client) for distributed tracing and log correlation. Header is exposed in CORS so browser clients can read it.
+
+### Changed
+- Updated `tower-http` workspace dependency to enable `timeout`, `request-id`, and `propagate-header` features.
+- Stale doc comment in `AuthClaims.roles` updated to reference Cognito groups instead of Keycloak realm roles.
+
 ## [1.16.0] - 2026-03-21
 
 ### Added
