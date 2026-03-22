@@ -67,14 +67,14 @@ jobs:
             git pull origin main
 
             echo "=== Rebuilding api and ui images ==="
-            docker compose -f deploy/docker-compose.prod.yml build api ui
+            docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod build api ui
 
             echo "=== Restarting services ==="
-            docker compose -f deploy/docker-compose.prod.yml up -d --force-recreate api ui proxy
+            docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d --force-recreate api ui proxy
 
             echo "=== Verifying health ==="
             sleep 10
-            curl -sf http://localhost:3003/api/health | python3 -c "
+            docker exec deploy-api-1 wget -qO- http://localhost:3003/api/health | python3 -c "
             import sys, json
             d = json.load(sys.stdin)
             print('Health:', json.dumps(d, indent=2))
