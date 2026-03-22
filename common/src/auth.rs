@@ -10,7 +10,7 @@ pub struct AuthClaims {
     pub email: Option<String>,
     /// Display name.
     pub name: Option<String>,
-    /// Realm roles assigned in Keycloak.
+    /// Groups/roles from the identity provider (`cognito:groups` on Cognito).
     #[serde(default)]
     pub roles: Vec<String>,
     /// Token expiry (Unix timestamp).
