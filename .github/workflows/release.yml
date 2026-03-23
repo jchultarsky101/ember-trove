@@ -43,12 +43,14 @@ jobs:
     name: Deploy to production (Lightsail)
     runs-on: ubuntu-latest
     needs: release
-    # Only runs when LIGHTSAIL_SSH_KEY secret is configured.
-    # To enable: add LIGHTSAIL_SSH_KEY and LIGHTSAIL_HOST to repository secrets.
-    if: ${{ secrets.LIGHTSAIL_SSH_KEY != '' }}
+    # Job always runs after release succeeds; individual steps skip when secrets
+    # are absent (secrets context is not valid in job-level `if` conditions).
 
     steps:
       - name: Deploy via SSH
+        # Only runs when LIGHTSAIL_SSH_KEY secret is configured.
+        # To enable: add LIGHTSAIL_SSH_KEY and LIGHTSAIL_HOST to repository secrets.
+        if: ${{ secrets.LIGHTSAIL_SSH_KEY != '' }}
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}

@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust stable
+      - name: Install Rust (pinned via rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -56,7 +56,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust stable + wasm32 target
+      - name: Install Rust (pinned via rust-toolchain.toml) + wasm32 target
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
@@ -76,3 +76,102 @@ jobs:
 
       - name: cargo clippy (ui, wasm32)
         run: cargo clippy -p ui --target wasm32-unknown-unknown -- -D warnings
+
+  audit:
+    name: cargo audit (security)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (pinned via rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ubuntu-cargo-audit-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ubuntu-cargo-audit-
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run cargo audit
+        run: cargo audit
+
+  migrations:
+    name: validate migrations
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ember_trove
+          POSTGRES_PASSWORD: ember_trove_dev
+          POSTGRES_DB: ember_trove
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (pinned via rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ubuntu-cargo-sqlx-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ubuntu-cargo-sqlx-
+
+      - name: Install sqlx-cli
+        run: cargo install sqlx-cli --no-default-features --features postgres --locked
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgres://ember_trove:ember_trove_dev@localhost:5432/ember_trove
+        run: sqlx migrate run --source migrations
+
+  docker-build:
+    name: docker build validation
+    runs-on: ubuntu-latest
+    # Only run on ubuntu — Docker build is slow; skip on macos runner.
+    # Builds both images to catch Dockerfile errors before a release deploy.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build api image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.api
+          push: false
+          tags: ember-trove/api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build ui image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.ui
+          push: false
+          tags: ember-trove/ui:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
