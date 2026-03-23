@@ -4,6 +4,11 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.19.3] - 2026-03-23
+
+### Fixed
+- **Deploy concurrency guard**: added `concurrency: group: production-deploy, cancel-in-progress: true` to `release.yml` so rapid successive tag pushes no longer pile up concurrent Docker builds on the Lightsail VM.
+
 ## [1.19.2] - 2026-03-23
 
 ### Fixed
