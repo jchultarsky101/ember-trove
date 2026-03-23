@@ -2,3 +2,6 @@
 # AWS SDK crates require rustc >= 1.91.1; pin to 1.92 for reproducible builds.
 channel = "1.92"
 targets = ["wasm32-unknown-unknown"]
+# clippy must be listed here — dtolnay/rust-toolchain ignores workflow
+# `components:` when rust-toolchain.toml is present.
+components = ["clippy"]

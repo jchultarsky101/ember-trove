@@ -1,9 +1,11 @@
 [advisories]
 # RUSTSEC-2023-0071: Marvin Attack timing sidechannel in rsa crate.
-# This vulnerability affects RSA private-key operations. It is pulled in
-# transitively via sqlx-mysql, which is included in sqlx's default feature
-# set. Ember Trove uses PostgreSQL exclusively — no MySQL connection is ever
-# opened, so the vulnerable code path is never executed.
-# No fixed version of rsa is available upstream; ignore until sqlx drops the
-# mysql feature from its defaults or a fix is released.
-ignore = ["RUSTSEC-2023-0071"]
+# Pulled via sqlx-mysql which is never used (Postgres-only project).
+# No upstream fix available.
+#
+# RUSTSEC-2026-0049: CRL authorativeness matching bug in rustls-webpki.
+# The 0.103.x branch was fixed in 0.103.10 (already updated in Cargo.lock).
+# The 0.101.x branch has no fix and is a transitive dep from an older AWS SDK
+# rustls chain (aws-smithy-http-client → hyper-rustls 0.24 → rustls 0.21).
+# CRL validation edge-case; not exposed in this app's threat model.
+ignore = ["RUSTSEC-2023-0071", "RUSTSEC-2026-0049"]
