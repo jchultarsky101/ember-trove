@@ -32,10 +32,27 @@ services:
       timeout: 5s
       retries: 5
 
+  # Creates the S3 bucket on first boot so attachment uploads work immediately.
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 ember_trove ember_trove_dev &&
+        mc mb --ignore-existing local/ember-trove &&
+        mc anonymous set download local/ember-trove &&
+        echo 'MinIO bucket ready.'
+      "
+    restart: on-failure
+
   api:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
+    # Override sensitive defaults by running with --env-file deploy/.env.local
+    # See deploy/.env.local.example for the required variables.
     environment:
       DATABASE_URL: postgres://ember_trove:ember_trove_dev@postgres/ember_trove
       S3_ENDPOINT: http://minio:9000
@@ -45,16 +62,16 @@ services:
       S3_REGION: us-east-1
       OIDC_ISSUER: https://cognito-idp.us-east-2.amazonaws.com/us-east-2_4RQfxhKqn
       OIDC_CLIENT_ID: eogq2sehdad3uc8nmar7aneol
-      OIDC_CLIENT_SECRET: change-me
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-change-me}
       # Cognito Admin — used by /api/admin/* endpoints.
       COGNITO_USER_POOL_ID: us-east-2_4RQfxhKqn
       COGNITO_REGION: us-east-2
-      AWS_ACCESS_KEY_ID: change-me
-      AWS_SECRET_ACCESS_KEY: change-me
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-change-me}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-change-me}
       # 128-char hex key (64 bytes) for cookie encryption — CHANGE IN PRODUCTION
       COOKIE_KEY: "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
       FRONTEND_URL: "http://localhost:8003"
-      API_EXTERNAL_URL: "http://localhost:3003"
+      API_EXTERNAL_URL: "http://localhost:8003"
       HOST: "0.0.0.0"
       PORT: "3003"
       RUST_LOG: info
@@ -63,8 +80,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
-        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
 
   ui:
     build:

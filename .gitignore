@@ -9,6 +9,7 @@ ui/dist/
 .env.*
 !.env.example
 !deploy/.env.prod.template
+!deploy/.env.local.example
 
 # ── SSH keys & certificates ───────────────────────────────────────────────────
 .ssh/
