@@ -59,8 +59,8 @@ jobs:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ubuntu
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
-          # Conservative timeout for Rust rebuild (api crate is large).
-          command_timeout: 30m
+          # Rust rebuild on cold Lightsail VM can exceed 30 min; 60 min is safe.
+          command_timeout: 60m
           script: |
             set -euo pipefail
 
