@@ -1,3 +1,4 @@
 [toolchain]
-channel = "1.85"
+# AWS SDK crates require rustc >= 1.91.1; pin to 1.92 for reproducible builds.
+channel = "1.92"
 targets = ["wasm32-unknown-unknown"]
