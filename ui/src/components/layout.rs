@@ -89,11 +89,16 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                         } else {
                             "fixed inset-y-0 left-0 z-40 w-72 -translate-x-full md:translate-x-0"
                         };
-                        // Desktop width (overrides the fixed/translate on md+)
+                        // Desktop width (overrides the fixed/translate on md+).
+                        // md:transform-none is required: the mobile translate-x-* classes leave
+                        // a CSS transform on the element even when the value is zero, which creates
+                        // a new stacking context and traps position:fixed children (e.g. modals)
+                        // inside the sidebar bounds. Removing the transform on desktop lets fixed
+                        // overlays escape to the viewport as intended.
                         let desktop = if collapsed.get() {
-                            "md:relative md:inset-auto md:w-16 md:flex-shrink-0"
+                            "md:relative md:inset-auto md:w-16 md:flex-shrink-0 md:transform-none"
                         } else {
-                            "md:relative md:inset-auto md:w-64 md:flex-shrink-0"
+                            "md:relative md:inset-auto md:w-64 md:flex-shrink-0 md:transform-none"
                         };
                         format!("{base} {mobile} {desktop}")
                     }
