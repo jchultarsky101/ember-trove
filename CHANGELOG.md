@@ -4,6 +4,11 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.20.2] - 2026-03-24
+
+### Fixed
+- **502 Bad Gateway on login in local Docker stack**: nginx's default 4 KB `proxy_buffer_size` was too small for the `/api/auth/callback` response, which sets large `Set-Cookie` headers containing JWT access/id/refresh tokens. Increased `proxy_buffer_size` and `proxy_buffers` to 32 KB in `deploy/nginx.conf`.
+
 ## [1.20.1] - 2026-03-24
 
 ### Fixed
