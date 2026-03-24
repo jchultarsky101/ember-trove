@@ -30,8 +30,9 @@ bytes      = "1"
 async-trait = "0.1"
 
 # Web framework
-axum       = { version = "0.8", features = ["multipart"] }
-tower-http = { version = "0.6", features = ["cors", "trace", "timeout", "request-id", "propagate-header"] }
+axum           = { version = "0.8", features = ["multipart"] }
+tower-http     = { version = "0.6", features = ["cors", "trace", "timeout", "request-id", "propagate-header"] }
+tower_governor = { version = "0.8", features = ["axum"] }
 
 # OpenAPI
 utoipa            = { version = "5", features = ["axum_extras"] }
