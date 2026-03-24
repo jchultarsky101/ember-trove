@@ -4,6 +4,11 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.21.2] - 2026-03-23
+
+### Fixed
+- **Health-check tooling missing from runtime image**: `debian:trixie-slim` does not include `wget`; `docker exec deploy-api-1 wget …` always exited non-zero, causing every production deploy to fail at the verification step. Added `wget` to the `apt-get install` list in the API runtime stage so the deploy health-check command works as intended.
+
 ## [1.21.1] - 2026-03-23
 
 ### Fixed
