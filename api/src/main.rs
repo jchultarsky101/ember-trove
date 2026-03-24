@@ -12,7 +12,7 @@ mod routes;
 mod state;
 mod wikilink;
 
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use axum_extra::extract::cookie::Key;
 use sqlx::postgres::PgPoolOptions;
@@ -141,6 +141,6 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!("ember-trove-api listening on {addr}");
 
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
     Ok(())
 }

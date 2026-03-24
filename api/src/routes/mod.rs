@@ -21,7 +21,7 @@ use std::time::Duration;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::timeout::TimeoutLayer;
-use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
+use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor};
 
 use crate::{auth::middleware::require_auth, state::AppState};
 
@@ -30,9 +30,15 @@ pub fn build_router(state: AppState) -> anyhow::Result<Router> {
     // 10 req/s sustained per peer IP; burst cap of 100 tokens.
     // Only applies to mutating methods (POST/PUT/DELETE/PATCH) to keep read
     // traffic snappy for a single-user PKM.
-    let governor_conf = GovernorConfigBuilder::default()
+    // SmartIpKeyExtractor reads X-Real-IP / X-Forwarded-For (set by nginx) and
+    // falls back to ConnectInfo<SocketAddr> for direct connections.
+    // const_* methods are only on PeerIpKeyExtractor builders, so we set period
+    // and burst first, then switch extractor via key_extractor().
+    let mut base = GovernorConfigBuilder::default()
         .const_per_millisecond(100) // replenish 1 token per 100 ms = 10 req/s
-        .const_burst_size(100)
+        .const_burst_size(100);
+    let mut smart = base.key_extractor(SmartIpKeyExtractor);
+    let governor_conf = smart
         .finish()
         .ok_or_else(|| anyhow::anyhow!("invalid rate-limit governor config"))?;
     let governor_limiter = governor_conf.limiter().clone();
@@ -124,11 +130,12 @@ mod tests {
     /// (non-zero period and burst size) and therefore `finish()` returns `Some`.
     #[test]
     fn governor_config_is_valid() {
-        let conf = GovernorConfigBuilder::default()
+        use tower_governor::key_extractor::SmartIpKeyExtractor;
+        let mut base = GovernorConfigBuilder::default()
             .const_per_millisecond(100)
-            .const_burst_size(100)
-            .finish();
-        assert!(conf.is_some(), "governor config must be valid");
+            .const_burst_size(100);
+        let conf = base.key_extractor(SmartIpKeyExtractor).finish();
+        assert!(conf.is_some(), "governor config with SmartIpKeyExtractor must be valid");
     }
 }
 
