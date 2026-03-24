@@ -4,6 +4,11 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.24.1] - 2026-03-24
+
+### Fixed
+- **Note edit button always visible** — Replaced `opacity-0 group-hover:opacity-100` CSS pattern (unreliable in Tailwind v4 due to `@media (hover:hover)` scoping) with an always-rendered button in muted `stone-300` that brightens to `amber-500` on hover. The pencil icon is now permanently visible on every note card.
+
 ## [1.24.0] - 2026-03-24
 
 ### Added
