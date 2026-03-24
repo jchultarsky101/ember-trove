@@ -2,6 +2,7 @@ use common::{
     favorite::CreateFavoriteRequest,
     node::NodeTitleEntry,
 };
+use leptos::portal::Portal;
 use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
@@ -128,6 +129,7 @@ pub fn AddFavoriteModal(
         {move || {
             if !show.get() { return view! { <div /> }.into_any(); }
             view! {
+                <Portal>
                 <div
                     class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
                     on:keydown=handle_keydown
@@ -310,6 +312,7 @@ pub fn AddFavoriteModal(
                         </div>
                     </div>
                 </div>
+                </Portal>
             }.into_any()
         }}
     }
