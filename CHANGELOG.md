@@ -4,6 +4,15 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.21.0] - 2026-03-24
+
+### Added
+- **Standalone permission routes**: `GET /api/permissions[?node_id=<uuid>]` lists all grants (optionally filtered to a node); `PUT /api/permissions/{id}` updates the role on an existing grant; `DELETE /api/permissions/{id}` revokes a grant by ID directly — complementing the existing nested routes under `/api/nodes/{id}/permissions`.
+- **`UpdatePermissionRequest` DTO** and **`PermissionListParams` DTO** added to the `common` crate.
+- **`list_all` and `update` methods** added to `PermissionRepo` trait and `PgPermissionRepo`.
+- **Rate limiting** via `tower_governor 0.8`: 10 requests/second per peer IP (burst cap 100) applied globally to all API routes. A background task prunes stale IP entries every 60 seconds.
+- **Unit test suite expansion**: 16 new tests — permission repo helper round-trips, governor config validity, and DTO serde/validation in `common`.
+
 ## [1.20.2] - 2026-03-24
 
 ### Fixed
