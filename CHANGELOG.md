@@ -4,6 +4,15 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.24.0] - 2026-03-24
+
+### Added
+- **Editable notes** — Notes can now be edited after creation. Each note in the panel shows a pencil icon on hover (owner only); clicking it switches to an inline textarea with Save / Cancel controls and Ctrl+Enter shortcut. The API gains `PATCH /notes/:id` (owner-scoped); the `Note` DTO gains `updated_at`; notes display a `· edited` badge when `updated_at` differs from `created_at` by more than 2 seconds. Migration `010_notes_updated_at.sql` adds the column + trigger and back-fills existing rows from `created_at`.
+- **Editable task titles** — Each task row gains an edit pencil icon in its hover-action strip. Clicking it replaces the title with an inline input; Enter saves via `PATCH /tasks/:id`, Escape cancels. All reactive closures capture only `Copy` signal types to stay `FnMut`-compatible with Leptos 0.8.
+
+### Changed
+- Notes are returned newest-first by the API (`ORDER BY created_at DESC`) — the panel now displays them in that order (most recent at the top).
+
 ## [1.23.0] - 2026-03-24
 
 ### Fixed
