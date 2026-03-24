@@ -6,7 +6,7 @@
 /// the panel falls back gracefully to a plain text input.
 use common::admin::AdminUser;
 use common::id::NodeId;
-use common::permission::{GrantPermissionRequest, PermissionRole};
+use common::permission::{GrantPermissionRequest, PermissionRole, UpdatePermissionRequest};
 use leptos::prelude::*;
 
 use crate::api;
@@ -42,12 +42,10 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                         admin_api_available.set(true);
                     }
                     Err(crate::error::UiError::Api { status: 403, .. }) => {
-                        // Not an admin — fall back to raw text input.
                         admin_users.set(Some(vec![]));
                         admin_api_available.set(false);
                     }
                     Err(_) => {
-                        // Network error or other — fall back to raw text input.
                         admin_users.set(Some(vec![]));
                         admin_api_available.set(false);
                     }
@@ -238,6 +236,14 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                                     {list.into_iter().map(|perm| {
                                         let perm_id = perm.id;
                                         let subject = perm.subject_id.clone();
+                                        // Local signal tracks the currently displayed role so the
+                                        // select reflects an in-flight change immediately.
+                                        let current_role = RwSignal::new(match perm.role {
+                                            PermissionRole::Owner  => "owner",
+                                            PermissionRole::Editor => "editor",
+                                            PermissionRole::Viewer => "viewer",
+                                        }.to_string());
+                                        let updating = RwSignal::new(false);
 
                                         // Resolve display name from cached users list.
                                         let display_subject = {
@@ -256,19 +262,29 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                                             }
                                         };
 
-                                        let role_label = match perm.role {
-                                            PermissionRole::Owner => "owner",
-                                            PermissionRole::Editor => "editor",
-                                            PermissionRole::Viewer => "viewer",
+                                        let role_color = move || match current_role.get().as_str() {
+                                            "owner"  => "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+                                            "editor" => "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+                                            _        => "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400",
                                         };
-                                        let role_color = match perm.role {
-                                            PermissionRole::Owner =>
-                                                "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-                                            PermissionRole::Editor =>
-                                                "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-                                            PermissionRole::Viewer =>
-                                                "bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-400",
+
+                                        let on_role_change = move |ev: leptos::ev::Event| {
+                                            let new_role_str = event_target_value(&ev);
+                                            let new_role = match new_role_str.as_str() {
+                                                "owner"  => PermissionRole::Owner,
+                                                "editor" => PermissionRole::Editor,
+                                                _        => PermissionRole::Viewer,
+                                            };
+                                            current_role.set(new_role_str);
+                                            updating.set(true);
+                                            let req = UpdatePermissionRequest { role: new_role };
+                                            wasm_bindgen_futures::spawn_local(async move {
+                                                let _ = api::update_permission(perm_id, &req).await;
+                                                updating.set(false);
+                                                refresh.update(|n| *n += 1);
+                                            });
                                         };
+
                                         view! {
                                             <div class="flex items-center justify-between py-1.5 px-2 rounded
                                                 hover:bg-stone-50 dark:hover:bg-stone-800/50 group">
@@ -276,26 +292,53 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                                                     <span class="material-symbols-outlined text-stone-400 dark:text-stone-600 text-[16px] shrink-0">
                                                         "person"
                                                     </span>
-                                                    <span class="text-xs text-stone-700 dark:text-stone-300 truncate max-w-[180px]"
+                                                    <span class="text-xs text-stone-700 dark:text-stone-300 truncate max-w-[160px]"
                                                         title={subject.clone()}>
                                                         {display_subject}
                                                     </span>
-                                                    <span class={format!("px-1.5 py-0.5 text-[10px] rounded-full font-medium shrink-0 {role_color}")}>
-                                                        {role_label}
-                                                    </span>
                                                 </div>
-                                                <button
-                                                    class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600
-                                                        text-xs transition-opacity shrink-0"
-                                                    on:click=move |_| {
-                                                        wasm_bindgen_futures::spawn_local(async move {
-                                                            let _ = api::revoke_permission(node_id, perm_id).await;
-                                                            refresh.update(|n| *n += 1);
-                                                        });
-                                                    }
-                                                >
-                                                    "\u{00d7}"
-                                                </button>
+                                                <div class="flex items-center gap-1.5 shrink-0">
+                                                    // Inline role selector — visible on hover, shows
+                                                    // a spinner badge while saving.
+                                                    {move || if updating.get() {
+                                                        view! {
+                                                            <span class={format!("px-1.5 py-0.5 text-[10px] rounded-full font-medium {}", role_color())}>
+                                                                "saving…"
+                                                            </span>
+                                                        }.into_any()
+                                                    } else {
+                                                        view! {
+                                                            <select
+                                                                class=move || format!(
+                                                                    "text-[10px] rounded-full font-medium px-1.5 py-0.5 border-0 \
+                                                                     focus:outline-none focus:ring-1 focus:ring-amber-400 \
+                                                                     cursor-pointer transition-colors {}",
+                                                                    role_color()
+                                                                )
+                                                                prop:value=move || current_role.get()
+                                                                on:change=on_role_change
+                                                            >
+                                                                <option value="viewer">"viewer"</option>
+                                                                <option value="editor">"editor"</option>
+                                                                <option value="owner">"owner"</option>
+                                                            </select>
+                                                        }.into_any()
+                                                    }}
+                                                    // Revoke button — visible on row hover
+                                                    <button
+                                                        class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600
+                                                            text-xs transition-opacity shrink-0 px-1"
+                                                        title="Revoke access"
+                                                        on:click=move |_| {
+                                                            wasm_bindgen_futures::spawn_local(async move {
+                                                                let _ = api::revoke_permission(node_id, perm_id).await;
+                                                                refresh.update(|n| *n += 1);
+                                                            });
+                                                        }
+                                                    >
+                                                        "\u{00d7}"
+                                                    </button>
+                                                </div>
                                             </div>
                                         }
                                     }).collect::<Vec<_>>()}

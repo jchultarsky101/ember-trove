@@ -452,6 +452,19 @@ pub async fn revoke_permission(
     }
 }
 
+pub async fn update_permission(
+    perm_id: common::id::PermissionId,
+    req: &common::permission::UpdatePermissionRequest,
+) -> Result<common::permission::Permission, UiError> {
+    let resp = Request::put(&api_url(&format!("/permissions/{perm_id}")))
+        .json(req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
 // ── Graph positions ──────────────────────────────────────────────────────
 
 pub async fn fetch_positions() -> Result<Vec<common::graph::NodePosition>, UiError> {

@@ -4,6 +4,17 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.23.0] - 2026-03-24
+
+### Fixed
+- **Portal modals** — `DeleteConfirmModal` and `LinkPickerModal` now use Leptos `<Portal>` (same fix as v1.22.0 for `AddFavoriteModal`). Both were rendered inside ancestor elements that could carry a CSS `transform`, trapping their `position:fixed` backdrops.
+
+### Changed
+- **Permission panel — inline role editing** — Each permission row in the "Sharing" section now shows an inline `<select>` dropdown (owner / editor / viewer) instead of a static badge. Changing the role calls `PUT /permissions/{id}` immediately, with a "saving…" state while the request is in flight. The `update_permission` API helper was added to `ui/src/api.rs`.
+
+### Added
+- **API integration tests** — `api/src/tests.rs` contains 36 router-level integration tests run via `tower::ServiceExt::oneshot` with stub repositories and a lazy pool (no live database required). Tests cover: health endpoint shape, route registration for every domain (nodes, edges, tags, search, graph, notes, favorites, permissions — standalone and per-node), auth-guard behaviour, and permission DTO serialisation. Total test count: **63** (41 API + 22 common).
+
 ## [1.22.0] - 2026-03-24
 
 ### Fixed
