@@ -135,7 +135,7 @@ async fn main() -> anyhow::Result<()> {
         pool,
     };
 
-    let app = axum::Router::new().nest("/api", routes::build_router(state));
+    let app = axum::Router::new().nest("/api", routes::build_router(state)?);
 
     let addr = format!("{}:{}", config.host, config.port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
