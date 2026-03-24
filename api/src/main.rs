@@ -12,6 +12,9 @@ mod routes;
 mod state;
 mod wikilink;
 
+#[cfg(test)]
+mod tests;
+
 use std::{net::SocketAddr, sync::Arc};
 
 use axum_extra::extract::cookie::Key;
