@@ -131,7 +131,7 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                                 let ts_display   = ts.clone();
 
                                 view! {
-                                    <div class="group rounded-lg bg-stone-50 dark:bg-stone-900/50
+                                    <div class="rounded-lg bg-stone-50 dark:bg-stone-900/50
                                         border border-stone-200 dark:border-stone-700 px-3 py-2.5">
 
                                         // ── Display mode ──────────────────────────────
@@ -148,9 +148,9 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                                                     </p>
                                                     {is_owner.then(|| view! {
                                                         <button
-                                                            class="opacity-0 group-hover:opacity-100 p-0.5 rounded
-                                                                text-stone-400 hover:text-amber-600 dark:hover:text-amber-400
-                                                                transition-opacity transition-colors"
+                                                            class="p-0.5 rounded text-stone-300 dark:text-stone-600
+                                                                hover:text-amber-500 dark:hover:text-amber-400
+                                                                transition-colors"
                                                             title="Edit note"
                                                             on:click=move |_| editing.set(true)
                                                         >
