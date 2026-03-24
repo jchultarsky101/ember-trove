@@ -4,6 +4,11 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.21.1] - 2026-03-23
+
+### Fixed
+- **Health endpoint rate-limiting**: `/api/health` is now exempt from the `tower_governor` rate-limit layer. Monitoring tools and the deploy health-check (`wget` inside the API container) connect directly without nginx headers, which caused the rate-limiter key extraction to fail and return 500, making every production deploy appear unhealthy. The health route is now handled by a separate sub-router that does not pass through `GovernorLayer`.
+
 ## [1.21.0] - 2026-03-24
 
 ### Added
