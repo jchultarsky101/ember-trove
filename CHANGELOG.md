@@ -4,6 +4,11 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.20.1] - 2026-03-24
+
+### Fixed
+- **Production deploy health check**: replaced fixed `sleep 10` with a 5 s × 12 retry loop (up to 60 s total). The API container starts quickly but OIDC discovery and database migrations take 5–15 s; the fixed sleep was not sufficient, causing false-negative deploy failures even when the deployment itself succeeded.
+
 ## [1.20.0] - 2026-03-23
 
 ### Added
