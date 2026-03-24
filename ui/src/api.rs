@@ -9,7 +9,7 @@ use common::{
     node::{CreateNodeRequest, Node, NodeListResponse, NodeTitleEntry, UpdateNodeRequest},
     search::SearchResponse,
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
-    note::{CreateNoteRequest, FeedNote, Note},
+    note::{CreateNoteRequest, FeedNote, Note, UpdateNoteRequest},
     task::{CreateTaskRequest, MyDayTask, ProjectDashboardEntry, Task, UpdateTaskRequest},
 };
 use gloo_net::http::Request;
@@ -670,6 +670,16 @@ pub async fn fetch_notes(node_id: NodeId) -> Result<Vec<Note>, UiError> {
 
 pub async fn create_note(node_id: NodeId, req: &CreateNoteRequest) -> Result<Note, UiError> {
     let resp = Request::post(&api_url(&format!("/nodes/{node_id}/notes")))
+        .json(req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn update_note(note_id: NoteId, req: &UpdateNoteRequest) -> Result<Note, UiError> {
+    let resp = Request::patch(&api_url(&format!("/notes/{note_id}")))
         .json(req)
         .map_err(|e| UiError::Parse(e.to_string()))?
         .send()

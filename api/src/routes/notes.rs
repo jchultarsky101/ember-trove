@@ -2,12 +2,12 @@ use axum::{
     Extension, Json, Router,
     extract::{Path, State},
     http::StatusCode,
-    routing::get,
+    routing::{get, patch},
 };
 use common::{
     auth::AuthClaims,
-    id::NodeId,
-    note::{CreateNoteRequest, FeedNote, Note},
+    id::{NodeId, NoteId},
+    note::{CreateNoteRequest, FeedNote, Note, UpdateNoteRequest},
 };
 use garde::Validate;
 use uuid::Uuid;
@@ -20,8 +20,10 @@ pub fn node_note_router() -> Router<AppState> {
 }
 
 /// Mounts under `/notes`
-pub fn note_feed_router() -> Router<AppState> {
-    Router::new().route("/feed", get(note_feed))
+pub fn note_router() -> Router<AppState> {
+    Router::new()
+        .route("/feed", get(note_feed))
+        .route("/{note_id}", patch(update_note))
 }
 
 // ── Handlers ───────────────────────────────────────────────────────────────────
@@ -36,7 +38,7 @@ async fn list_notes(
     Ok(Json(notes))
 }
 
-/// POST /nodes/:id/notes — create a note. Only the node owner may do this.
+/// POST /nodes/:id/notes — create a note.
 async fn create_note(
     State(state): State<AppState>,
     Extension(claims): Extension<AuthClaims>,
@@ -46,13 +48,28 @@ async fn create_note(
     req.validate()
         .map_err(|e| ApiError::Validation(e.to_string()))?;
 
-    // Single-user mode: any authenticated user may add notes to any node.
     let note = state.notes.create(NodeId(node_id), &claims.sub, req).await?;
     Ok((StatusCode::CREATED, Json(note)))
 }
 
+/// PATCH /notes/:note_id — edit the body of an existing note (owner only).
+async fn update_note(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Path(note_id): Path<Uuid>,
+    Json(req): Json<UpdateNoteRequest>,
+) -> Result<Json<Note>, ApiError> {
+    req.validate()
+        .map_err(|e| ApiError::Validation(e.to_string()))?;
+
+    let note = state
+        .notes
+        .update(NoteId(note_id), &claims.sub, req)
+        .await?;
+    Ok(Json(note))
+}
+
 /// GET /notes/feed — all notes, newest first, with node titles.
-/// Single-user mode: returns notes from all owners so the feed shows everything.
 async fn note_feed(
     State(state): State<AppState>,
     Extension(_claims): Extension<AuthClaims>,

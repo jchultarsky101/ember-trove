@@ -91,7 +91,7 @@ pub fn build_router(state: AppState) -> anyhow::Result<Router> {
         .nest("/my-day", tasks::my_day_router())
         .nest("/dashboard/projects", tasks::dashboard_router())
         .nest("/nodes/{node_id}/notes", notes::node_note_router())
-        .nest("/notes", notes::note_feed_router())
+        .nest("/notes", notes::note_router())
         .nest("/edges", edges::router())
         .nest("/tags", tags::router())
         .nest("/attachments", attachments::router())

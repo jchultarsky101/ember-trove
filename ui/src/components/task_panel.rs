@@ -231,7 +231,6 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
     let p_icon = priority_icon(&priority);
     let p_color = priority_color(&priority);
     let p_label = priority_label(&priority);
-    let title = task.title.clone();
     let due = task.due_date;
     let focus = task.focus_date;
 
@@ -240,6 +239,11 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
     let in_my_day = focus == Some(today);
 
     let status_sig = RwSignal::new(status_val.clone());
+
+    // Inline title editing — RwSignal is Copy so closures stay FnMut.
+    let editing_title = RwSignal::new(false);
+    let edit_title    = RwSignal::new(task.title.clone());
+    let orig_title    = RwSignal::new(task.title.clone());
 
     // Toggle done ↔ open on checkbox click
     let on_toggle = move |_| {
@@ -284,6 +288,8 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
         });
     };
 
+    let title_display = task.title.clone();
+
     view! {
         <div class="group flex items-start gap-2 py-2 border-b border-stone-100 dark:border-stone-800 last:border-0">
             // Checkbox
@@ -305,14 +311,56 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
 
             // Title + meta
             <div class="flex-1 min-w-0">
-                <p
-                    class="text-sm text-stone-800 dark:text-stone-200 leading-snug"
-                    style=move || if status_done(&parse_status(&status_sig.get())) {
-                        "text-decoration: line-through; opacity: 0.5;"
-                    } else { "" }
-                >
-                    {title.clone()}
-                </p>
+                // Title — display or inline edit (only Copy types captured)
+                {move || if editing_title.get() {
+                    view! {
+                        <input
+                            type="text"
+                            class="w-full bg-stone-100 dark:bg-stone-800 text-sm
+                                text-stone-900 dark:text-stone-100 rounded px-1.5 py-0.5
+                                focus:outline-none focus:ring-1 focus:ring-amber-500"
+                            prop:value=move || edit_title.get()
+                            on:input=move |ev| edit_title.set(event_target_value(&ev))
+                            on:keydown=move |ev: leptos::ev::KeyboardEvent| {
+                                match ev.key().as_str() {
+                                    "Enter" => {
+                                        let new_title = edit_title.get_untracked().trim().to_string();
+                                        if new_title.is_empty() { return; }
+                                        editing_title.set(false);
+                                        let req = UpdateTaskRequest {
+                                            title: Some(new_title),
+                                            status: None,
+                                            priority: None,
+                                            focus_date: None,
+                                            due_date: None,
+                                        };
+                                        wasm_bindgen_futures::spawn_local(async move {
+                                            let _ = crate::api::update_task(task_id, &req).await;
+                                            task_refresh.update(|n| *n += 1);
+                                        });
+                                    }
+                                    "Escape" => {
+                                        editing_title.set(false);
+                                        edit_title.set(orig_title.get_untracked());
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        />
+                    }.into_any()
+                } else {
+                    let td = title_display.clone();
+                    view! {
+                        <p
+                            class="text-sm text-stone-800 dark:text-stone-200 leading-snug"
+                            style=move || if status_done(&parse_status(&status_sig.get())) {
+                                "text-decoration: line-through; opacity: 0.5;"
+                            } else { "" }
+                        >
+                            {td}
+                        </p>
+                    }.into_any()
+                }}
                 <div class="flex items-center gap-2 mt-0.5">
                     // Priority badge
                     <span class="flex items-center gap-0.5 text-xs" style=p_color
@@ -347,6 +395,14 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
 
             // Actions (visible on hover)
             <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                // Edit title
+                <button
+                    class="p-1 rounded text-stone-400 hover:text-amber-500 transition-colors"
+                    title="Edit title"
+                    on:click=move |_| editing_title.set(true)
+                >
+                    <span class="material-symbols-outlined" style="font-size:16px;">{"edit"}</span>
+                </button>
                 // My Day toggle
                 <button
                     class="p-1 rounded text-stone-400 transition-colors"

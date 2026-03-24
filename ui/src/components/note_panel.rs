@@ -1,4 +1,7 @@
-use common::{id::NodeId, note::CreateNoteRequest};
+use common::{
+    id::NodeId,
+    note::{CreateNoteRequest, UpdateNoteRequest},
+};
 use leptos::prelude::*;
 
 #[component]
@@ -31,7 +34,6 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
     let on_add = move |_| do_add();
 
     let on_keydown = move |ev: web_sys::KeyboardEvent| {
-        // Ctrl+Enter or Cmd+Enter submits
         if ev.key() == "Enter" && (ev.ctrl_key() || ev.meta_key()) {
             do_add();
         }
@@ -110,17 +112,125 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                     view! {
                         <div class="space-y-3">
                             {notes.into_iter().map(|note| {
-                                let ts = note.created_at.format("%b %-d, %Y %H:%M").to_string();
-                                let body_text = note.body.clone();
+                                let note_id = note.id;
+
+                                // Show "· edited" if updated_at is meaningfully after created_at.
+                                let edited = (note.updated_at - note.created_at).num_seconds() > 2;
+                                let ts = {
+                                    let base = note.created_at.format("%b %-d, %Y %H:%M").to_string();
+                                    if edited { format!("{base} · edited") } else { base }
+                                };
+
+                                // Per-note signals — RwSignal is Copy so all closures stay FnMut.
+                                let editing    = RwSignal::new(false);
+                                let edit_body  = RwSignal::new(note.body.clone());
+                                let orig_body  = RwSignal::new(note.body.clone());
+                                let save_error = RwSignal::new(Option::<String>::None);
+
+                                let body_display = note.body.clone();
+                                let ts_display   = ts.clone();
+
                                 view! {
-                                    <div class="rounded-lg bg-stone-50 dark:bg-stone-900/50
+                                    <div class="group rounded-lg bg-stone-50 dark:bg-stone-900/50
                                         border border-stone-200 dark:border-stone-700 px-3 py-2.5">
-                                        <p class="text-sm text-stone-800 dark:text-stone-200 whitespace-pre-wrap">
-                                            {body_text}
-                                        </p>
-                                        <p class="text-xs text-stone-400 dark:text-stone-600 mt-1.5">
-                                            {ts}
-                                        </p>
+
+                                        // ── Display mode ──────────────────────────────
+                                        {move || (!editing.get()).then({
+                                            let bd = body_display.clone();
+                                            let td = ts_display.clone();
+                                            move || view! {
+                                                <p class="text-sm text-stone-800 dark:text-stone-200 whitespace-pre-wrap">
+                                                    {bd.clone()}
+                                                </p>
+                                                <div class="flex items-center justify-between mt-1.5">
+                                                    <p class="text-xs text-stone-400 dark:text-stone-600">
+                                                        {td.clone()}
+                                                    </p>
+                                                    {is_owner.then(|| view! {
+                                                        <button
+                                                            class="opacity-0 group-hover:opacity-100 p-0.5 rounded
+                                                                text-stone-400 hover:text-amber-600 dark:hover:text-amber-400
+                                                                transition-opacity transition-colors"
+                                                            title="Edit note"
+                                                            on:click=move |_| editing.set(true)
+                                                        >
+                                                            <span class="material-symbols-outlined"
+                                                                style="font-size: 14px;">{"edit"}</span>
+                                                        </button>
+                                                    })}
+                                                </div>
+                                            }
+                                        })}
+
+                                        // ── Edit mode ─────────────────────────────────
+                                        {move || editing.get().then(move || view! {
+                                            <textarea
+                                                class="w-full bg-transparent text-sm text-stone-800 dark:text-stone-200
+                                                    resize-none focus:outline-none"
+                                                rows="4"
+                                                prop:value=move || edit_body.get()
+                                                on:input=move |ev| edit_body.set(event_target_value(&ev))
+                                                on:keydown=move |ev: web_sys::KeyboardEvent| {
+                                                    if ev.key() == "Escape" {
+                                                        editing.set(false);
+                                                        edit_body.set(orig_body.get_untracked());
+                                                    }
+                                                    if ev.key() == "Enter" && (ev.ctrl_key() || ev.meta_key()) {
+                                                        let new_body = edit_body.get_untracked().trim().to_string();
+                                                        if new_body.is_empty() { return; }
+                                                        let req = UpdateNoteRequest { body: new_body };
+                                                        wasm_bindgen_futures::spawn_local(async move {
+                                                            match crate::api::update_note(note_id, &req).await {
+                                                                Ok(_) => {
+                                                                    editing.set(false);
+                                                                    save_error.set(None);
+                                                                    refresh.update(|n| *n += 1);
+                                                                }
+                                                                Err(e) => save_error.set(Some(format!("{e}"))),
+                                                            }
+                                                        });
+                                                    }
+                                                }
+                                            />
+                                            {move || save_error.get().map(|msg| view! {
+                                                <p class="text-xs text-red-500 mt-1">{msg}</p>
+                                            })}
+                                            <div class="flex items-center justify-end gap-2 mt-2">
+                                                <button
+                                                    class="px-2 py-1 text-xs text-stone-500 dark:text-stone-400
+                                                        hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+                                                    on:click=move |_| {
+                                                        editing.set(false);
+                                                        edit_body.set(orig_body.get_untracked());
+                                                    }
+                                                >
+                                                    "Cancel"
+                                                </button>
+                                                <button
+                                                    class="px-3 py-1 text-xs font-medium rounded
+                                                        bg-amber-500 hover:bg-amber-600 text-white transition-colors
+                                                        disabled:opacity-40"
+                                                    disabled=move || edit_body.get().trim().is_empty()
+                                                    on:click=move |_| {
+                                                        let new_body = edit_body.get_untracked().trim().to_string();
+                                                        if new_body.is_empty() { return; }
+                                                        let req = UpdateNoteRequest { body: new_body };
+                                                        wasm_bindgen_futures::spawn_local(async move {
+                                                            match crate::api::update_note(note_id, &req).await {
+                                                                Ok(_) => {
+                                                                    editing.set(false);
+                                                                    save_error.set(None);
+                                                                    refresh.update(|n| *n += 1);
+                                                                }
+                                                                Err(e) => save_error.set(Some(format!("{e}"))),
+                                                            }
+                                                        });
+                                                    }
+                                                >
+                                                    "Save"
+                                                </button>
+                                            </div>
+                                        })}
                                     </div>
                                 }
                             }).collect_view()}
