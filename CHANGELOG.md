@@ -4,6 +4,20 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.20.0] - 2026-03-23
+
+### Added
+- **Local development workflow**: `docker-compose.yml` now supports a fully self-contained local stack with one command:
+  `docker compose -f deploy/docker-compose.yml --env-file deploy/.env.local up --build`
+- **`minio-init` service**: auto-creates the `ember-trove` S3 bucket on first boot so attachment uploads work without any manual MinIO setup.
+- **`deploy/.env.local.example`**: committed template documenting the three variables that need real values (`OIDC_CLIENT_SECRET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`).
+- **Cognito localhost callback**: registered `http://localhost:8003/api/auth/callback` and `http://localhost:8003` as allowed redirect/logout URLs so Cognito OIDC authentication works in the local Docker stack.
+
+### Fixed
+- **`API_EXTERNAL_URL` for local dev**: corrected from `:3003` (direct API port) to `:8003` (nginx proxy) so OIDC redirect URIs match the registered Cognito callback.
+- **`cargo audit` paste warning silenced**: `RUSTSEC-2024-0436` (`paste` unmaintained, warning-level only via Leptos transitive dep) added to ignore list — Leptos owns that upgrade path.
+- **`tar` 0.4.45 in `Cargo.lock`**: carried forward from v1.19.1 patch.
+
 ## [1.19.3] - 2026-03-23
 
 ### Fixed
