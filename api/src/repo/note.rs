@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use common::{
     EmberTroveError,
     id::{NodeId, NoteId},
-    note::{CreateNoteRequest, FeedNote, Note},
+    note::{CreateNoteRequest, FeedNote, Note, UpdateNoteRequest},
 };
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -12,12 +12,20 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait NoteRepo: Send + Sync {
-    /// Create a new note on a node. Only the node owner should call this.
+    /// Create a new note on a node.
     async fn create(
         &self,
         node_id: NodeId,
         owner_id: &str,
         req: CreateNoteRequest,
+    ) -> Result<Note, EmberTroveError>;
+
+    /// Update the body of an existing note. Only the note's owner may edit it.
+    async fn update(
+        &self,
+        note_id: NoteId,
+        owner_id: &str,
+        req: UpdateNoteRequest,
     ) -> Result<Note, EmberTroveError>;
 
     /// All notes for a node, newest first.
@@ -54,6 +62,7 @@ struct NoteRow {
     owner_id: String,
     body: String,
     created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
 }
 
 impl NoteRow {
@@ -64,6 +73,7 @@ impl NoteRow {
             owner_id: self.owner_id,
             body: self.body,
             created_at: self.created_at,
+            updated_at: self.updated_at,
         }
     }
 }
@@ -80,7 +90,7 @@ impl NoteRepo for PgNoteRepo {
             r#"
             INSERT INTO node_notes (node_id, owner_id, body)
             VALUES ($1, $2, $3)
-            RETURNING id, node_id, owner_id, body, created_at
+            RETURNING id, node_id, owner_id, body, created_at, updated_at
             "#,
         )
         .bind(node_id.0)
@@ -93,10 +103,35 @@ impl NoteRepo for PgNoteRepo {
         Ok(row.into_note())
     }
 
+    async fn update(
+        &self,
+        note_id: NoteId,
+        owner_id: &str,
+        req: UpdateNoteRequest,
+    ) -> Result<Note, EmberTroveError> {
+        let row = sqlx::query_as::<_, NoteRow>(
+            r#"
+            UPDATE node_notes
+            SET body = $1
+            WHERE id = $2 AND owner_id = $3
+            RETURNING id, node_id, owner_id, body, created_at, updated_at
+            "#,
+        )
+        .bind(&req.body)
+        .bind(note_id.0)
+        .bind(owner_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("update note failed: {e}")))?
+        .ok_or_else(|| EmberTroveError::NotFound("note not found".to_string()))?;
+
+        Ok(row.into_note())
+    }
+
     async fn list_for_node(&self, node_id: NodeId) -> Result<Vec<Note>, EmberTroveError> {
         let rows = sqlx::query_as::<_, NoteRow>(
             r#"
-            SELECT id, node_id, owner_id, body, created_at
+            SELECT id, node_id, owner_id, body, created_at, updated_at
             FROM node_notes
             WHERE node_id = $1
             ORDER BY created_at DESC
@@ -113,7 +148,7 @@ impl NoteRepo for PgNoteRepo {
     async fn list_all(&self) -> Result<Vec<Note>, EmberTroveError> {
         let rows = sqlx::query_as::<_, NoteRow>(
             r#"
-            SELECT id, node_id, owner_id, body, created_at
+            SELECT id, node_id, owner_id, body, created_at, updated_at
             FROM node_notes
             ORDER BY created_at ASC
             "#,
@@ -133,13 +168,14 @@ impl NoteRepo for PgNoteRepo {
             owner_id: String,
             body: String,
             created_at: DateTime<Utc>,
+            updated_at: DateTime<Utc>,
             node_title: String,
         }
 
         let rows = sqlx::query_as::<_, FeedRow>(
             r#"
             SELECT
-                n.id, n.node_id, n.owner_id, n.body, n.created_at,
+                n.id, n.node_id, n.owner_id, n.body, n.created_at, n.updated_at,
                 nd.title AS node_title
             FROM node_notes n
             JOIN nodes nd ON nd.id = n.node_id
@@ -161,6 +197,7 @@ impl NoteRepo for PgNoteRepo {
                     owner_id: r.owner_id,
                     body: r.body,
                     created_at: r.created_at,
+                    updated_at: r.updated_at,
                 },
                 node_title: r.node_title,
             })
@@ -175,13 +212,14 @@ impl NoteRepo for PgNoteRepo {
             owner_id: String,
             body: String,
             created_at: DateTime<Utc>,
+            updated_at: DateTime<Utc>,
             node_title: String,
         }
 
         let rows = sqlx::query_as::<_, FeedRow>(
             r#"
             SELECT
-                n.id, n.node_id, n.owner_id, n.body, n.created_at,
+                n.id, n.node_id, n.owner_id, n.body, n.created_at, n.updated_at,
                 nd.title AS node_title
             FROM node_notes n
             JOIN nodes nd ON nd.id = n.node_id
@@ -201,6 +239,7 @@ impl NoteRepo for PgNoteRepo {
                     owner_id: r.owner_id,
                     body: r.body,
                     created_at: r.created_at,
+                    updated_at: r.updated_at,
                 },
                 node_title: r.node_title,
             })

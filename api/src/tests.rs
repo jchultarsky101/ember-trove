@@ -117,6 +117,7 @@ struct StubNoteRepo;
 #[async_trait]
 impl NoteRepo for StubNoteRepo {
     async fn create(&self, _: NodeId, _: &str, _: CreateNoteRequest) -> Result<Note, EmberTroveError> { unimplemented!() }
+    async fn update(&self, _: common::id::NoteId, _: &str, _: common::note::UpdateNoteRequest) -> Result<Note, EmberTroveError> { unimplemented!() }
     async fn list_for_node(&self, _: NodeId) -> Result<Vec<Note>, EmberTroveError> { unimplemented!() }
     async fn feed_for_owner(&self, _: &str) -> Result<Vec<FeedNote>, EmberTroveError> { unimplemented!() }
     async fn feed_all(&self) -> Result<Vec<FeedNote>, EmberTroveError> { unimplemented!() }
