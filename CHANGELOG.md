@@ -4,6 +4,11 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.22.0] - 2026-03-24
+
+### Fixed
+- **Add-Favorite dialog confined to sidebar**: The "Add to Favorites" modal was rendered inside the sidebar's `<aside>` DOM node, which carries a CSS `translate-x-*` transform for the mobile slide-in animation. Even with `md:transform-none`, the transform created a new stacking context that trapped `position:fixed` children inside the sidebar's bounding box (~230 px wide), making the dialog unusable — especially in collapsed mode. Fixed by wrapping the modal backdrop in Leptos 0.8's `<Portal>`, which teleports the DOM nodes to `<body>`, completely bypassing any ancestor stacking context.
+
 ## [1.21.2] - 2026-03-23
 
 ### Fixed
