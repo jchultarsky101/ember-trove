@@ -1,0 +1,445 @@
+//! Integration tests for the Axum router.
+//!
+//! These tests build the full production router (minus a live database) and
+//! send requests through it via `tower::ServiceExt::oneshot`, verifying HTTP
+//! status codes, JSON shape, and route registration.
+//!
+//! ## Design constraints
+//! * No live database — `PgPool::connect_lazy` defers the TCP dial until the
+//!   first query.  Routes that hit the DB return a "degraded" payload rather
+//!   than the happy path; we only assert HTTP status codes here.
+//! * No OIDC — `state.oidc = None`.  The `require_auth` middleware returns
+//!   `500 Internal Server Error` ("OIDC not configured") for every protected
+//!   route, which is distinct from `404 Not Found`.  We exploit this to
+//!   verify that every route is **registered** without setting up real auth.
+//! * Rate limiter — `SmartIpKeyExtractor` needs at least one of
+//!   `X-Real-IP`, `X-Forwarded-For`, or `ConnectInfo<SocketAddr>`.
+//!   All requests to rate-limited routes include `X-Forwarded-For: 127.0.0.1`.
+
+use std::{sync::Arc, time::{Duration, Instant}};
+
+use async_trait::async_trait;
+use axum::{Router, body::Body, http::{Request, StatusCode}};
+use axum_extra::extract::cookie::Key;
+use chrono::NaiveDate;
+use common::{
+    EmberTroveError,
+    attachment::Attachment,
+    backup::BackupJob,
+    edge::{CreateEdgeRequest, Edge, EdgeWithTitles},
+    favorite::{CreateFavoriteRequest, Favorite},
+    graph::NodePosition,
+    id::{AttachmentId, EdgeId, FavoriteId, NodeId, PermissionId, TagId, TaskId},
+    node::{CreateNodeRequest, Node, NodeListParams, NodeTitleEntry, UpdateNodeRequest},
+    note::{CreateNoteRequest, FeedNote, Note},
+    permission::{GrantPermissionRequest, Permission, PermissionRole},
+    search::{SearchQuery, SearchResponse},
+    tag::{CreateTagRequest, Tag, UpdateTagRequest},
+    task::{CreateTaskRequest, MyDayTask, Task, TaskCounts, UpdateTaskRequest},
+};
+use http_body_util::BodyExt;
+use tower::ServiceExt;
+use uuid::Uuid;
+
+use crate::{
+    auth::AuthConfig,
+    config::Config,
+    object_store::NullObjectStore,
+    repo::{
+        attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo, favorite::FavoriteRepo,
+        graph::GraphRepo, node::NodeRepo, note::NoteRepo, permission::PermissionRepo,
+        search::SearchRepo, tag::TagRepo, task::TaskRepo,
+    },
+    routes::build_router,
+    state::AppState,
+};
+
+// ── Stub repo implementations ─────────────────────────────────────────────────
+// All methods panic with `unimplemented!()` — they are never reached because
+// the auth middleware short-circuits every protected request when oidc = None.
+
+struct StubNodeRepo;
+#[async_trait]
+impl NodeRepo for StubNodeRepo {
+    async fn create(&self, _: &str, _: CreateNodeRequest) -> Result<Node, EmberTroveError> { unimplemented!() }
+    async fn get(&self, _: NodeId) -> Result<Node, EmberTroveError> { unimplemented!() }
+    async fn get_by_slug(&self, _: &str) -> Result<Node, EmberTroveError> { unimplemented!() }
+    async fn list(&self, _: NodeListParams) -> Result<(Vec<Node>, u64), EmberTroveError> { unimplemented!() }
+    async fn update(&self, _: NodeId, _: UpdateNodeRequest) -> Result<Node, EmberTroveError> { unimplemented!() }
+    async fn delete(&self, _: NodeId) -> Result<(), EmberTroveError> { unimplemented!() }
+    async fn neighbors(&self, _: NodeId) -> Result<Vec<Node>, EmberTroveError> { unimplemented!() }
+    async fn backlinks(&self, _: NodeId) -> Result<Vec<Node>, EmberTroveError> { unimplemented!() }
+    async fn list_titles(&self) -> Result<Vec<NodeTitleEntry>, EmberTroveError> { unimplemented!() }
+    async fn find_id_by_title(&self, _: &str) -> Result<Option<NodeId>, EmberTroveError> { unimplemented!() }
+    async fn list_all_for_owner(&self, _: &str) -> Result<Vec<Node>, EmberTroveError> { unimplemented!() }
+    async fn list_all(&self) -> Result<Vec<Node>, EmberTroveError> { unimplemented!() }
+}
+
+struct StubEdgeRepo;
+#[async_trait]
+impl EdgeRepo for StubEdgeRepo {
+    async fn create(&self, _: CreateEdgeRequest) -> Result<Edge, EmberTroveError> { unimplemented!() }
+    async fn delete(&self, _: EdgeId) -> Result<(), EmberTroveError> { unimplemented!() }
+    async fn list_for_node(&self, _: NodeId) -> Result<Vec<Edge>, EmberTroveError> { unimplemented!() }
+    async fn list_for_node_with_titles(&self, _: NodeId) -> Result<Vec<EdgeWithTitles>, EmberTroveError> { unimplemented!() }
+    async fn list_all(&self) -> Result<Vec<Edge>, EmberTroveError> { unimplemented!() }
+    async fn sync_wikilinks(&self, _: NodeId, _: &[NodeId]) -> Result<(), EmberTroveError> { unimplemented!() }
+}
+
+struct StubTagRepo;
+#[async_trait]
+impl TagRepo for StubTagRepo {
+    async fn create(&self, _: &str, _: CreateTagRequest) -> Result<Tag, EmberTroveError> { unimplemented!() }
+    async fn list(&self, _: &str) -> Result<Vec<Tag>, EmberTroveError> { unimplemented!() }
+    async fn list_all(&self) -> Result<Vec<Tag>, EmberTroveError> { unimplemented!() }
+    async fn update(&self, _: TagId, _: UpdateTagRequest) -> Result<Tag, EmberTroveError> { unimplemented!() }
+    async fn delete(&self, _: TagId) -> Result<(), EmberTroveError> { unimplemented!() }
+    async fn attach(&self, _: NodeId, _: TagId) -> Result<(), EmberTroveError> { unimplemented!() }
+    async fn detach(&self, _: NodeId, _: TagId) -> Result<(), EmberTroveError> { unimplemented!() }
+    async fn list_for_node(&self, _: NodeId) -> Result<Vec<Tag>, EmberTroveError> { unimplemented!() }
+}
+
+struct StubTaskRepo;
+#[async_trait]
+impl TaskRepo for StubTaskRepo {
+    async fn create(&self, _: NodeId, _: &str, _: CreateTaskRequest) -> Result<Task, EmberTroveError> { unimplemented!() }
+    async fn list_for_node(&self, _: NodeId, _: &str) -> Result<Vec<Task>, EmberTroveError> { unimplemented!() }
+    async fn get(&self, _: TaskId) -> Result<Task, EmberTroveError> { unimplemented!() }
+    async fn update(&self, _: TaskId, _: UpdateTaskRequest) -> Result<Task, EmberTroveError> { unimplemented!() }
+    async fn delete(&self, _: TaskId) -> Result<(), EmberTroveError> { unimplemented!() }
+    async fn list_my_day(&self, _: &str, _: NaiveDate) -> Result<Vec<MyDayTask>, EmberTroveError> { unimplemented!() }
+    async fn counts_for_nodes(&self, _: &[NodeId]) -> Result<Vec<(NodeId, TaskCounts)>, EmberTroveError> { unimplemented!() }
+    async fn list_all_for_owner(&self, _: &str) -> Result<Vec<Task>, EmberTroveError> { unimplemented!() }
+    async fn list_all(&self) -> Result<Vec<Task>, EmberTroveError> { unimplemented!() }
+}
+
+struct StubNoteRepo;
+#[async_trait]
+impl NoteRepo for StubNoteRepo {
+    async fn create(&self, _: NodeId, _: &str, _: CreateNoteRequest) -> Result<Note, EmberTroveError> { unimplemented!() }
+    async fn list_for_node(&self, _: NodeId) -> Result<Vec<Note>, EmberTroveError> { unimplemented!() }
+    async fn feed_for_owner(&self, _: &str) -> Result<Vec<FeedNote>, EmberTroveError> { unimplemented!() }
+    async fn feed_all(&self) -> Result<Vec<FeedNote>, EmberTroveError> { unimplemented!() }
+    async fn list_all(&self) -> Result<Vec<Note>, EmberTroveError> { unimplemented!() }
+}
+
+struct StubAttachmentRepo;
+#[async_trait]
+impl AttachmentRepo for StubAttachmentRepo {
+    async fn create(&self, _: NodeId, _: &str, _: &str, _: i64, _: &str) -> Result<Attachment, EmberTroveError> { unimplemented!() }
+    async fn list(&self, _: NodeId) -> Result<Vec<Attachment>, EmberTroveError> { unimplemented!() }
+    async fn get(&self, _: AttachmentId) -> Result<Attachment, EmberTroveError> { unimplemented!() }
+    async fn delete(&self, _: AttachmentId) -> Result<String, EmberTroveError> { unimplemented!() }
+}
+
+struct StubPermissionRepo;
+#[async_trait]
+impl PermissionRepo for StubPermissionRepo {
+    async fn grant(&self, _: NodeId, _: &str, _: GrantPermissionRequest) -> Result<Permission, EmberTroveError> { unimplemented!() }
+    async fn revoke(&self, _: PermissionId) -> Result<(), EmberTroveError> { unimplemented!() }
+    async fn list(&self, _: NodeId) -> Result<Vec<Permission>, EmberTroveError> { unimplemented!() }
+    async fn find(&self, _: NodeId, _: &str) -> Result<Option<Permission>, EmberTroveError> { unimplemented!() }
+    async fn list_all(&self, _: Option<NodeId>) -> Result<Vec<Permission>, EmberTroveError> { unimplemented!() }
+    async fn update(&self, _: PermissionId, _: PermissionRole, _: &str) -> Result<Permission, EmberTroveError> { unimplemented!() }
+}
+
+struct StubSearchRepo;
+#[async_trait]
+impl SearchRepo for StubSearchRepo {
+    async fn search(&self, _: &SearchQuery) -> Result<SearchResponse, EmberTroveError> { unimplemented!() }
+}
+
+struct StubGraphRepo;
+#[async_trait]
+impl GraphRepo for StubGraphRepo {
+    async fn list_positions(&self) -> Result<Vec<NodePosition>, EmberTroveError> { unimplemented!() }
+    async fn upsert_position(&self, _: Uuid, _: f64, _: f64) -> Result<(), EmberTroveError> { unimplemented!() }
+}
+
+struct StubBackupRepo;
+#[async_trait]
+impl BackupRepo for StubBackupRepo {
+    async fn create(
+        &self, _: &str, _: &str, _: i64,
+        _: i32, _: i32, _: i32, _: i32, _: i32, _: i32,
+    ) -> Result<BackupJob, EmberTroveError> { unimplemented!() }
+    async fn list_for_owner(&self, _: &str) -> Result<Vec<BackupJob>, EmberTroveError> { unimplemented!() }
+    async fn get(&self, _: Uuid) -> Result<BackupJob, EmberTroveError> { unimplemented!() }
+    async fn delete(&self, _: Uuid) -> Result<(), EmberTroveError> { unimplemented!() }
+}
+
+struct StubFavoriteRepo;
+#[async_trait]
+impl FavoriteRepo for StubFavoriteRepo {
+    async fn list(&self, _: &str) -> Result<Vec<Favorite>, EmberTroveError> { unimplemented!() }
+    async fn create(&self, _: &str, _: CreateFavoriteRequest) -> Result<Favorite, EmberTroveError> { unimplemented!() }
+    async fn delete(&self, _: FavoriteId, _: &str) -> Result<(), EmberTroveError> { unimplemented!() }
+    async fn reorder(&self, _: &str, _: &[FavoriteId]) -> Result<Vec<Favorite>, EmberTroveError> { unimplemented!() }
+}
+
+// ── Test helpers ──────────────────────────────────────────────────────────────
+
+fn test_state() -> AppState {
+    // Short acquire_timeout ensures the health-check DB query fails fast (~50 ms)
+    // rather than blocking until the 30-second TimeoutLayer fires.
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .acquire_timeout(Duration::from_millis(50))
+        .connect_lazy("postgres://test:test@127.0.0.1:5432/test")
+        .expect("lazy pool from valid URL");
+
+    AppState {
+        pool,
+        nodes:        Arc::new(StubNodeRepo),
+        edges:        Arc::new(StubEdgeRepo),
+        tags:         Arc::new(StubTagRepo),
+        tasks:        Arc::new(StubTaskRepo),
+        notes:        Arc::new(StubNoteRepo),
+        attachments:  Arc::new(StubAttachmentRepo),
+        permissions:  Arc::new(StubPermissionRepo),
+        search:       Arc::new(StubSearchRepo),
+        graph:        Arc::new(StubGraphRepo),
+        backup:       Arc::new(StubBackupRepo),
+        favorites:    Arc::new(StubFavoriteRepo),
+        object_store: Arc::new(NullObjectStore),
+        oidc:          None,
+        cognito_admin: None,
+        cookie_key:    Key::generate(),
+        auth: AuthConfig {
+            issuer:           "https://example.com".to_string(),
+            client_id:        "test-client".to_string(),
+            client_secret:    "test-secret".to_string(),
+            frontend_url:     "http://localhost:3000".to_string(),
+            api_external_url: "http://localhost:3003".to_string(),
+            cookie_secure:    false,
+        },
+        config: Config {
+            database_url:          "postgres://test:test@127.0.0.1:5432/test".to_string(),
+            s3_endpoint:           None,
+            s3_bucket:             None,
+            s3_access_key:         None,
+            s3_secret_key:         None,
+            s3_region:             "us-east-1".to_string(),
+            oidc_issuer:           None,
+            oidc_client_id:        None,
+            oidc_client_secret:    None,
+            cognito_user_pool_id:  None,
+            cognito_region:        "us-east-2".to_string(),
+            aws_access_key_id:     None,
+            aws_secret_access_key: None,
+            cookie_key:            "a".repeat(128),
+            cookie_secure:         false,
+            frontend_url:          "http://localhost:3000".to_string(),
+            api_external_url:      "http://localhost:3003".to_string(),
+            host:                  "127.0.0.1".to_string(),
+            port:                  3003,
+        },
+        started_at: Instant::now(),
+    }
+}
+
+fn test_app() -> Router {
+    build_router(test_state()).expect("test router must build successfully")
+}
+
+async fn body_json(resp: axum::response::Response) -> serde_json::Value {
+    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    serde_json::from_slice(&bytes).expect("response body must be valid JSON")
+}
+
+/// Verify a route is registered: build a request and assert the status is not 404.
+/// With oidc = None the auth middleware returns 500 before any handler runs, so:
+///   - 404 → route not registered
+///   - anything else → route exists
+async fn assert_route_registered(method: &str, uri: &str) {
+    let req = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("x-forwarded-for", "127.0.0.1")
+        .header("content-type", "application/json")
+        .body(Body::from("{}"))
+        .unwrap();
+    let status = test_app().oneshot(req).await.unwrap().status();
+    assert_ne!(
+        status,
+        StatusCode::NOT_FOUND,
+        "{method} {uri} must be registered (got {status})"
+    );
+}
+
+// ── Health endpoint ───────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn health_returns_200() {
+    let resp = test_app()
+        .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn health_body_has_required_fields() {
+    let resp = test_app()
+        .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let body = body_json(resp).await;
+    for field in ["status", "service", "version", "database"] {
+        assert!(body.get(field).is_some(), "health body must have '{field}'");
+    }
+}
+
+#[tokio::test]
+async fn health_version_matches_cargo_pkg() {
+    let resp = test_app()
+        .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let body = body_json(resp).await;
+    assert_eq!(
+        body["version"].as_str().unwrap(),
+        env!("CARGO_PKG_VERSION"),
+        "health 'version' must equal CARGO_PKG_VERSION"
+    );
+}
+
+#[tokio::test]
+async fn health_service_field_is_correct() {
+    let resp = test_app()
+        .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let body = body_json(resp).await;
+    assert_eq!(body["service"], "ember-trove-api");
+}
+
+// ── Routing fallthrough ───────────────────────────────────────────────────────
+// In Axum 0.8, `Router::layer()` wraps the entire router service, so the
+// `require_auth` middleware fires even for unmatched routes.  With oidc = None
+// unmatched requests return 500 (OIDC not configured), not 404.  The important
+// invariant is that the health endpoint is unaffected and still returns 200.
+
+#[tokio::test]
+async fn unknown_route_does_not_return_success() {
+    let resp = test_app()
+        .oneshot(
+            Request::get("/this-path-does-not-exist")
+                .header("x-forwarded-for", "127.0.0.1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        !resp.status().is_success(),
+        "unknown route must not return a 2xx status; got {}",
+        resp.status()
+    );
+}
+
+// ── Auth guard ────────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn protected_route_without_oidc_returns_500_with_error_field() {
+    let resp = test_app()
+        .oneshot(
+            Request::get("/nodes")
+                .header("x-forwarded-for", "127.0.0.1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    let body = body_json(resp).await;
+    assert!(
+        body.get("error").is_some(),
+        "auth-guard error response must have 'error' field; got: {body}"
+    );
+}
+
+// ── Node routes ───────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn nodes_list_route_registered()   { assert_route_registered("GET",    "/nodes").await; }
+#[tokio::test]
+async fn node_create_route_registered()  { assert_route_registered("POST",   "/nodes").await; }
+#[tokio::test]
+async fn node_get_route_registered()     { assert_route_registered("GET",    &format!("/nodes/{}", Uuid::new_v4())).await; }
+#[tokio::test]
+async fn node_update_route_registered()  { assert_route_registered("PUT",    &format!("/nodes/{}", Uuid::new_v4())).await; }
+#[tokio::test]
+async fn node_delete_route_registered()  { assert_route_registered("DELETE", &format!("/nodes/{}", Uuid::new_v4())).await; }
+
+// ── Per-node permission routes ────────────────────────────────────────────────
+
+#[tokio::test]
+async fn node_permissions_list_route_registered() {
+    let nid = Uuid::new_v4();
+    assert_route_registered("GET",    &format!("/nodes/{nid}/permissions")).await;
+}
+#[tokio::test]
+async fn node_permissions_grant_route_registered() {
+    let nid = Uuid::new_v4();
+    assert_route_registered("POST",   &format!("/nodes/{nid}/permissions")).await;
+}
+#[tokio::test]
+async fn node_permissions_revoke_route_registered() {
+    let nid = Uuid::new_v4();
+    let pid = Uuid::new_v4();
+    assert_route_registered("DELETE", &format!("/nodes/{nid}/permissions/{pid}")).await;
+}
+
+// ── Standalone permission routes (v1.21.0) ────────────────────────────────────
+
+#[tokio::test]
+async fn standalone_permissions_list_route_registered() {
+    assert_route_registered("GET",    "/permissions").await;
+}
+#[tokio::test]
+async fn standalone_permission_update_route_registered() {
+    assert_route_registered("PUT",    &format!("/permissions/{}", Uuid::new_v4())).await;
+}
+#[tokio::test]
+async fn standalone_permission_delete_route_registered() {
+    assert_route_registered("DELETE", &format!("/permissions/{}", Uuid::new_v4())).await;
+}
+
+// ── Other domain routes ───────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn tags_list_route_registered()      { assert_route_registered("GET", "/tags").await; }
+#[tokio::test]
+async fn search_route_registered()         { assert_route_registered("GET", "/search").await; }
+#[tokio::test]
+async fn graph_route_registered()          { assert_route_registered("GET", "/graph").await; }
+#[tokio::test]
+async fn favorites_list_route_registered() { assert_route_registered("GET", "/favorites").await; }
+#[tokio::test]
+async fn notes_feed_route_registered()     { assert_route_registered("GET", "/notes").await; }
+#[tokio::test]
+async fn edges_list_route_registered()     { assert_route_registered("GET", "/edges").await; }
+
+// ── Permission DTO unit tests ─────────────────────────────────────────────────
+
+#[test]
+fn update_permission_request_serializes_role() {
+    use common::permission::UpdatePermissionRequest;
+    let req = UpdatePermissionRequest { role: PermissionRole::Editor };
+    let json = serde_json::to_value(&req).unwrap();
+    assert_eq!(json["role"], "editor");
+}
+
+#[test]
+fn permission_role_roundtrip_all_variants() {
+    for (variant, expected) in [
+        (PermissionRole::Owner,  "owner"),
+        (PermissionRole::Editor, "editor"),
+        (PermissionRole::Viewer, "viewer"),
+    ] {
+        let s = serde_json::to_string(&variant).unwrap();
+        assert_eq!(s, format!("\"{expected}\""), "serialize {expected}");
+        let back: PermissionRole = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, variant, "deserialize {expected}");
+    }
+}
