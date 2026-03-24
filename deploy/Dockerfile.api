@@ -35,7 +35,7 @@ RUN cargo build --release -p api
 FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y \
-    ca-certificates libssl3 \
+    ca-certificates libssl3 wget \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/target/release/api /usr/local/bin/ember-trove-api
