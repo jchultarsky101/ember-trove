@@ -26,6 +26,20 @@ pub trait PermissionRepo: Send + Sync {
         node_id: NodeId,
         subject_id: &str,
     ) -> Result<Option<Permission>, EmberTroveError>;
+
+    /// List all permissions, optionally filtered to a specific node.
+    async fn list_all(
+        &self,
+        node_id: Option<NodeId>,
+    ) -> Result<Vec<Permission>, EmberTroveError>;
+
+    /// Update the role on an existing permission by its ID.
+    async fn update(
+        &self,
+        id: PermissionId,
+        role: PermissionRole,
+        updated_by: &str,
+    ) -> Result<Permission, EmberTroveError>;
 }
 
 pub struct PgPermissionRepo {
@@ -49,7 +63,7 @@ struct PermissionRow {
     created_at: DateTime<Utc>,
 }
 
-fn parse_role(s: &str) -> Result<PermissionRole, EmberTroveError> {
+pub(crate) fn parse_role(s: &str) -> Result<PermissionRole, EmberTroveError> {
     match s {
         "owner" => Ok(PermissionRole::Owner),
         "editor" => Ok(PermissionRole::Editor),
@@ -60,7 +74,7 @@ fn parse_role(s: &str) -> Result<PermissionRole, EmberTroveError> {
     }
 }
 
-fn role_to_str(role: &PermissionRole) -> &'static str {
+pub(crate) fn role_to_str(role: &PermissionRole) -> &'static str {
     match role {
         PermissionRole::Owner => "owner",
         PermissionRole::Editor => "editor",
@@ -161,5 +175,88 @@ impl PermissionRepo for PgPermissionRepo {
         .map_err(|e| EmberTroveError::Internal(format!("find permission failed: {e}")))?;
 
         row.map(|r| r.into_permission()).transpose()
+    }
+
+    async fn list_all(
+        &self,
+        node_id: Option<NodeId>,
+    ) -> Result<Vec<Permission>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, PermissionRow>(
+            r#"
+            SELECT id, node_id, subject_id, role::text, granted_by, created_at
+            FROM permissions
+            WHERE ($1::uuid IS NULL OR node_id = $1)
+            ORDER BY created_at
+            "#,
+        )
+        .bind(node_id.map(|n| n.inner()))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list_all permissions failed: {e}")))?;
+
+        rows.into_iter().map(|r| r.into_permission()).collect()
+    }
+
+    async fn update(
+        &self,
+        id: PermissionId,
+        role: PermissionRole,
+        updated_by: &str,
+    ) -> Result<Permission, EmberTroveError> {
+        let role_str = role_to_str(&role);
+        let row = sqlx::query_as::<_, PermissionRow>(
+            r#"
+            UPDATE permissions
+               SET role = $2::permission_role, granted_by = $3
+             WHERE id = $1
+            RETURNING id, node_id, subject_id, role::text, granted_by, created_at
+            "#,
+        )
+        .bind(id.inner())
+        .bind(role_str)
+        .bind(updated_by)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("update permission failed: {e}")))?
+        .ok_or_else(|| EmberTroveError::NotFound(format!("permission {id} not found")))?;
+
+        row.into_permission()
+    }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_role_known_variants() {
+        assert_eq!(parse_role("owner").unwrap(), PermissionRole::Owner);
+        assert_eq!(parse_role("editor").unwrap(), PermissionRole::Editor);
+        assert_eq!(parse_role("viewer").unwrap(), PermissionRole::Viewer);
+    }
+
+    #[test]
+    fn parse_role_unknown_returns_error() {
+        assert!(parse_role("superuser").is_err());
+        assert!(parse_role("").is_err());
+        assert!(parse_role("Owner").is_err()); // case-sensitive
+    }
+
+    #[test]
+    fn role_to_str_and_back_round_trip() {
+        for role in [PermissionRole::Owner, PermissionRole::Editor, PermissionRole::Viewer] {
+            let s = role_to_str(&role);
+            let back = parse_role(s).expect("round-trip should succeed");
+            assert_eq!(back, role);
+        }
+    }
+
+    #[test]
+    fn role_to_str_produces_lowercase() {
+        assert_eq!(role_to_str(&PermissionRole::Owner), "owner");
+        assert_eq!(role_to_str(&PermissionRole::Editor), "editor");
+        assert_eq!(role_to_str(&PermissionRole::Viewer), "viewer");
     }
 }
