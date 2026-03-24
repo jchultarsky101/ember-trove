@@ -8,4 +8,15 @@
 # The 0.101.x branch has no fix and is a transitive dep from an older AWS SDK
 # rustls chain (aws-smithy-http-client → hyper-rustls 0.24 → rustls 0.21).
 # CRL validation edge-case; not exposed in this app's threat model.
-ignore = ["RUSTSEC-2023-0071", "RUSTSEC-2026-0049"]
+ignore = [
+  # Marvin Attack timing sidechannel in rsa crate.
+  # Pulled via sqlx-mysql which is never used (Postgres-only project). No upstream fix.
+  "RUSTSEC-2023-0071",
+  # CRL authorativeness matching bug in rustls-webpki 0.101.x.
+  # The 0.101.x branch has no fix; transitive via older AWS SDK hyper-rustls chain.
+  "RUSTSEC-2026-0049",
+  # paste crate marked unmaintained (RUSTSEC-2024-0436).
+  # Transitive dependency of Leptos 0.8 (tachys/reactive_graph). No alternative; Leptos
+  # owns the upgrade path. Warning-level only — not a vulnerability.
+  "RUSTSEC-2024-0436",
+]
