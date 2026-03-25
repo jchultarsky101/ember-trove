@@ -20,6 +20,7 @@ use uuid::Uuid;
 use crate::{
     auth::permissions::{require_editor, require_owner, require_viewer},
     error::ApiError,
+    notify::maybe_notify_invite,
     state::AppState,
     wikilink::parse_wikilink_titles,
 };
@@ -336,10 +337,20 @@ async fn invite(
         ApiError::Internal("invite requires Cognito admin to be configured".to_string())
     })?;
 
-    // Look up the email in Cognito.  If not found, create the user (which
-    // triggers Cognito's welcome email with a temporary password).
-    let subject_id = match cognito.find_user_by_email(&req.email).await? {
-        Some(user) => user.id,
+    // Fetch the node title for the notification email (best-effort; fall back gracefully).
+    let node_title = state
+        .nodes
+        .get(NodeId(id))
+        .await
+        .map(|n| n.title)
+        .unwrap_or_else(|_| "a node".to_string());
+
+    // Look up the email in Cognito.  If not found, create the user (Cognito
+    // then sends a welcome / temp-password email automatically).
+    // Track whether this is an existing user — we only send an explicit invite
+    // notification for existing users; new users get the Cognito welcome email.
+    let (subject_id, notify_email) = match cognito.find_user_by_email(&req.email).await? {
+        Some(user) => (user.id, Some(req.email.clone())),
         None => {
             let new_user = cognito
                 .create_user(&common::admin::CreateAdminUserRequest {
@@ -350,8 +361,16 @@ async fn invite(
                     send_welcome_email: true,
                 })
                 .await?;
-            new_user.id
+            // New users receive the Cognito welcome email but no separate
+            // invite notification (to avoid sending two emails at once).
+            (new_user.id, None)
         }
+    };
+
+    let role_str = match req.role {
+        PermissionRole::Owner => "owner",
+        PermissionRole::Editor => "editor",
+        PermissionRole::Viewer => "viewer",
     };
 
     let grant_req = GrantPermissionRequest {
@@ -362,6 +381,26 @@ async fn invite(
         .permissions
         .grant(NodeId(id), &claims.sub, grant_req)
         .await?;
+
+    // Send invite notification to existing users (non-fatal — permission already granted).
+    if let Some(email) = notify_email {
+        let inviter = claims
+            .name
+            .as_deref()
+            .or(claims.email.as_deref())
+            .unwrap_or("A collaborator")
+            .to_string();
+        let node_id_str = id.to_string();
+        maybe_notify_invite(
+            state.notifier.as_ref().map(|a| a.as_ref()),
+            &email,
+            &inviter,
+            &node_title,
+            role_str,
+            &node_id_str,
+        )
+        .await;
+    }
 
     Ok((StatusCode::CREATED, Json(perm)))
 }

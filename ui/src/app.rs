@@ -1,5 +1,5 @@
 use common::{id::NodeId, tag::Tag};
-use leptos::prelude::*;
+use leptos::{ev, prelude::*};
 
 use crate::{
     auth::provide_auth_state,
@@ -113,6 +113,61 @@ pub fn App() -> impl IntoView {
     // Toast notification state.
     let toast_state = ToastState::new();
     provide_context(toast_state);
+
+    // ── Global keyboard shortcuts ───────────────────────────────────────────
+    // Suppressed when the user is typing in an input, textarea, select, or
+    // any contenteditable element.
+    //
+    // Shortcuts:
+    //   n   → New node
+    //   g   → Graph view
+    //   /   → Search (also prevents the browser's built-in page-find)
+    //   Esc → Back to node list (from detail / edit / create)
+    let handle = window_event_listener(ev::keydown, move |ev: web_sys::KeyboardEvent| {
+        // Ignore if a modifier key is held (Ctrl+n, Cmd+/, etc.).
+        if ev.ctrl_key() || ev.meta_key() || ev.alt_key() {
+            return;
+        }
+
+        // Ignore when focus is inside an editable element.
+        let is_editable = web_sys::window()
+            .and_then(|w| w.document())
+            .and_then(|d| d.active_element())
+            .map(|el| {
+                let tag = el.tag_name().to_uppercase();
+                if matches!(tag.as_str(), "INPUT" | "TEXTAREA" | "SELECT" | "BUTTON") {
+                    return true;
+                }
+                // contenteditable="true" or contenteditable="" (empty = true per spec)
+                el.get_attribute("contenteditable")
+                    .map(|v| v != "false")
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+
+        if is_editable {
+            return;
+        }
+
+        match ev.key().as_str() {
+            "n" => current_view.set(View::NodeCreate),
+            "g" => current_view.set(View::Graph),
+            "/" => {
+                ev.prevent_default();
+                current_view.set(View::Search);
+            }
+            "Escape" => {
+                if matches!(
+                    current_view.get_untracked(),
+                    View::NodeDetail(_) | View::NodeEdit(_) | View::NodeCreate
+                ) {
+                    current_view.set(View::NodeList);
+                }
+            }
+            _ => {}
+        }
+    });
+    on_cleanup(move || handle.remove());
 
     view! {
         <Layout auth_state=auth_state />
