@@ -4,6 +4,12 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.28.0] - 2026-03-25
+
+### Added
+- **Node export** — `GET /nodes/{id}/export?format=markdown|json` returns a file download. Markdown includes YAML front-matter (title, type, status, tags, timestamps). JSON serialises the full Node DTO. A download icon in the node-view toolbar triggers the browser's native save dialog.
+- **Public sharing links** — owners can generate opaque share tokens (`POST /nodes/{id}/share`). Sharing a token URL (`/share/<token>`) renders a read-only public node view with no login required. Tokens can be listed and revoked from the new "Public Links" panel in the node view. Migration 012 adds the `share_tokens` table (with optional `expires_at`).
+
 ## [1.27.0] - 2026-03-25
 
 ### Added
