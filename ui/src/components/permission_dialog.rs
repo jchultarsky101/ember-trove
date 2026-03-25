@@ -1,12 +1,12 @@
-/// Permission panel — list, grant, and revoke per-node access.
+/// Permission panel — list, invite, and revoke per-node access.
 ///
-/// When the "Add permission" form is opened, the panel attempts to fetch the
-/// list of Keycloak users from `/admin/users` so the operator can pick by name
-/// instead of pasting a raw UUID.  If the current user is not an admin (403)
-/// the panel falls back gracefully to a plain text input.
-use common::admin::AdminUser;
+/// The "Invite" form accepts an email address and calls `POST /nodes/{id}/invite`.
+/// The backend looks up the email in Cognito; if the user does not exist yet it
+/// creates a Cognito account (which triggers a welcome / temporary-password email)
+/// and then grants the permission.  If the user already exists the permission is
+/// granted directly without sending an email.
 use common::id::NodeId;
-use common::permission::{GrantPermissionRequest, PermissionRole, UpdatePermissionRequest};
+use common::permission::{InviteRequest, PermissionRole, UpdatePermissionRequest};
 use leptos::prelude::*;
 
 use crate::api;
@@ -14,15 +14,16 @@ use crate::api;
 #[component]
 pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
     let refresh = RwSignal::new(0u32);
-    let show_add = RwSignal::new(false);
-    let subject_input = RwSignal::new(String::new());
+    let show_invite = RwSignal::new(false);
+    let email_input = RwSignal::new(String::new());
     let role_input = RwSignal::new("viewer".to_string());
     let error_msg = RwSignal::new(Option::<String>::None);
     let saving = RwSignal::new(false);
 
-    // User picker state — loaded once when the form is first opened.
-    let admin_users: RwSignal<Option<Vec<AdminUser>>> = RwSignal::new(None);
-    let admin_api_available = RwSignal::new(true);
+    // Admin users — loaded once when the panel is first opened, used only to
+    // resolve display names in the permission list.  The invite form no longer
+    // requires it.
+    let admin_users: RwSignal<Option<Vec<common::admin::AdminUser>>> = RwSignal::new(None);
 
     let permissions = LocalResource::new(move || {
         let _ = refresh.get();
@@ -30,34 +31,25 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
         async move { api::list_permissions(node_id).await }
     });
 
-    // Fetch admin users the first time the "Add permission" form is opened.
-    let on_toggle_add = move |_| {
-        let opening = !show_add.get_untracked();
-        show_add.update(|v| *v = !*v);
+    // Fetch admin users for display-name resolution the first time the panel expands.
+    let open = RwSignal::new(false);
+    let on_toggle_open = move |_| {
+        let opening = !open.get_untracked();
+        open.update(|v| *v = !*v);
         if opening && admin_users.get_untracked().is_none() {
             wasm_bindgen_futures::spawn_local(async move {
                 match api::list_admin_users().await {
-                    Ok(users) => {
-                        admin_users.set(Some(users));
-                        admin_api_available.set(true);
-                    }
-                    Err(crate::error::UiError::Api { status: 403, .. }) => {
-                        admin_users.set(Some(vec![]));
-                        admin_api_available.set(false);
-                    }
-                    Err(_) => {
-                        admin_users.set(Some(vec![]));
-                        admin_api_available.set(false);
-                    }
+                    Ok(users) => admin_users.set(Some(users)),
+                    Err(_) => admin_users.set(Some(vec![])),
                 }
             });
         }
     };
 
-    let on_grant = move |_| {
-        let subject = subject_input.get_untracked().trim().to_string();
-        if subject.is_empty() {
-            error_msg.set(Some("Please select or enter a user.".to_string()));
+    let on_invite = move |_| {
+        let email = email_input.get_untracked().trim().to_string();
+        if email.is_empty() {
+            error_msg.set(Some("Please enter an email address.".to_string()));
             return;
         }
         let role = match role_input.get_untracked().as_str() {
@@ -67,32 +59,27 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
         };
         error_msg.set(None);
         saving.set(true);
-        let req = GrantPermissionRequest {
-            subject_id: subject,
-            role,
-        };
+        let req = InviteRequest { email, role };
         wasm_bindgen_futures::spawn_local(async move {
-            match api::grant_permission(node_id, &req).await {
+            match api::invite_to_node(node_id, &req).await {
                 Ok(_) => {
-                    show_add.set(false);
-                    subject_input.set(String::new());
+                    show_invite.set(false);
+                    email_input.set(String::new());
                     role_input.set("viewer".to_string());
                     refresh.update(|n| *n += 1);
                 }
-                Err(e) => error_msg.set(Some(format!("Grant failed: {e}"))),
+                Err(e) => error_msg.set(Some(format!("Invite failed: {e}"))),
             }
             saving.set(false);
         });
     };
-
-    let open = RwSignal::new(false);
 
     view! {
         <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-6">
             <div class="flex items-center justify-between">
                 <button
                     class="flex items-center gap-1 text-left cursor-pointer"
-                    on:click=move |_| open.update(|v| *v = !*v)
+                    on:click=on_toggle_open
                 >
                     <span
                         class="material-symbols-outlined text-stone-400 dark:text-stone-500"
@@ -109,11 +96,11 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                         class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
                             dark:hover:text-stone-300 hover:bg-stone-100
                             dark:hover:bg-stone-800 transition-colors"
-                        on:click=on_toggle_add
-                        title=move || if show_add.get() { "Cancel" } else { "Add permission" }
+                        on:click=move |_| show_invite.update(|v| *v = !*v)
+                        title=move || if show_invite.get() { "Cancel" } else { "Invite someone" }
                     >
                         <span class="material-symbols-outlined" style="font-size: 16px;">
-                            {move || if show_add.get() { "close" } else { "person_add" }}
+                            {move || if show_invite.get() { "close" } else { "person_add" }}
                         </span>
                     </button>
                 })}
@@ -121,64 +108,19 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
 
             {move || open.get().then(|| view! {
             <div class="mt-4">
-            // Add permission form
-            {move || show_add.get().then(|| view! {
+            // Invite form
+            {move || show_invite.get().then(|| view! {
                 <div class="mb-4 p-3 bg-stone-50 dark:bg-stone-900 rounded-lg space-y-2">
                     <div class="flex gap-2">
-                        // User picker: dropdown if admin API available, text input as fallback.
-                        {move || {
-                            let users_opt = admin_users.get();
-                            match users_opt {
-                                // Still loading
-                                None => view! {
-                                    <div class="flex-1 flex items-center px-2 py-1 text-xs text-stone-400">
-                                        <span class="material-symbols-outlined mr-1"
-                                            style="font-size: 14px;">"hourglass_empty"</span>
-                                        "Loading users\u{2026}"
-                                    </div>
-                                }.into_any(),
-                                // Loaded with users + admin API available: show select
-                                Some(users) if admin_api_available.get() && !users.is_empty() => {
-                                    view! {
-                                        <select
-                                            class="flex-1 px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
-                                                bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300
-                                                focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                            prop:value=move || subject_input.get()
-                                            on:change=move |ev| subject_input.set(event_target_value(&ev))
-                                        >
-                                            <option value="">"\u{2014} Select a user \u{2014}"</option>
-                                            {users.into_iter().map(|u| {
-                                                let id = u.id.clone();
-                                                let label = match (&u.first_name, &u.last_name, &u.email) {
-                                                    (Some(f), Some(l), Some(e))
-                                                        if !f.is_empty() || !l.is_empty() =>
-                                                        format!("{} {} <{}>", f, l, e).trim().to_string(),
-                                                    (_, _, Some(e)) =>
-                                                        format!("{} <{}>", u.username, e),
-                                                    _ => u.username.clone(),
-                                                };
-                                                view! {
-                                                    <option value={id}>{label}</option>
-                                                }
-                                            }).collect::<Vec<_>>()}
-                                        </select>
-                                    }.into_any()
-                                },
-                                // Not admin or empty user list: raw text input fallback
-                                _ => view! {
-                                    <input
-                                        type="text"
-                                        class="flex-1 px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
-                                            bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none
-                                            focus:ring-1 focus:ring-amber-500"
-                                        placeholder="User subject ID (OIDC sub)\u{2026}"
-                                        prop:value=move || subject_input.get()
-                                        on:input=move |ev| subject_input.set(event_target_value(&ev))
-                                    />
-                                }.into_any(),
-                            }
-                        }}
+                        <input
+                            type="email"
+                            class="flex-1 px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
+                                bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none
+                                focus:ring-1 focus:ring-amber-500"
+                            placeholder="Email address\u{2026}"
+                            prop:value=move || email_input.get()
+                            on:input=move |ev| email_input.set(event_target_value(&ev))
+                        />
                         <select
                             class="px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
                                 bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300
@@ -196,14 +138,17 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                             class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
                                 dark:hover:text-stone-300 hover:bg-stone-100
                                 dark:hover:bg-stone-800 transition-colors disabled:opacity-30"
-                            on:click=on_grant
+                            on:click=on_invite
                             disabled=move || saving.get()
-                            title=move || if saving.get() { "Saving\u{2026}" } else { "Grant" }
+                            title=move || if saving.get() { "Sending\u{2026}" } else { "Send invite" }
                         >
                             <span class="material-symbols-outlined" style="font-size: 16px;">
-                                {move || if saving.get() { "hourglass_empty" } else { "check" }}
+                                {move || if saving.get() { "hourglass_empty" } else { "send" }}
                             </span>
                         </button>
+                        <span class="text-[10px] text-stone-400 dark:text-stone-500">
+                            "New users receive a Cognito welcome email."
+                        </span>
                     </div>
                     {move || error_msg.get().map(|msg| view! {
                         <div class="text-xs text-red-500">{msg}</div>
@@ -236,8 +181,6 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                                     {list.into_iter().map(|perm| {
                                         let perm_id = perm.id;
                                         let subject = perm.subject_id.clone();
-                                        // Local signal tracks the currently displayed role so the
-                                        // select reflects an in-flight change immediately.
                                         let current_role = RwSignal::new(match perm.role {
                                             PermissionRole::Owner  => "owner",
                                             PermissionRole::Editor => "editor",
@@ -298,12 +241,10 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                                                     </span>
                                                 </div>
                                                 <div class="flex items-center gap-1.5 shrink-0">
-                                                    // Inline role selector — visible on hover, shows
-                                                    // a spinner badge while saving.
                                                     {move || if updating.get() {
                                                         view! {
                                                             <span class={format!("px-1.5 py-0.5 text-[10px] rounded-full font-medium {}", role_color())}>
-                                                                "saving…"
+                                                                "saving\u{2026}"
                                                             </span>
                                                         }.into_any()
                                                     } else {
@@ -324,7 +265,6 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                                                             </select>
                                                         }.into_any()
                                                     }}
-                                                    // Revoke button — visible on row hover
                                                     <button
                                                         class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600
                                                             text-xs transition-opacity shrink-0 px-1"
@@ -351,8 +291,8 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                     })
                 }}
             </Suspense>
-            </div>  // close mt-4
-            })}    // close open.then
+            </div>
+            })}
         </div>
     }
 }

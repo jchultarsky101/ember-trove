@@ -72,6 +72,10 @@ pub struct NodeListParams {
     pub status: Option<NodeStatus>,
     pub tag_id: Option<TagId>,
     pub owner_id: Option<String>,
+    /// When set, restricts results to nodes the subject owns or has an explicit
+    /// permission row for.  Set by the API layer from the caller's JWT sub claim.
+    #[serde(skip)]
+    pub subject_id: Option<String>,
     pub page: Option<u32>,
     pub per_page: Option<u32>,
 }

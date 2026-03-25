@@ -157,6 +157,31 @@ impl CognitoAdminClient {
         Ok(cognito_user_to_dto(user, req.initial_roles.clone()))
     }
 
+    /// Find a user by their email address.
+    ///
+    /// Returns `None` when no user with that email exists in the pool.
+    /// Uses the Cognito `ListUsers` filter `email = "<addr>"`.
+    pub async fn find_user_by_email(&self, email: &str) -> Result<Option<AdminUser>, ApiError> {
+        let filter = format!("email = \"{email}\"");
+        let resp = self
+            .client
+            .list_users()
+            .user_pool_id(&self.user_pool_id)
+            .filter(&filter)
+            .send()
+            .await
+            .map_err(|e| ApiError::Internal(format!("Cognito list_users (by email) failed: {e}")))?;
+
+        let user = match resp.users().first() {
+            None => return Ok(None),
+            Some(u) => u,
+        };
+
+        let username = user.username().unwrap_or_default().to_string();
+        let groups = self.list_user_groups(&username).await?;
+        Ok(Some(cognito_user_to_dto(user, groups)))
+    }
+
     /// Hard-delete a user by their Cognito username (which is their UUID sub).
     pub async fn delete_user(&self, username: &str) -> Result<(), ApiError> {
         self.client

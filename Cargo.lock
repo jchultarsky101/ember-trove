@@ -99,7 +99,7 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "api"
-version = "1.8.2"
+version = "1.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1673,6 +1673,8 @@ checksum = "0a3233677ea1554a48235d81bb59d2a41654969a8e29a1316c48105fd1701693"
 dependencies = [
  "compact_str",
  "garde_derive",
+ "once_cell",
+ "regex",
  "smallvec",
 ]
 
@@ -1684,6 +1686,7 @@ checksum = "8796f322e43105351a7ec35148807b32b5b6058a539656dafe4a5b456d5ca41f"
 dependencies = [
  "proc-macro2",
  "quote",
+ "regex",
  "syn 2.0.117",
 ]
 
