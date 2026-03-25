@@ -7,6 +7,7 @@ use axum::{
 };
 use bytes::Bytes;
 use common::{
+    activity::{ActivityAction, ActivityEntry},
     attachment::Attachment,
     auth::AuthClaims,
     edge::EdgeWithTitles,
@@ -16,6 +17,7 @@ use common::{
     tag::Tag,
 };
 use garde::Validate;
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
@@ -49,6 +51,7 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/permissions/{perm_id}", delete(revoke_permission))
         .route("/{id}/invite", post(invite))
         .route("/{id}/export", get(export_node))
+        .route("/{id}/activity", get(list_activity))
 }
 
 // ── Node list ────────────────────────────────────────────────────────────────
@@ -111,6 +114,7 @@ async fn create_node(
         .map_err(|e| ApiError::Internal(format!("auto-grant owner permission failed: {e}")))?;
 
     sync_wikilinks(&state, node.id, node.body.as_deref().unwrap_or("")).await?;
+    log_activity(&state, node.id, &claims, ActivityAction::Created, json!({ "title": node.title })).await;
     Ok((StatusCode::CREATED, Json(node)))
 }
 
@@ -144,6 +148,7 @@ async fn update_node(
     require_editor(state.permissions.as_ref(), &claims, NodeId(id)).await?;
     let node = state.nodes.update(NodeId(id), req).await?;
     sync_wikilinks(&state, node.id, node.body.as_deref().unwrap_or("")).await?;
+    log_activity(&state, node.id, &claims, ActivityAction::Edited, json!({ "title": node.title })).await;
     Ok(Json(node))
 }
 
@@ -153,7 +158,10 @@ async fn delete_node(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     require_owner(state.permissions.as_ref(), &claims, NodeId(id)).await?;
+    // Capture the title before deletion for the activity entry (cascade will remove it after).
+    let title = state.nodes.get(NodeId(id)).await.map(|n| n.title).unwrap_or_default();
     state.nodes.delete(NodeId(id)).await?;
+    log_activity(&state, NodeId(id), &claims, ActivityAction::Deleted, json!({ "title": title })).await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -206,6 +214,7 @@ async fn attach_tag(
 ) -> Result<StatusCode, ApiError> {
     require_editor(state.permissions.as_ref(), &claims, NodeId(id)).await?;
     state.tags.attach(NodeId(id), TagId(tag_id)).await?;
+    log_activity(&state, NodeId(id), &claims, ActivityAction::TagAdded, json!({ "tag_id": tag_id })).await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -216,6 +225,7 @@ async fn detach_tag(
 ) -> Result<StatusCode, ApiError> {
     require_editor(state.permissions.as_ref(), &claims, NodeId(id)).await?;
     state.tags.detach(NodeId(id), TagId(tag_id)).await?;
+    log_activity(&state, NodeId(id), &claims, ActivityAction::TagRemoved, json!({ "tag_id": tag_id })).await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -272,6 +282,14 @@ async fn upload_attachment(
         .create(NodeId(id), &filename, &content_type, size_bytes, &s3_key)
         .await?;
 
+    log_activity(
+        &state,
+        NodeId(id),
+        &claims,
+        ActivityAction::AttachmentUploaded,
+        json!({ "filename": filename, "content_type": content_type }),
+    )
+    .await;
     Ok((StatusCode::CREATED, Json(attachment)))
 }
 
@@ -302,6 +320,14 @@ async fn grant_permission(
         .permissions
         .grant(NodeId(id), &claims.sub, req)
         .await?;
+    log_activity(
+        &state,
+        NodeId(id),
+        &claims,
+        ActivityAction::PermissionGranted,
+        json!({ "subject_id": perm.subject_id, "role": perm.role }),
+    )
+    .await;
     Ok((StatusCode::CREATED, Json(perm)))
 }
 
@@ -312,6 +338,14 @@ async fn revoke_permission(
 ) -> Result<StatusCode, ApiError> {
     require_owner(state.permissions.as_ref(), &claims, NodeId(id)).await?;
     state.permissions.revoke(PermissionId(perm_id)).await?;
+    log_activity(
+        &state,
+        NodeId(id),
+        &claims,
+        ActivityAction::PermissionRevoked,
+        json!({ "perm_id": perm_id }),
+    )
+    .await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -404,7 +438,62 @@ async fn invite(
         .await;
     }
 
+    log_activity(
+        &state,
+        NodeId(id),
+        &claims,
+        ActivityAction::PermissionGranted,
+        json!({ "invited_email": req.email, "role": role_str }),
+    )
+    .await;
     Ok((StatusCode::CREATED, Json(perm)))
+}
+
+// ── Activity log ─────────────────────────────────────────────────────────────
+
+/// Fire-and-forget activity record. Failures are logged as warnings, never
+/// propagated — the main operation has already succeeded at this point.
+pub(crate) async fn log_activity(
+    state: &AppState,
+    node_id: NodeId,
+    claims: &AuthClaims,
+    action: ActivityAction,
+    extra: serde_json::Value,
+) {
+    let mut meta = json!({
+        "actor_name": claims.name,
+        "actor_email": claims.email,
+    });
+    // Merge in caller-supplied extra fields.
+    if let (Some(obj), Some(ext)) = (meta.as_object_mut(), extra.as_object()) {
+        for (k, v) in ext {
+            obj.insert(k.clone(), v.clone());
+        }
+    }
+    if let Err(e) = state.activity.record(node_id, &claims.sub, action, meta).await {
+        tracing::warn!("activity log write failed (non-fatal): {e}");
+    }
+}
+
+/// `GET /nodes/{id}/activity?limit=<n>`
+///
+/// Returns the most recent activity entries for a node.
+/// Defaults to the last 50. Requires Viewer permission.
+#[derive(Debug, serde::Deserialize)]
+struct ActivityParams {
+    limit: Option<i64>,
+}
+
+async fn list_activity(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Path(id): Path<Uuid>,
+    Query(params): Query<ActivityParams>,
+) -> Result<Json<Vec<ActivityEntry>>, ApiError> {
+    require_viewer(state.permissions.as_ref(), &claims, NodeId(id)).await?;
+    let limit = params.limit.unwrap_or(50).clamp(1, 200);
+    let entries = state.activity.list(NodeId(id), limit).await?;
+    Ok(Json(entries))
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
@@ -484,6 +573,14 @@ async fn export_node(
             .map_err(|e| ApiError::Internal(format!("header value: {e}")))?,
     );
 
+    log_activity(
+        &state,
+        NodeId(id),
+        &claims,
+        ActivityAction::Exported,
+        json!({ "format": format }),
+    )
+    .await;
     Ok((headers, body))
 }
 

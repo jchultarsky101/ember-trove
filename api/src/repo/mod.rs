@@ -1,3 +1,4 @@
+pub mod activity;
 pub mod attachment;
 pub mod backup;
 pub mod favorite;

@@ -15,16 +15,19 @@ use axum::{
     Extension, Json, Router,
 };
 use common::{
+    activity::ActivityAction,
     auth::AuthClaims,
     id::{NodeId, ShareTokenId},
     node::Node,
     share_token::{CreateShareTokenRequest, ShareToken},
 };
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
     auth::permissions::require_owner,
     error::ApiError,
+    routes::nodes::log_activity,
     state::AppState,
 };
 
@@ -47,6 +50,14 @@ async fn create_share_token(
         .share_tokens
         .create(NodeId(node_id), &claims.sub, &req)
         .await?;
+    log_activity(
+        &state,
+        NodeId(node_id),
+        &claims,
+        ActivityAction::Shared,
+        json!({ "token_id": token.id }),
+    )
+    .await;
     Ok((StatusCode::CREATED, Json(token)))
 }
 
