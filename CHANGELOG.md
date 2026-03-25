@@ -4,6 +4,12 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.27.0] - 2026-03-25
+
+### Added
+- **SES invite notification** — when an existing Cognito user is granted access to a node, an HTML+text email is sent via AWS SES v2 with the node title, role, and a direct link. New users continue to receive only the Cognito welcome email (no duplicate). Controlled by the optional `SES_FROM_EMAIL` env var; if unset the invite still works, the email is simply skipped. Send failures are logged as warnings and do not affect the API response.
+- **Global keyboard shortcuts** — `n` new node · `g` graph · `/` search · `Esc` back to node list. Suppressed inside inputs, textareas, selects, contenteditable elements, and when Ctrl/Meta/Alt is held.
+
 ## [1.26.0] - 2026-03-25
 
 ### Added
