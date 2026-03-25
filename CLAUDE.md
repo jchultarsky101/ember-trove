@@ -155,6 +155,9 @@ Follows standard Git Flow. `v1.0.0` is the first production tag on `main`.
 - **SVG marker re-injection guard**: In `spawn_local` marker injectors, check
   `svg.query_selector("defs marker").is_ok_and(|m| m.is_none())` before inserting — reactive
   signals can re-fire and duplicate markers if unguarded.
+- **Tailwind v4 `group-hover` opacity unreliable**: `opacity-0 group-hover:opacity-100`
+  fails silently in Tailwind v4 (scoped to `@media (hover:hover)`). Use always-visible
+  elements with a muted colour instead: e.g. `text-stone-300 hover:text-amber-500`.
 
 ## Browser Testing (mcp__Claude_in_Chrome)
 
@@ -184,6 +187,28 @@ Follows standard Git Flow. `v1.0.0` is the first production tag on `main`.
   `array_length($n::uuid[], 1) IS NULL` as a bypass guard (empty array → skip filter) combined
   with `HAVING (NOT $and_mode) OR COUNT(DISTINCT tag_id) = array_length($n::uuid[], 1)` to
   switch AND/OR logic — all in a single static parameterised query.
+
+## Production Deployment
+
+- **Production server**: AWS EC2 `ubuntu@18.221.254.95` — SSH key at
+  `/Users/julian/projects/joomla4/ssh/LightsailDefaultKey-us-east-2.pem`.
+  `trove.chultarsky.me` points to this host; `docker compose -f deploy/docker-compose.yml`
+  only updates the local dev stack (port 8003) — it does NOT reach production.
+- **Prod compose file**: `deploy/docker-compose.prod.yml` with `deploy/.env.prod`;
+  always pass `--env-file deploy/.env.prod` or env vars silently default to empty strings.
+- **Full prod deploy sequence**:
+  1. `git push origin main develop --tags`
+  2. SSH to EC2: `nohup docker compose -f deploy/docker-compose.prod.yml build <svc> > /tmp/build.log 2>&1 &`
+     (use nohup — direct SSH drops during long Rust/WASM builds)
+  3. Poll: `ssh ... "ps -p <PID> || tail -5 /tmp/build.log"`
+  4. `docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d --force-recreate <svc>`
+  5. `docker exec deploy-proxy-1 nginx -s reload` (picks up new container IPs after recreate)
+- **DB migrations are automatic**: API runs `sqlx::migrate!()` at startup; `sqlx` binary is
+  not in the container. Check `docker logs deploy-api-1` for "database migrations complete".
+- **Docker BuildKit WASM cache**: `docker compose build --no-cache` does not reliably
+  invalidate BuildKit's content-addressed cache for Rust source changes. If the WASM hash
+  in the built image matches the previous build, stale WASM was served. Workaround:
+  build locally with `trunk build --release` then `docker cp ui/dist/. <container>:/usr/share/nginx/html/`.
 
 ## Implementation Phases
 

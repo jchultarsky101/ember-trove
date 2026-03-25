@@ -99,6 +99,7 @@ pub fn ActivityPanel(node_id: NodeId) -> impl IntoView {
     });
 
     view! {
+        <div class="mt-4 border-t border-stone-200 dark:border-stone-700 pt-6">
         <div class="border border-stone-200 dark:border-stone-700 rounded-lg overflow-hidden">
             // ── Header / toggle ────────────────────────────────────────────
             <button
@@ -162,6 +163,7 @@ pub fn ActivityPanel(node_id: NodeId) -> impl IntoView {
                     </Suspense>
                 </div>
             })}
+        </div>
         </div>
     }
 }
