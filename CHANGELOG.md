@@ -4,6 +4,16 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.26.0] - 2026-03-25
+
+### Added
+- **GitHub CD automation** — `LIGHTSAIL_HOST`, `LIGHTSAIL_SSH_KEY` secrets and `DEPLOY_ENABLED=true` repository variable are now set. Every push of a `v*.*.*` tag triggers the existing `release.yml` workflow: creates a GitHub Release, SSH-builds the Docker images on the EC2 host, force-recreates the containers, and health-checks the API. No more manual deploy steps.
+
+### Fixed
+- **Permission panel ownership gating** — `PermissionPanel` now accepts `is_owner: bool`; the invite button, role-change dropdown, and revoke button are hidden for viewers and editors (they only see a read-only role badge).
+- **`is_owner` computation** — `node_view.rs` previously treated every authenticated user as owner. It now correctly compares `auth.sub == node.owner_id`.
+- **Revoke button visibility** — Replaced the unreliable `opacity-0 group-hover:opacity-100` pattern (broken in Tailwind v4) with an always-visible muted `text-stone-300 hover:text-red-500` style, consistent with the note-edit button fix in v1.24.1.
+
 ## [1.24.1] - 2026-03-24
 
 ### Fixed
