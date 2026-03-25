@@ -6,6 +6,7 @@ mod auth;
 mod backup;
 mod config;
 mod error;
+mod notify;
 mod object_store;
 mod repo;
 mod routes;
@@ -23,6 +24,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use admin::CognitoAdminClient;
 use auth::{AuthConfig, oidc::OidcClient};
+use notify::SesNotifier;
 use config::Config;
 use object_store::s3::S3ObjectStore;
 use repo::{
@@ -116,6 +118,17 @@ async fn main() -> anyhow::Result<()> {
         None
     };
 
+    // SES notifier — optional; enabled when SES_FROM_EMAIL is set.
+    let notifier = if let Some(from_email) = config.ses_from_email.clone() {
+        tracing::info!("SES notifier enabled (from: {from_email})");
+        Some(Arc::new(
+            SesNotifier::new(from_email, config.frontend_url.clone()).await,
+        ))
+    } else {
+        tracing::info!("SES_FROM_EMAIL not set — invite email notifications disabled");
+        None
+    };
+
     let state = AppState {
         started_at: std::time::Instant::now(),
         nodes: Arc::new(PgNodeRepo::new(pool.clone())),
@@ -132,6 +145,7 @@ async fn main() -> anyhow::Result<()> {
         object_store,
         oidc,
         cognito_admin,
+        notifier,
         cookie_key,
         auth,
         config: config.clone(),

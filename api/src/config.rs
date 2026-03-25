@@ -29,6 +29,9 @@ pub struct Config {
     pub cognito_region: String,
     pub aws_access_key_id: Option<String>,
     pub aws_secret_access_key: Option<String>,
+    /// Verified SES sender address. When set, invite notifications are emailed to
+    /// existing users granted access to a node. Optional — invites still work without it.
+    pub ses_from_email: Option<String>,
     // Cookie encryption key (128 hex chars → 64 bytes, required by cookie::Key)
     pub cookie_key: String,
     /// Set `Secure` on session cookies. `true` in production (HTTPS), `false` in dev.
@@ -73,6 +76,7 @@ impl Config {
                 .unwrap_or_else(|_| "us-east-2".to_string()),
             aws_access_key_id: env::var("AWS_ACCESS_KEY_ID").ok(),
             aws_secret_access_key: env::var("AWS_SECRET_ACCESS_KEY").ok(),
+            ses_from_email: env::var("SES_FROM_EMAIL").ok(),
             cookie_key,
             cookie_secure: env::var("COOKIE_SECURE")
                 .map(|v| v == "true" || v == "1")
