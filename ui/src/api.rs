@@ -452,6 +452,19 @@ pub async fn revoke_permission(
     }
 }
 
+pub async fn invite_to_node(
+    node_id: NodeId,
+    req: &common::permission::InviteRequest,
+) -> Result<common::permission::Permission, UiError> {
+    let resp = Request::post(&api_url(&format!("/nodes/{node_id}/invite")))
+        .json(req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
 pub async fn update_permission(
     perm_id: common::id::PermissionId,
     req: &common::permission::UpdatePermissionRequest,

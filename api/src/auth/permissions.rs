@@ -1,31 +1,97 @@
 /// Per-node permission check helpers.
 ///
-/// Phase 1 stub — all checks pass through.
-/// Phase 7 wires these against the `permissions` table.
+/// Each helper performs a DB lookup and returns `Err(ApiError::Forbidden)`
+/// when the caller does not hold the required minimum role on the node.
+///
+/// Role hierarchy (weakest → strongest):  Viewer < Editor < Owner
 use common::auth::AuthClaims;
+use common::id::NodeId;
 use common::permission::PermissionRole;
 
 use crate::error::ApiError;
+use crate::repo::permission::PermissionRepo;
+
+/// Returns `true` when `actual` satisfies or exceeds `required`.
+fn role_satisfies(actual: &PermissionRole, required: &PermissionRole) -> bool {
+    match required {
+        PermissionRole::Viewer => true, // every role can view
+        PermissionRole::Editor => {
+            matches!(actual, PermissionRole::Editor | PermissionRole::Owner)
+        }
+        PermissionRole::Owner => matches!(actual, PermissionRole::Owner),
+    }
+}
 
 /// Assert that `claims.sub` holds at least `required_role` on `node_id`.
 ///
-/// Phase 1 always returns `Ok(())`.
-pub fn require_role(
-    _claims: &AuthClaims,
-    _node_id: uuid::Uuid,
-    _required_role: PermissionRole,
+/// Returns `Err(ApiError::Forbidden)` when no permission row is found or the
+/// stored role is insufficient.
+pub async fn require_role(
+    permissions: &dyn PermissionRepo,
+    claims: &AuthClaims,
+    node_id: NodeId,
+    required_role: PermissionRole,
 ) -> Result<(), ApiError> {
-    Ok(())
+    let perm = permissions
+        .find(node_id, &claims.sub)
+        .await
+        .map_err(|e| ApiError::Internal(e.to_string()))?;
+
+    match perm {
+        None => Err(ApiError::Forbidden("access denied".to_string())),
+        Some(p) if role_satisfies(&p.role, &required_role) => Ok(()),
+        Some(_) => Err(ApiError::Forbidden("insufficient permission".to_string())),
+    }
 }
 
-pub fn require_owner(claims: &AuthClaims, node_id: uuid::Uuid) -> Result<(), ApiError> {
-    require_role(claims, node_id, PermissionRole::Owner)
+pub async fn require_owner(
+    permissions: &dyn PermissionRepo,
+    claims: &AuthClaims,
+    node_id: NodeId,
+) -> Result<(), ApiError> {
+    require_role(permissions, claims, node_id, PermissionRole::Owner).await
 }
 
-pub fn require_editor(claims: &AuthClaims, node_id: uuid::Uuid) -> Result<(), ApiError> {
-    require_role(claims, node_id, PermissionRole::Editor)
+pub async fn require_editor(
+    permissions: &dyn PermissionRepo,
+    claims: &AuthClaims,
+    node_id: NodeId,
+) -> Result<(), ApiError> {
+    require_role(permissions, claims, node_id, PermissionRole::Editor).await
 }
 
-pub fn require_viewer(claims: &AuthClaims, node_id: uuid::Uuid) -> Result<(), ApiError> {
-    require_role(claims, node_id, PermissionRole::Viewer)
+pub async fn require_viewer(
+    permissions: &dyn PermissionRepo,
+    claims: &AuthClaims,
+    node_id: NodeId,
+) -> Result<(), ApiError> {
+    require_role(permissions, claims, node_id, PermissionRole::Viewer).await
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn viewer_requirement_is_satisfied_by_any_role() {
+        for role in [PermissionRole::Viewer, PermissionRole::Editor, PermissionRole::Owner] {
+            assert!(role_satisfies(&role, &PermissionRole::Viewer));
+        }
+    }
+
+    #[test]
+    fn editor_requirement_is_satisfied_by_editor_and_owner() {
+        assert!(role_satisfies(&PermissionRole::Editor, &PermissionRole::Editor));
+        assert!(role_satisfies(&PermissionRole::Owner, &PermissionRole::Editor));
+        assert!(!role_satisfies(&PermissionRole::Viewer, &PermissionRole::Editor));
+    }
+
+    #[test]
+    fn owner_requirement_is_satisfied_only_by_owner() {
+        assert!(role_satisfies(&PermissionRole::Owner, &PermissionRole::Owner));
+        assert!(!role_satisfies(&PermissionRole::Editor, &PermissionRole::Owner));
+        assert!(!role_satisfies(&PermissionRole::Viewer, &PermissionRole::Owner));
+    }
 }
