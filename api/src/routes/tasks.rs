@@ -111,6 +111,7 @@ async fn project_dashboard(
         status: None,
         tag_id: None,
         owner_id: Some(claims.sub.clone()),
+        subject_id: None,
         page: Some(1),
         per_page: Some(500),
     };

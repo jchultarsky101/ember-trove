@@ -290,6 +290,18 @@ impl NodeRepo for PgNodeRepo {
             param_idx += 1;
         }
 
+        if params.subject_id.is_some() {
+            // Restrict to nodes the caller owns or holds any permission on.
+            conditions.push(format!(
+                "n.id IN (\
+                    SELECT node_id FROM permissions WHERE subject_id = ${param_idx} \
+                    UNION \
+                    SELECT id FROM nodes WHERE owner_id = ${param_idx}\
+                )"
+            ));
+            param_idx += 1;
+        }
+
         if !conditions.is_empty() {
             let where_clause = " WHERE ".to_owned() + &conditions.join(" AND ");
             count_sql.push_str(&where_clause);
@@ -309,6 +321,9 @@ impl NodeRepo for PgNodeRepo {
         }
         if let Some(ref owner_id) = params.owner_id {
             count_query = count_query.bind(owner_id.as_str());
+        }
+        if let Some(ref subject_id) = params.subject_id {
+            count_query = count_query.bind(subject_id.as_str());
         }
 
         let total: i64 = count_query
@@ -335,6 +350,9 @@ impl NodeRepo for PgNodeRepo {
         }
         if let Some(ref owner_id) = params.owner_id {
             query = query.bind(owner_id.as_str());
+        }
+        if let Some(ref subject_id) = params.subject_id {
+            query = query.bind(subject_id.as_str());
         }
 
         query = query.bind(per_page as i64).bind(offset as i64);

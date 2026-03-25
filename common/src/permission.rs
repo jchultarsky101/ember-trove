@@ -43,6 +43,19 @@ pub struct PermissionListParams {
     pub node_id: Option<uuid::Uuid>,
 }
 
+/// Request body for `POST /nodes/{id}/invite`.
+///
+/// If a Cognito user with the given email already exists, the permission is
+/// granted directly.  Otherwise a new Cognito user is created (which triggers
+/// a welcome / temporary-password email) and the permission is then granted.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+pub struct InviteRequest {
+    #[garde(email)]
+    pub email: String,
+    #[garde(skip)]
+    pub role: PermissionRole,
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
