@@ -1,6 +1,7 @@
 use axum::{
     extract::{DefaultBodyLimit, Multipart, Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, HeaderValue, StatusCode},
+    response::IntoResponse,
     routing::{delete, get, post},
     Extension, Json, Router,
 };
@@ -47,6 +48,7 @@ pub fn router() -> Router<AppState> {
         )
         .route("/{id}/permissions/{perm_id}", delete(revoke_permission))
         .route("/{id}/invite", post(invite))
+        .route("/{id}/export", get(export_node))
 }
 
 // ── Node list ────────────────────────────────────────────────────────────────
@@ -403,6 +405,86 @@ async fn invite(
     }
 
     Ok((StatusCode::CREATED, Json(perm)))
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, serde::Deserialize)]
+struct ExportParams {
+    /// `markdown` (default) or `json`
+    format: Option<String>,
+}
+
+/// `GET /nodes/{id}/export?format=markdown|json`
+///
+/// Returns the node as a downloadable file.
+/// - `markdown` (default): YAML front-matter + body
+/// - `json`: full Node DTO
+///
+/// Requires at least Viewer permission.
+async fn export_node(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Path(id): Path<Uuid>,
+    Query(params): Query<ExportParams>,
+) -> Result<impl IntoResponse, ApiError> {
+    require_viewer(state.permissions.as_ref(), &claims, NodeId(id)).await?;
+    let node = state.nodes.get(NodeId(id)).await?;
+
+    let format = params.format.as_deref().unwrap_or("markdown");
+    let (body, content_type, filename) = match format {
+        "json" => {
+            let json = serde_json::to_string_pretty(&node)
+                .map_err(|e| ApiError::Internal(format!("JSON serialise failed: {e}")))?;
+            let name = sanitize_filename(&format!("{}.json", node.title));
+            (json, "application/json; charset=utf-8", name)
+        }
+        _ => {
+            // Build YAML-style front-matter block then append body.
+            let node_type = format!("{:?}", node.node_type).to_lowercase();
+            let status = format!("{:?}", node.status).to_lowercase();
+            let tag_names: Vec<String> = node.tags.iter().map(|t| t.name.clone()).collect();
+            let tags_yaml = if tag_names.is_empty() {
+                "[]".to_string()
+            } else {
+                format!(
+                    "[{}]",
+                    tag_names
+                        .iter()
+                        .map(|t| format!("\"{t}\""))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            };
+            let front_matter = format!(
+                "---\ntitle: \"{}\"\ntype: {node_type}\nstatus: {status}\ntags: {tags_yaml}\ncreated_at: {}\nupdated_at: {}\n---\n\n",
+                node.title.replace('"', "\\\""),
+                node.created_at.format("%Y-%m-%dT%H:%M:%SZ"),
+                node.updated_at.format("%Y-%m-%dT%H:%M:%SZ"),
+            );
+            let md = format!(
+                "{}{}",
+                front_matter,
+                node.body.as_deref().unwrap_or("")
+            );
+            let name = sanitize_filename(&format!("{}.md", node.title));
+            (md, "text/markdown; charset=utf-8", name)
+        }
+    };
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        axum::http::header::CONTENT_TYPE,
+        HeaderValue::from_str(content_type)
+            .map_err(|e| ApiError::Internal(format!("header value: {e}")))?,
+    );
+    headers.insert(
+        axum::http::header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&format!("attachment; filename=\"{filename}\""))
+            .map_err(|e| ApiError::Internal(format!("header value: {e}")))?,
+    );
+
+    Ok((headers, body))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

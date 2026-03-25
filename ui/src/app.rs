@@ -3,7 +3,10 @@ use leptos::{ev, prelude::*};
 
 use crate::{
     auth::provide_auth_state,
-    components::{dark_mode_toggle::Theme, layout::Layout, toast::ToastState},
+    components::{
+        dark_mode_toggle::Theme, layout::Layout,
+        public_share_view::PublicShareView, toast::ToastState,
+    },
 };
 
 // ── localStorage helpers ───────────────────────────────────────────────────
@@ -55,6 +58,17 @@ pub enum View {
 
 #[component]
 pub fn App() -> impl IntoView {
+    // Public share links (`/share/<uuid>`) render a standalone read-only view
+    // without authentication or the main layout.
+    let pathname = web_sys::window()
+        .and_then(|w| w.location().pathname().ok())
+        .unwrap_or_default();
+    if let Some(token_str) = pathname.strip_prefix("/share/")
+        && let Ok(token) = token_str.parse::<uuid::Uuid>()
+    {
+        return view! { <PublicShareView token=token /> }.into_any();
+    }
+
     let auth_state = provide_auth_state();
 
     // Persist theme in localStorage
@@ -172,4 +186,5 @@ pub fn App() -> impl IntoView {
     view! {
         <Layout auth_state=auth_state />
     }
+    .into_any()
 }
