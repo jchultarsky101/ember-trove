@@ -106,11 +106,14 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                             let node_type = format!("{:?}", n.node_type).to_lowercase();
                             let status = format!("{:?}", n.status).to_lowercase();
                             let edit_id = n.id;
-                            // Single-user mode: any authenticated user can act as owner.
-                            let is_owner = matches!(
-                                auth_state.get_untracked(),
-                                AuthStatus::Authenticated(_)
-                            );
+                            // Real ownership check: compare the JWT sub with the node's owner_id.
+                            let is_owner = if let AuthStatus::Authenticated(ref user) =
+                                auth_state.get_untracked()
+                            {
+                                user.sub == n.owner_id
+                            } else {
+                                false
+                            };
 
                             // Click delegation: intercept clicks on `.wikilink` anchors and
                             // navigate in-app instead of following the href.
@@ -203,7 +206,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         <EdgePanel node_id=id />
                                         <BacklinksPanel node_id=id />
                                         <AttachmentPanel node_id=id />
-                                        <PermissionPanel node_id=id />
+                                        <PermissionPanel node_id=id is_owner=is_owner />
                                     </div>
                                 </div>
                             }.into_any()
