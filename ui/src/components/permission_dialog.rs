@@ -12,7 +12,7 @@ use leptos::prelude::*;
 use crate::api;
 
 #[component]
-pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
+pub fn PermissionPanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
     let refresh = RwSignal::new(0u32);
     let show_invite = RwSignal::new(false);
     let email_input = RwSignal::new(String::new());
@@ -91,7 +91,7 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                         "Sharing"
                     </h2>
                 </button>
-                {move || open.get().then(|| view! {
+                {move || (open.get() && is_owner).then(|| view! {
                     <button
                         class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
                             dark:hover:text-stone-300 hover:bg-stone-100
@@ -241,13 +241,13 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                                                     </span>
                                                 </div>
                                                 <div class="flex items-center gap-1.5 shrink-0">
-                                                    {move || if updating.get() {
+                                                    {move || if is_owner && updating.get() {
                                                         view! {
                                                             <span class={format!("px-1.5 py-0.5 text-[10px] rounded-full font-medium {}", role_color())}>
                                                                 "saving\u{2026}"
                                                             </span>
                                                         }.into_any()
-                                                    } else {
+                                                    } else if is_owner {
                                                         view! {
                                                             <select
                                                                 class=move || format!(
@@ -264,20 +264,32 @@ pub fn PermissionPanel(node_id: NodeId) -> impl IntoView {
                                                                 <option value="owner">"owner"</option>
                                                             </select>
                                                         }.into_any()
+                                                    } else {
+                                                        // Read-only role badge for non-owners.
+                                                        view! {
+                                                            <span class={format!("px-1.5 py-0.5 text-[10px] rounded-full font-medium {}", role_color())}>
+                                                                {current_role.get_untracked()}
+                                                            </span>
+                                                        }.into_any()
                                                     }}
-                                                    <button
-                                                        class="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600
-                                                            text-xs transition-opacity shrink-0 px-1"
-                                                        title="Revoke access"
-                                                        on:click=move |_| {
-                                                            wasm_bindgen_futures::spawn_local(async move {
-                                                                let _ = api::revoke_permission(node_id, perm_id).await;
-                                                                refresh.update(|n| *n += 1);
-                                                            });
-                                                        }
-                                                    >
-                                                        "\u{00d7}"
-                                                    </button>
+                                                    // Revoke button — always visible with muted colour (Tailwind v4
+                                                    // group-hover opacity is unreliable). Hidden for non-owners.
+                                                    {is_owner.then(|| view! {
+                                                        <button
+                                                            class="text-stone-300 hover:text-red-500
+                                                                dark:text-stone-600 dark:hover:text-red-400
+                                                                text-xs transition-colors shrink-0 px-1"
+                                                            title="Revoke access"
+                                                            on:click=move |_| {
+                                                                wasm_bindgen_futures::spawn_local(async move {
+                                                                    let _ = api::revoke_permission(node_id, perm_id).await;
+                                                                    refresh.update(|n| *n += 1);
+                                                                });
+                                                            }
+                                                        >
+                                                            "\u{00d7}"
+                                                        </button>
+                                                    })}
                                                 </div>
                                             </div>
                                         }
