@@ -1,6 +1,6 @@
 [package]
 name       = "api"
-version = "1.26.0"
+version = "1.27.0"
 edition    = "2021"
 repository = "https://github.com/jchultarsky101/ember-trove"
 
@@ -33,10 +33,11 @@ rand               = { workspace = true }
 sha2               = { workspace = true }
 base64             = { workspace = true }
 
-# AWS SDKs — S3 object storage + Cognito user management
+# AWS SDKs — S3 object storage + Cognito user management + SES email
 aws-config = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-s3 = "1"
 aws-sdk-cognitoidentityprovider = "1"
+aws-sdk-sesv2 = "1"
 
 # Backup archive (tar + gzip)
 tar    = "0.4"

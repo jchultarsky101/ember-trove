@@ -7,6 +7,7 @@ use crate::{
     admin::CognitoAdminClient,
     auth::{AuthConfig, oidc::OidcClient},
     config::Config,
+    notify::SesNotifier,
     object_store::ObjectStore,
     repo::{
         attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo, favorite::FavoriteRepo,
@@ -33,6 +34,8 @@ pub struct AppState {
     pub oidc: Option<Arc<OidcClient>>,
     /// Cognito admin client — `None` when `COGNITO_USER_POOL_ID` is not set.
     pub cognito_admin: Option<Arc<CognitoAdminClient>>,
+    /// SES notifier — `None` when `SES_FROM_EMAIL` is not set.
+    pub notifier: Option<Arc<SesNotifier>>,
     pub cookie_key: Key,
     pub auth: AuthConfig,
     pub config: Config,
