@@ -10,9 +10,10 @@ use crate::{
     notify::SesNotifier,
     object_store::ObjectStore,
     repo::{
-        attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo, favorite::FavoriteRepo,
-        graph::GraphRepo, node::NodeRepo, note::NoteRepo, permission::PermissionRepo,
-        search::SearchRepo, share_token::ShareTokenRepo, tag::TagRepo, task::TaskRepo,
+        activity::ActivityRepo, attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo,
+        favorite::FavoriteRepo, graph::GraphRepo, node::NodeRepo, note::NoteRepo,
+        permission::PermissionRepo, search::SearchRepo, share_token::ShareTokenRepo,
+        tag::TagRepo, task::TaskRepo,
     },
 };
 
@@ -31,6 +32,7 @@ pub struct AppState {
     pub backup: Arc<dyn BackupRepo>,
     pub favorites: Arc<dyn FavoriteRepo>,
     pub share_tokens: Arc<dyn ShareTokenRepo>,
+    pub activity: Arc<dyn ActivityRepo>,
     pub object_store: Arc<dyn ObjectStore>,
     pub oidc: Option<Arc<OidcClient>>,
     /// Cognito admin client — `None` when `COGNITO_USER_POOL_ID` is not set.

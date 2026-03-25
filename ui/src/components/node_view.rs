@@ -10,6 +10,7 @@ use crate::app::View;
 use crate::components::attachment_panel::AttachmentPanel;
 use crate::components::modals::delete_confirm::DeleteConfirmModal;
 use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
+use crate::components::activity_panel::ActivityPanel;
 use crate::components::permission_dialog::PermissionPanel;
 use crate::components::share_panel::SharePanel;
 use crate::components::tag_bar::TagBar;
@@ -222,6 +223,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         <AttachmentPanel node_id=id />
                                         <PermissionPanel node_id=id is_owner=is_owner />
                                         <SharePanel node_id=id is_owner=is_owner />
+                                        <ActivityPanel node_id=id />
                                     </div>
                                 </div>
                             }.into_any()
