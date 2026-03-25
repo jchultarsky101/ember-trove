@@ -24,12 +24,13 @@ use axum_extra::extract::cookie::Key;
 use chrono::NaiveDate;
 use common::{
     EmberTroveError,
+    activity::{ActivityAction, ActivityEntry},
     attachment::Attachment,
     backup::BackupJob,
     edge::{CreateEdgeRequest, Edge, EdgeWithTitles},
     favorite::{CreateFavoriteRequest, Favorite},
     graph::NodePosition,
-    id::{AttachmentId, EdgeId, FavoriteId, NodeId, PermissionId, TagId, TaskId},
+    id::{AttachmentId, EdgeId, FavoriteId, NodeId, PermissionId, ShareTokenId, TagId, TaskId},
     node::{CreateNodeRequest, Node, NodeListParams, NodeTitleEntry, UpdateNodeRequest},
     note::{CreateNoteRequest, FeedNote, Note},
     permission::{GrantPermissionRequest, Permission, PermissionRole},
@@ -46,9 +47,10 @@ use crate::{
     config::Config,
     object_store::NullObjectStore,
     repo::{
-        attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo, favorite::FavoriteRepo,
-        graph::GraphRepo, node::NodeRepo, note::NoteRepo, permission::PermissionRepo,
-        search::SearchRepo, tag::TagRepo, task::TaskRepo,
+        activity::ActivityRepo, attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo,
+        favorite::FavoriteRepo, graph::GraphRepo, node::NodeRepo, note::NoteRepo,
+        permission::PermissionRepo, search::SearchRepo, share_token::ShareTokenRepo, tag::TagRepo,
+        task::TaskRepo,
     },
     routes::build_router,
     state::AppState,
@@ -178,6 +180,22 @@ impl FavoriteRepo for StubFavoriteRepo {
     async fn reorder(&self, _: &str, _: &[FavoriteId]) -> Result<Vec<Favorite>, EmberTroveError> { unimplemented!() }
 }
 
+struct StubShareTokenRepo;
+#[async_trait]
+impl ShareTokenRepo for StubShareTokenRepo {
+    async fn create(&self, _: NodeId, _: &str, _: &common::share_token::CreateShareTokenRequest) -> Result<common::share_token::ShareToken, EmberTroveError> { unimplemented!() }
+    async fn list(&self, _: NodeId) -> Result<Vec<common::share_token::ShareToken>, EmberTroveError> { unimplemented!() }
+    async fn find_by_token(&self, _: Uuid) -> Result<Option<common::share_token::ShareToken>, EmberTroveError> { unimplemented!() }
+    async fn revoke(&self, _: ShareTokenId) -> Result<(), EmberTroveError> { unimplemented!() }
+}
+
+struct StubActivityRepo;
+#[async_trait]
+impl ActivityRepo for StubActivityRepo {
+    async fn record(&self, _: NodeId, _: &str, _: ActivityAction, _: serde_json::Value) -> Result<(), EmberTroveError> { Ok(()) }
+    async fn list(&self, _: NodeId, _: i64) -> Result<Vec<ActivityEntry>, EmberTroveError> { unimplemented!() }
+}
+
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
 fn test_state() -> AppState {
@@ -201,9 +219,12 @@ fn test_state() -> AppState {
         graph:        Arc::new(StubGraphRepo),
         backup:       Arc::new(StubBackupRepo),
         favorites:    Arc::new(StubFavoriteRepo),
+        share_tokens: Arc::new(StubShareTokenRepo),
+        activity:     Arc::new(StubActivityRepo),
         object_store: Arc::new(NullObjectStore),
         oidc:          None,
         cognito_admin: None,
+        notifier:      None,
         cookie_key:    Key::generate(),
         auth: AuthConfig {
             issuer:           "https://example.com".to_string(),
@@ -225,6 +246,7 @@ fn test_state() -> AppState {
             oidc_client_secret:    None,
             cognito_user_pool_id:  None,
             cognito_region:        "us-east-2".to_string(),
+            ses_from_email:        None,
             aws_access_key_id:     None,
             aws_secret_access_key: None,
             cookie_key:            "a".repeat(128),

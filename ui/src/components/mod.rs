@@ -1,3 +1,4 @@
+pub mod activity_panel;
 pub mod admin_view;
 pub mod backup_view;
 pub mod attachment_panel;
