@@ -11,6 +11,7 @@ use crate::components::attachment_panel::AttachmentPanel;
 use crate::components::modals::delete_confirm::DeleteConfirmModal;
 use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
 use crate::components::permission_dialog::PermissionPanel;
+use crate::components::share_panel::SharePanel;
 use crate::components::tag_bar::TagBar;
 use crate::auth::{AuthStatus, use_auth_state};
 use crate::components::note_panel::NotePanel;
@@ -165,6 +166,19 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                             </span>
                                         </div>
                                         <div class="flex items-center gap-1">
+                                            // Export — opens the markdown download in a new tab.
+                                            // Using an <a> with the API URL triggers the browser's
+                                            // native file-save dialog without any JS fetch.
+                                            <a
+                                                href=format!("/api/nodes/{id}/export")
+                                                download=true
+                                                class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                                                    dark:hover:text-stone-300 hover:bg-stone-100
+                                                    dark:hover:bg-stone-800 transition-colors"
+                                                title="Export as Markdown"
+                                            >
+                                                <span class="material-symbols-outlined">"download"</span>
+                                            </a>
                                             <button
                                                 class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
                                                     dark:hover:text-stone-300 hover:bg-stone-100
@@ -207,6 +221,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         <BacklinksPanel node_id=id />
                                         <AttachmentPanel node_id=id />
                                         <PermissionPanel node_id=id is_owner=is_owner />
+                                        <SharePanel node_id=id is_owner=is_owner />
                                     </div>
                                 </div>
                             }.into_any()

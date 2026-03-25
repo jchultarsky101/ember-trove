@@ -13,6 +13,8 @@ pub mod notes_view;
 pub mod node_meta;
 pub mod node_view;
 pub mod permission_dialog;
+pub mod public_share_view;
+pub mod share_panel;
 pub mod search_bar;
 pub mod search_view;
 pub mod sidebar;
