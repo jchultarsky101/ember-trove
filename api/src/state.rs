@@ -12,7 +12,7 @@ use crate::{
     repo::{
         attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo, favorite::FavoriteRepo,
         graph::GraphRepo, node::NodeRepo, note::NoteRepo, permission::PermissionRepo,
-        search::SearchRepo, tag::TagRepo, task::TaskRepo,
+        search::SearchRepo, share_token::ShareTokenRepo, tag::TagRepo, task::TaskRepo,
     },
 };
 
@@ -30,6 +30,7 @@ pub struct AppState {
     pub graph: Arc<dyn GraphRepo>,
     pub backup: Arc<dyn BackupRepo>,
     pub favorites: Arc<dyn FavoriteRepo>,
+    pub share_tokens: Arc<dyn ShareTokenRepo>,
     pub object_store: Arc<dyn ObjectStore>,
     pub oidc: Option<Arc<OidcClient>>,
     /// Cognito admin client — `None` when `COGNITO_USER_POOL_ID` is not set.

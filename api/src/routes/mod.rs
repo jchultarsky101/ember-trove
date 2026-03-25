@@ -10,6 +10,7 @@ pub mod graph;
 pub mod nodes;
 pub mod permissions;
 pub mod search;
+pub mod share;
 pub mod tags;
 pub mod tasks;
 
@@ -99,6 +100,7 @@ pub fn build_router(state: AppState) -> anyhow::Result<Router> {
         .nest("/graph", graph::router())
         .nest("/permissions", permissions::router())
         .nest("/favorites", favorites::router())
+        .nest("/nodes/{node_id}/share", share::node_share_router())
         .nest("/admin", admin::router())
         .nest("/admin/backups", backup::router())
         .nest("/metrics", metrics::router())
@@ -114,6 +116,7 @@ pub fn build_router(state: AppState) -> anyhow::Result<Router> {
     // Public routes — no auth required.
     let router = Router::new()
         .route("/health", get(health))
+        .nest("/share", share::public_share_router())
         .merge(rate_limited)
         .layer(cors)
         // 30-second request timeout — returns 408 Request Timeout.
