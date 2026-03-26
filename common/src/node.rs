@@ -35,8 +35,14 @@ pub struct Node {
     pub metadata: serde_json::Value,
     pub status: NodeStatus,
     pub tags: Vec<Tag>,
+    pub pinned: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SetPinnedRequest {
+    pub pinned: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]

@@ -2,7 +2,7 @@ use axum::{
     extract::{DefaultBodyLimit, Multipart, Path, Query, State},
     http::{HeaderMap, HeaderValue, StatusCode},
     response::IntoResponse,
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
     Extension, Json, Router,
 };
 use bytes::Bytes;
@@ -12,7 +12,7 @@ use common::{
     auth::AuthClaims,
     edge::EdgeWithTitles,
     id::{NodeId, NodeVersionId, PermissionId, TagId},
-    node::{CreateNodeRequest, Node, NodeListParams, NodeListResponse, NodeTitleEntry, UpdateNodeRequest},
+    node::{CreateNodeRequest, Node, NodeListParams, NodeListResponse, NodeTitleEntry, SetPinnedRequest, UpdateNodeRequest},
     node_version::NodeVersion,
     permission::{GrantPermissionRequest, InviteRequest, Permission, PermissionRole},
     tag::Tag,
@@ -55,6 +55,7 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/activity", get(list_activity))
         .route("/{id}/versions", get(list_versions))
         .route("/{id}/versions/{version_id}/restore", post(restore_version))
+        .route("/{id}/pin", put(pin_node))
 }
 
 // ── Node list ────────────────────────────────────────────────────────────────
@@ -659,6 +660,21 @@ async fn restore_version(
         }
     });
     log_activity(&state, node.id, &claims, ActivityAction::Edited, json!({ "title": node.title, "restored_from": version_id })).await;
+    Ok(Json(node))
+}
+
+// ── Node pinning ─────────────────────────────────────────────────────────────
+
+/// `PUT /nodes/{id}/pin`  — set or clear the pinned flag.
+/// Requires Editor or Owner role. Pinned nodes sort to the top of node lists.
+async fn pin_node(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<SetPinnedRequest>,
+) -> Result<Json<Node>, ApiError> {
+    require_editor(state.permissions.as_ref(), &claims, NodeId(id)).await?;
+    let node = state.nodes.set_pinned(NodeId(id), req).await?;
     Ok(Json(node))
 }
 

@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use common::{
     EmberTroveError,
     id::{NodeId, TagId},
-    node::{CreateNodeRequest, Node, NodeListParams, NodeStatus, NodeType, NodeTitleEntry, UpdateNodeRequest},
+    node::{CreateNodeRequest, Node, NodeListParams, NodeStatus, NodeType, NodeTitleEntry, UpdateNodeRequest, SetPinnedRequest},
     slug::slugify,
     tag::Tag,
 };
@@ -43,6 +43,9 @@ pub trait NodeRepo: Send + Sync {
 
     /// Fetch every node across all owners with tags populated — used for full backup.
     async fn list_all(&self) -> Result<Vec<Node>, EmberTroveError>;
+
+    /// Set or clear the pinned flag on a node.
+    async fn set_pinned(&self, id: NodeId, req: SetPinnedRequest) -> Result<Node, EmberTroveError>;
 }
 
 pub struct PgNodeRepo {
@@ -67,6 +70,7 @@ struct NodeRow {
     body: Option<String>,
     metadata: serde_json::Value,
     status: String,
+    pinned: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -83,6 +87,7 @@ impl NodeRow {
             metadata: self.metadata,
             status: parse_node_status(&self.status)?,
             tags: vec![], // populated separately if needed
+            pinned: self.pinned,
             created_at: self.created_at,
             updated_at: self.updated_at,
         })
@@ -194,7 +199,7 @@ impl NodeRepo for PgNodeRepo {
             INSERT INTO nodes (owner_id, node_type, title, slug, body, metadata, status)
             VALUES ($1, $2::node_type, $3, $4, $5, $6, $7::node_status)
             RETURNING id, owner_id, node_type::text, title, slug, body, metadata,
-                      status::text, created_at, updated_at
+                      status::text, pinned, created_at, updated_at
             "#,
         )
         .bind(owner_id)
@@ -220,7 +225,7 @@ impl NodeRepo for PgNodeRepo {
         let row = sqlx::query_as::<_, NodeRow>(
             r#"
             SELECT id, owner_id, node_type::text, title, slug, body, metadata,
-                   status::text, created_at, updated_at
+                   status::text, pinned, created_at, updated_at
             FROM nodes WHERE id = $1
             "#,
         )
@@ -240,7 +245,7 @@ impl NodeRepo for PgNodeRepo {
         let row = sqlx::query_as::<_, NodeRow>(
             r#"
             SELECT id, owner_id, node_type::text, title, slug, body, metadata,
-                   status::text, created_at, updated_at
+                   status::text, pinned, created_at, updated_at
             FROM nodes WHERE slug = $1
             "#,
         )
@@ -262,7 +267,7 @@ impl NodeRepo for PgNodeRepo {
         let mut count_sql = String::from("SELECT COUNT(*) FROM nodes n");
         let mut data_sql = String::from(
             "SELECT n.id, n.owner_id, n.node_type::text, n.title, n.slug, n.body, \
-             n.metadata, n.status::text, n.created_at, n.updated_at FROM nodes n",
+             n.metadata, n.status::text, n.pinned, n.created_at, n.updated_at FROM nodes n",
         );
 
         let mut conditions: Vec<String> = Vec::new();
@@ -331,9 +336,9 @@ impl NodeRepo for PgNodeRepo {
             .await
             .map_err(|e| EmberTroveError::Internal(format!("count query failed: {e}")))?;
 
-        // Get paginated data.
+        // Get paginated data. Pinned nodes always sort first within any order.
         data_sql.push_str(&format!(
-            " ORDER BY n.updated_at DESC LIMIT ${param_idx} OFFSET ${}",
+            " ORDER BY n.pinned DESC, n.updated_at DESC LIMIT ${param_idx} OFFSET ${}",
             param_idx + 1
         ));
 
@@ -386,7 +391,7 @@ impl NodeRepo for PgNodeRepo {
                 status   = COALESCE($5::node_status, status)
             WHERE id = $1
             RETURNING id, owner_id, node_type::text, title, slug, body, metadata,
-                      status::text, created_at, updated_at
+                      status::text, pinned, created_at, updated_at
             "#,
         )
         .bind(id.0)
@@ -420,7 +425,7 @@ impl NodeRepo for PgNodeRepo {
         let rows = sqlx::query_as::<_, NodeRow>(
             r#"
             SELECT n.id, n.owner_id, n.node_type::text, n.title, n.slug, n.body,
-                   n.metadata, n.status::text, n.created_at, n.updated_at
+                   n.metadata, n.status::text, n.pinned, n.created_at, n.updated_at
             FROM nodes n
             JOIN edges e ON e.target_id = n.id
             WHERE e.source_id = $1
@@ -439,7 +444,7 @@ impl NodeRepo for PgNodeRepo {
         let rows = sqlx::query_as::<_, NodeRow>(
             r#"
             SELECT n.id, n.owner_id, n.node_type::text, n.title, n.slug, n.body,
-                   n.metadata, n.status::text, n.created_at, n.updated_at
+                   n.metadata, n.status::text, n.pinned, n.created_at, n.updated_at
             FROM nodes n
             JOIN edges e ON e.source_id = n.id
             WHERE e.target_id = $1
@@ -500,7 +505,7 @@ impl NodeRepo for PgNodeRepo {
         let rows = sqlx::query_as::<_, NodeRow>(
             r#"
             SELECT id, owner_id, node_type::text, title, slug, body, metadata,
-                   status::text, created_at, updated_at
+                   status::text, pinned, created_at, updated_at
             FROM nodes
             WHERE owner_id = $1
             ORDER BY created_at ASC
@@ -529,7 +534,7 @@ impl NodeRepo for PgNodeRepo {
         let rows = sqlx::query_as::<_, NodeRow>(
             r#"
             SELECT id, owner_id, node_type::text, title, slug, body, metadata,
-                   status::text, created_at, updated_at
+                   status::text, pinned, created_at, updated_at
             FROM nodes
             ORDER BY created_at ASC
             "#,
@@ -550,5 +555,24 @@ impl NodeRepo for PgNodeRepo {
         }
 
         Ok(nodes)
+    }
+
+    async fn set_pinned(&self, id: NodeId, req: SetPinnedRequest) -> Result<Node, EmberTroveError> {
+        let row = sqlx::query_as::<_, NodeRow>(
+            r#"
+            UPDATE nodes SET pinned = $2
+            WHERE id = $1
+            RETURNING id, owner_id, node_type::text, title, slug, body, metadata,
+                      status::text, pinned, created_at, updated_at
+            "#,
+        )
+        .bind(id.0)
+        .bind(req.pinned)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("set_pinned failed: {e}")))?
+        .ok_or_else(|| EmberTroveError::NotFound(format!("node {id} not found")))?;
+
+        row.into_node()
     }
 }
