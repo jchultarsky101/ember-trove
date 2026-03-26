@@ -6,7 +6,7 @@ use common::{
     edge::{CreateEdgeRequest, Edge, EdgeWithTitles},
     favorite::{CreateFavoriteRequest, Favorite, ReorderFavoritesRequest},
     id::{AttachmentId, EdgeId, FavoriteId, NodeId, NoteId, TagId, TaskId},
-    node::{CreateNodeRequest, Node, NodeListResponse, NodeTitleEntry, UpdateNodeRequest},
+    node::{CreateNodeRequest, Node, NodeListResponse, NodeTitleEntry, SetPinnedRequest, UpdateNodeRequest},
     search::SearchResponse,
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
     note::{CreateNoteRequest, FeedNote, Note, UpdateNoteRequest},
@@ -205,6 +205,17 @@ pub async fn delete_node(id: NodeId) -> Result<(), UiError> {
             .unwrap_or_else(|_| "unknown error".to_string());
         Err(UiError::api(status, text))
     }
+}
+
+pub async fn set_node_pinned(id: NodeId, pinned: bool) -> Result<Node, UiError> {
+    let req = SetPinnedRequest { pinned };
+    let resp = Request::put(&api_url(&format!("/nodes/{id}/pin")))
+        .json(&req)
+        .map_err(|e| UiError::Network(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
 }
 
 pub async fn fetch_node_titles() -> Result<Vec<NodeTitleEntry>, UiError> {

@@ -32,7 +32,7 @@ use common::{
     graph::NodePosition,
     id::{AttachmentId, EdgeId, FavoriteId, NodeId, PermissionId, ShareTokenId, TagId, TaskId,
          TemplateId},
-    node::{CreateNodeRequest, Node, NodeListParams, NodeTitleEntry, UpdateNodeRequest},
+    node::{CreateNodeRequest, Node, NodeListParams, NodeTitleEntry, SetPinnedRequest, UpdateNodeRequest},
     note::{CreateNoteRequest, FeedNote, Note},
     permission::{GrantPermissionRequest, Permission, PermissionRole},
     search::{SearchQuery, SearchResponse},
@@ -77,6 +77,7 @@ impl NodeRepo for StubNodeRepo {
     async fn find_id_by_title(&self, _: &str) -> Result<Option<NodeId>, EmberTroveError> { unimplemented!() }
     async fn list_all_for_owner(&self, _: &str) -> Result<Vec<Node>, EmberTroveError> { unimplemented!() }
     async fn list_all(&self) -> Result<Vec<Node>, EmberTroveError> { unimplemented!() }
+    async fn set_pinned(&self, _: NodeId, _: SetPinnedRequest) -> Result<Node, EmberTroveError> { unimplemented!() }
 }
 
 struct StubEdgeRepo;
@@ -459,6 +460,10 @@ async fn template_get_route_registered()     { assert_route_registered("GET",   
 async fn template_update_route_registered()  { assert_route_registered("PUT",    &format!("/templates/{}", Uuid::new_v4())).await; }
 #[tokio::test]
 async fn template_delete_route_registered()  { assert_route_registered("DELETE", &format!("/templates/{}", Uuid::new_v4())).await; }
+
+// ── Node pin route ─────────────────────────────────────────────────────────────
+#[tokio::test]
+async fn node_pin_route_registered() { assert_route_registered("PUT", &format!("/nodes/{}/pin", Uuid::new_v4())).await; }
 
 // ── Permission DTO unit tests ─────────────────────────────────────────────────
 
