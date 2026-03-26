@@ -127,6 +127,11 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                                 collapsed=collapsed
                             />
                             <SidebarLink
+                                icon="manage_accounts" label="Permissions"
+                                on_click=move || { current_view.set(View::BulkPermissions); on_nav.run(()); }
+                                collapsed=collapsed
+                            />
+                            <SidebarLink
                                 icon="backup" label="Backup"
                                 on_click=move || { current_view.set(View::Backup); on_nav.run(()); }
                                 collapsed=collapsed
