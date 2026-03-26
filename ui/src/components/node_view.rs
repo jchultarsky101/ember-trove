@@ -13,6 +13,7 @@ use crate::components::node_meta::{status_color, status_icon, status_label, type
 use crate::components::activity_panel::ActivityPanel;
 use crate::components::permission_dialog::PermissionPanel;
 use crate::components::share_panel::SharePanel;
+use crate::components::version_panel::VersionPanel;
 use crate::components::tag_bar::TagBar;
 use crate::auth::{AuthStatus, use_auth_state};
 use crate::components::note_panel::NotePanel;
@@ -223,6 +224,11 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         <AttachmentPanel node_id=id />
                                         <PermissionPanel node_id=id is_owner=is_owner />
                                         <SharePanel node_id=id is_owner=is_owner />
+                                        <VersionPanel
+                                            node_id=id
+                                            is_editor=is_owner
+                                            on_restore=Callback::new(move |_| refresh.update(|n| *n += 1))
+                                        />
                                         <ActivityPanel node_id=id />
                                     </div>
                                 </div>

@@ -51,3 +51,4 @@ uuid_newtype!(NoteId);
 uuid_newtype!(FavoriteId);
 uuid_newtype!(ShareTokenId);
 uuid_newtype!(ActivityId);
+uuid_newtype!(NodeVersionId);
