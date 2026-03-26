@@ -48,9 +48,9 @@ use crate::{
     object_store::NullObjectStore,
     repo::{
         activity::ActivityRepo, attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo,
-        favorite::FavoriteRepo, graph::GraphRepo, node::NodeRepo, note::NoteRepo,
-        permission::PermissionRepo, search::SearchRepo, share_token::ShareTokenRepo, tag::TagRepo,
-        task::TaskRepo,
+        favorite::FavoriteRepo, graph::GraphRepo, node::NodeRepo, node_version::NodeVersionRepo,
+        note::NoteRepo, permission::PermissionRepo, search::SearchRepo,
+        share_token::ShareTokenRepo, tag::TagRepo, task::TaskRepo,
     },
     routes::build_router,
     state::AppState,
@@ -196,6 +196,14 @@ impl ActivityRepo for StubActivityRepo {
     async fn list(&self, _: NodeId, _: i64) -> Result<Vec<ActivityEntry>, EmberTroveError> { unimplemented!() }
 }
 
+struct StubNodeVersionRepo;
+#[async_trait]
+impl NodeVersionRepo for StubNodeVersionRepo {
+    async fn record(&self, _: NodeId, _: &str, _: &str) -> Result<(), EmberTroveError> { Ok(()) }
+    async fn list(&self, _: NodeId, _: i64) -> Result<Vec<common::node_version::NodeVersion>, EmberTroveError> { unimplemented!() }
+    async fn get(&self, _: common::id::NodeVersionId) -> Result<common::node_version::NodeVersion, EmberTroveError> { unimplemented!() }
+}
+
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
 fn test_state() -> AppState {
@@ -219,8 +227,9 @@ fn test_state() -> AppState {
         graph:        Arc::new(StubGraphRepo),
         backup:       Arc::new(StubBackupRepo),
         favorites:    Arc::new(StubFavoriteRepo),
-        share_tokens: Arc::new(StubShareTokenRepo),
-        activity:     Arc::new(StubActivityRepo),
+        share_tokens:  Arc::new(StubShareTokenRepo),
+        activity:      Arc::new(StubActivityRepo),
+        node_versions: Arc::new(StubNodeVersionRepo),
         object_store: Arc::new(NullObjectStore),
         oidc:          None,
         cognito_admin: None,

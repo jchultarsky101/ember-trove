@@ -11,8 +11,9 @@ use common::{
     attachment::Attachment,
     auth::AuthClaims,
     edge::EdgeWithTitles,
-    id::{NodeId, PermissionId, TagId},
+    id::{NodeId, NodeVersionId, PermissionId, TagId},
     node::{CreateNodeRequest, Node, NodeListParams, NodeListResponse, NodeTitleEntry, UpdateNodeRequest},
+    node_version::NodeVersion,
     permission::{GrantPermissionRequest, InviteRequest, Permission, PermissionRole},
     tag::Tag,
 };
@@ -52,6 +53,8 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/invite", post(invite))
         .route("/{id}/export", get(export_node))
         .route("/{id}/activity", get(list_activity))
+        .route("/{id}/versions", get(list_versions))
+        .route("/{id}/versions/{version_id}/restore", post(restore_version))
 }
 
 // ── Node list ────────────────────────────────────────────────────────────────
@@ -148,6 +151,16 @@ async fn update_node(
     require_editor(state.permissions.as_ref(), &claims, NodeId(id)).await?;
     let node = state.nodes.update(NodeId(id), req).await?;
     sync_wikilinks(&state, node.id, node.body.as_deref().unwrap_or("")).await?;
+    // Record body snapshot (fire-and-forget — failure is non-fatal).
+    let body_snap = node.body.clone().unwrap_or_default();
+    let sub = claims.sub.clone();
+    let ver_repo = state.node_versions.clone();
+    let nid = node.id;
+    tokio::spawn(async move {
+        if let Err(e) = ver_repo.record(nid, &body_snap, &sub).await {
+            tracing::warn!("node version snapshot failed (non-fatal): {e}");
+        }
+    });
     log_activity(&state, node.id, &claims, ActivityAction::Edited, json!({ "title": node.title })).await;
     Ok(Json(node))
 }
@@ -582,6 +595,65 @@ async fn export_node(
     )
     .await;
     Ok((headers, body))
+}
+
+// ── Node versions ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, serde::Deserialize)]
+struct VersionParams {
+    limit: Option<i64>,
+}
+
+/// `GET /nodes/{id}/versions?limit=N`
+/// Returns up to `limit` (default 20, max 50) most-recent body snapshots.
+/// Requires Viewer permission.
+async fn list_versions(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Path(id): Path<Uuid>,
+    Query(params): Query<VersionParams>,
+) -> Result<Json<Vec<NodeVersion>>, ApiError> {
+    require_viewer(state.permissions.as_ref(), &claims, NodeId(id)).await?;
+    let limit = params.limit.unwrap_or(20).clamp(1, 50);
+    let versions = state.node_versions.list(NodeId(id), limit).await?;
+    Ok(Json(versions))
+}
+
+/// `POST /nodes/{id}/versions/{version_id}/restore`
+/// Restores the node body to the selected snapshot. Records a new snapshot
+/// of the restored body and logs an Edited activity entry.
+/// Requires Editor permission.
+async fn restore_version(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Path((id, version_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<Node>, ApiError> {
+    require_editor(state.permissions.as_ref(), &claims, NodeId(id)).await?;
+    let version = state.node_versions.get(NodeVersionId(version_id)).await?;
+    // Verify the version belongs to this node.
+    if version.node_id != NodeId(id) {
+        return Err(ApiError::NotFound("version does not belong to this node".to_string()));
+    }
+    let req = UpdateNodeRequest {
+        title: None,
+        body: Some(version.body.clone()),
+        metadata: None,
+        status: None,
+    };
+    let node = state.nodes.update(NodeId(id), req).await?;
+    sync_wikilinks(&state, node.id, &version.body).await?;
+    // Snapshot the restored body.
+    let sub = claims.sub.clone();
+    let ver_repo = state.node_versions.clone();
+    let nid = node.id;
+    let body_snap = version.body.clone();
+    tokio::spawn(async move {
+        if let Err(e) = ver_repo.record(nid, &body_snap, &sub).await {
+            tracing::warn!("restore version snapshot failed (non-fatal): {e}");
+        }
+    });
+    log_activity(&state, node.id, &claims, ActivityAction::Edited, json!({ "title": node.title, "restored_from": version_id })).await;
+    Ok(Json(node))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

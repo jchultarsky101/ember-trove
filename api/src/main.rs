@@ -30,8 +30,8 @@ use object_store::s3::S3ObjectStore;
 use repo::{
     activity::PgActivityRepo, attachment::PgAttachmentRepo, backup::PgBackupRepo,
     edge::PgEdgeRepo, favorite::PgFavoriteRepo, graph::PgGraphRepo, node::PgNodeRepo,
-    note::PgNoteRepo, permission::PgPermissionRepo, search::PgSearchRepo,
-    share_token::PgShareTokenRepo, tag::PgTagRepo, task::PgTaskRepo,
+    node_version::PgNodeVersionRepo, note::PgNoteRepo, permission::PgPermissionRepo,
+    search::PgSearchRepo, share_token::PgShareTokenRepo, tag::PgTagRepo, task::PgTaskRepo,
 };
 use state::AppState;
 
@@ -145,6 +145,7 @@ async fn main() -> anyhow::Result<()> {
         favorites: Arc::new(PgFavoriteRepo::new(pool.clone())),
         share_tokens: Arc::new(PgShareTokenRepo::new(pool.clone())),
         activity: Arc::new(PgActivityRepo::new(pool.clone())),
+        node_versions: Arc::new(PgNodeVersionRepo::new(pool.clone())),
         object_store,
         oidc,
         cognito_admin,
