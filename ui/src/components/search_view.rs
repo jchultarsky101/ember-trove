@@ -219,7 +219,12 @@ pub fn SearchView() -> impl IntoView {
                                     <div class="space-y-3">
                                         {resp.results.into_iter().map(|result| {
                                             let node_id = result.node_id;
-                                            let rank_pct = (result.rank * 100.0).min(100.0);
+                                            // 3-tier relevance: ≥0.3 → high, ≥0.08 → medium, >0 → low
+                                            let rank_tier: u8 = if result.rank >= 0.3 { 3 }
+                                                else if result.rank >= 0.08 { 2 }
+                                                else if result.rank > 0.0 { 1 }
+                                                else { 0 };
+                                            let rank_title = format!("Relevance: {:.0}%", result.rank * 100.0);
                                             let nt = result.node_type.clone();
                                             let st = result.status.clone();
                                             let t_icon  = type_icon(&nt);
@@ -259,9 +264,22 @@ pub fn SearchView() -> impl IntoView {
                                                         >
                                                             {s_icon}
                                                         </span>
-                                                        <span class="text-xs text-stone-400 dark:text-stone-500 shrink-0">
-                                                            {format!("{rank_pct:.0}%")}
-                                                        </span>
+                                                        // 3-bar relevance indicator
+                                                        <div class="flex gap-px items-end shrink-0"
+                                                            title=rank_title>
+                                                            <div class=format!("w-1 rounded-sm {}",
+                                                                if rank_tier >= 1 { "bg-amber-400 dark:bg-amber-500" }
+                                                                else { "bg-stone-200 dark:bg-stone-700" })
+                                                                style="height: 6px;" />
+                                                            <div class=format!("w-1 rounded-sm {}",
+                                                                if rank_tier >= 2 { "bg-amber-400 dark:bg-amber-500" }
+                                                                else { "bg-stone-200 dark:bg-stone-700" })
+                                                                style="height: 9px;" />
+                                                            <div class=format!("w-1 rounded-sm {}",
+                                                                if rank_tier >= 3 { "bg-amber-400 dark:bg-amber-500" }
+                                                                else { "bg-stone-200 dark:bg-stone-700" })
+                                                                style="height: 12px;" />
+                                                        </div>
                                                     </div>
                                                     // Row 2: slug
                                                     <p class="text-xs text-stone-500 dark:text-stone-400 mb-1 font-mono">
