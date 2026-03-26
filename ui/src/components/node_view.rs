@@ -118,6 +118,9 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                 false
                             };
 
+                            // Local pin state — initialised from the loaded node.
+                            let pinned = RwSignal::new(n.pinned);
+
                             // Click delegation: intercept clicks on `.wikilink` anchors and
                             // navigate in-app instead of following the href.
                             let handle_wikilink_click = move |ev: leptos::ev::MouseEvent| {
@@ -168,6 +171,34 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                             </span>
                                         </div>
                                         <div class="flex items-center gap-1">
+                                            // Pin toggle — editor/owner only
+                                            {is_owner.then(|| view! {
+                                                <button
+                                                    class=move || {
+                                                        let base = "p-1.5 rounded-lg transition-colors";
+                                                        if pinned.get() {
+                                                            format!("{base} text-amber-500 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20")
+                                                        } else {
+                                                            format!("{base} text-stone-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-stone-100 dark:hover:bg-stone-800")
+                                                        }
+                                                    }
+                                                    title=move || if pinned.get() { "Unpin node" } else { "Pin node" }
+                                                    on:click=move |_| {
+                                                        let new_state = !pinned.get_untracked();
+                                                        pinned.set(new_state);
+                                                        wasm_bindgen_futures::spawn_local(async move {
+                                                            if let Err(e) = crate::api::set_node_pinned(id, new_state).await {
+                                                                pinned.set(!new_state); // revert on failure
+                                                                push_toast(ToastLevel::Error, format!("Pin failed: {e}"));
+                                                            } else {
+                                                                refresh.update(|n| *n += 1);
+                                                            }
+                                                        });
+                                                    }
+                                                >
+                                                    <span class="material-symbols-outlined">"push_pin"</span>
+                                                </button>
+                                            })}
                                             // Export — opens the markdown download in a new tab.
                                             // Using an <a> with the API URL triggers the browser's
                                             // native file-save dialog without any JS fetch.

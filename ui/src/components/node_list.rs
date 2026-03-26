@@ -302,7 +302,10 @@ pub fn NodeList() -> impl IntoView {
                                             </div>
                                         }.into_any();
                                     }
-                                    let sorted = sort_key.get().sort_nodes(filtered);
+                                    // Pinned nodes always float to the top,
+                                    // then secondary sort by the chosen SortKey.
+                                    let mut sorted = sort_key.get().sort_nodes(filtered);
+                                    sorted.sort_by_key(|n| !n.pinned); // stable: false < true, so pinned (true) → !true = false sorts first
                                     view! { <NodeCards nodes=sorted current_view=current_view /> }.into_any()
                                 }
                                 Err(e) => view! {
@@ -332,6 +335,7 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
                 let st      = format!("{:?}", node.status).to_lowercase();
                 let updated = node.updated_at.format("%b %d, %Y").to_string();
                 let tags    = node.tags.clone();
+                let pinned  = node.pinned;
 
                 let t_icon  = type_icon(&nt);
                 let t_label = type_label(&nt);
@@ -374,6 +378,17 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
                                     >
                                         {s_icon}
                                     </span>
+
+                                    // Pin indicator
+                                    {pinned.then(|| view! {
+                                        <span
+                                            class="material-symbols-outlined text-amber-500 dark:text-amber-400 flex-shrink-0"
+                                            style="font-size: 13px;"
+                                            title="Pinned"
+                                        >
+                                            "push_pin"
+                                        </span>
+                                    })}
                                 </div>
 
                                 // ── Row 2: tag pills (only if present) ──────────────
