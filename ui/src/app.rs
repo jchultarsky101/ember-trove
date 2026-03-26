@@ -54,6 +54,7 @@ pub enum View {
     Notes,
     Backup,
     Templates,
+    BulkPermissions,
 }
 
 /// Pre-fill data passed from TemplatesView to NodeEditor when "Use" is clicked.

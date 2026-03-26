@@ -1,4 +1,5 @@
 pub mod activity_panel;
+pub mod bulk_permissions_view;
 pub mod version_panel;
 pub mod admin_view;
 pub mod backup_view;

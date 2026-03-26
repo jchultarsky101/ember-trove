@@ -407,6 +407,15 @@ pub fn attachment_download_url(id: AttachmentId) -> String {
 
 // ── Permissions ─────────────────────────────────────────────────────────
 
+/// List every permission row in the system — no node filter (admin view).
+pub async fn list_all_permissions() -> Result<Vec<common::permission::Permission>, UiError> {
+    let resp = Request::get(&api_url("/permissions"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
 pub async fn list_permissions(
     node_id: NodeId,
 ) -> Result<Vec<common::permission::Permission>, UiError> {
