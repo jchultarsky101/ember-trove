@@ -272,6 +272,8 @@ impl PgSearchRepo {
             ),
             candidates AS (
                 -- Match from node title / body
+                -- normalization=1: divide by log(unique words) to prevent long-body
+                -- documents from unfairly outranking short, well-titled nodes.
                 SELECT
                     n.id,
                     n.title,
@@ -282,7 +284,7 @@ impl PgSearchRepo {
                         websearch_to_tsquery('english', $1),
                         'StartSel=<mark>, StopSel=</mark>, MaxFragments=2, MaxWords=30, MinWords=10'
                     ) AS snippet,
-                    ts_rank_cd(n.search_vec, websearch_to_tsquery('english', $1)) AS rank,
+                    ts_rank_cd(n.search_vec, websearch_to_tsquery('english', $1), 1) AS rank,
                     n.node_type::text AS node_type,
                     n.status::text AS status,
                     'node'::text AS match_source
@@ -303,7 +305,7 @@ impl PgSearchRepo {
                         websearch_to_tsquery('english', $1),
                         'StartSel=<mark>, StopSel=</mark>, MaxFragments=2, MaxWords=30, MinWords=10'
                     ) AS snippet,
-                    ts_rank_cd(nn.search_vec, websearch_to_tsquery('english', $1)) AS rank,
+                    ts_rank_cd(nn.search_vec, websearch_to_tsquery('english', $1), 1) AS rank,
                     n.node_type::text AS node_type,
                     n.status::text AS status,
                     'note'::text AS match_source
@@ -322,7 +324,8 @@ impl PgSearchRepo {
                     substring(nt.title FROM 1 FOR 200) AS snippet,
                     ts_rank_cd(
                         to_tsvector('english', nt.title),
-                        websearch_to_tsquery('english', $1)
+                        websearch_to_tsquery('english', $1),
+                        1
                     ) AS rank,
                     n.node_type::text AS node_type,
                     n.status::text AS status,
@@ -445,6 +448,9 @@ impl PgSearchRepo {
             ),
             candidates AS (
                 -- Match from node title / body
+                -- Floor rank at 0.05 when only the body matches (ILIKE but no title
+                -- similarity), so body-only results sort above 0.0 and remain
+                -- distinguishable from each other by title-alpha fallback.
                 SELECT
                     n.id,
                     n.title,
@@ -453,7 +459,10 @@ impl PgSearchRepo {
                         THEN substring(n.body FROM 1 FOR 200)
                         ELSE NULL
                     END AS snippet,
-                    GREATEST(similarity(n.title, $1), 0.0) AS rank,
+                    GREATEST(
+                        similarity(n.title, $1),
+                        CASE WHEN n.body ILIKE $2 THEN 0.05 ELSE 0.0 END
+                    ) AS rank,
                     n.node_type::text AS node_type,
                     n.status::text AS status,
                     'node'::text AS match_source
