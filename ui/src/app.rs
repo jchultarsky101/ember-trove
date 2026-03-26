@@ -5,6 +5,7 @@ use crate::{
     auth::provide_auth_state,
     components::{
         dark_mode_toggle::Theme, layout::Layout,
+        modals::shortcuts::ShortcutsModal,
         public_share_view::PublicShareView, toast::ToastState,
     },
 };
@@ -128,6 +129,9 @@ pub fn App() -> impl IntoView {
     let toast_state = ToastState::new();
     provide_context(toast_state);
 
+    // Keyboard shortcuts help modal visibility.
+    let show_shortcuts = RwSignal::new(false);
+
     // ── Global keyboard shortcuts ───────────────────────────────────────────
     // Suppressed when the user is typing in an input, textarea, select, or
     // any contenteditable element.
@@ -136,7 +140,8 @@ pub fn App() -> impl IntoView {
     //   n   → New node
     //   g   → Graph view
     //   /   → Search (also prevents the browser's built-in page-find)
-    //   Esc → Back to node list (from detail / edit / create)
+    //   Esc → Back to node list (from detail / edit / create); close modal
+    //   ?   → Toggle keyboard shortcuts help
     let handle = window_event_listener(ev::keydown, move |ev: web_sys::KeyboardEvent| {
         // Ignore if a modifier key is held (Ctrl+n, Cmd+/, etc.).
         if ev.ctrl_key() || ev.meta_key() || ev.alt_key() {
@@ -164,6 +169,7 @@ pub fn App() -> impl IntoView {
         }
 
         match ev.key().as_str() {
+            "?" => show_shortcuts.update(|v| *v = !*v),
             "n" => current_view.set(View::NodeCreate),
             "g" => current_view.set(View::Graph),
             "/" => {
@@ -171,7 +177,9 @@ pub fn App() -> impl IntoView {
                 current_view.set(View::Search);
             }
             "Escape" => {
-                if matches!(
+                if show_shortcuts.get_untracked() {
+                    show_shortcuts.set(false);
+                } else if matches!(
                     current_view.get_untracked(),
                     View::NodeDetail(_) | View::NodeEdit(_) | View::NodeCreate
                 ) {
@@ -185,6 +193,10 @@ pub fn App() -> impl IntoView {
 
     view! {
         <Layout auth_state=auth_state />
+        <ShortcutsModal
+            show=show_shortcuts.read_only()
+            on_close=Callback::new(move |_| show_shortcuts.set(false))
+        />
     }
     .into_any()
 }
