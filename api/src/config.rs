@@ -43,6 +43,40 @@ pub struct Config {
     pub port: u16,
 }
 
+impl Default for Config {
+    /// Returns a zero-value Config suitable for unit tests.
+    ///
+    /// All optional fields are `None`; required string fields use empty or
+    /// placeholder values. `test_state()` in tests.rs overrides the fields it
+    /// cares about via struct update syntax: `Config { field: val, ..Config::default() }`.
+    /// This means adding new optional fields to Config never breaks the test
+    /// initializer — the compiler will use the `None` default automatically.
+    fn default() -> Self {
+        Self {
+            database_url:          String::new(),
+            s3_endpoint:           None,
+            s3_bucket:             None,
+            s3_access_key:         None,
+            s3_secret_key:         None,
+            s3_region:             "us-east-1".to_string(),
+            oidc_issuer:           None,
+            oidc_client_id:        None,
+            oidc_client_secret:    None,
+            cognito_user_pool_id:  None,
+            cognito_region:        "us-east-2".to_string(),
+            aws_access_key_id:     None,
+            aws_secret_access_key: None,
+            ses_from_email:        None,
+            cookie_key:            "a".repeat(128),
+            cookie_secure:         false,
+            frontend_url:          "http://localhost:3000".to_string(),
+            api_external_url:      "http://localhost:3003".to_string(),
+            host:                  "127.0.0.1".to_string(),
+            port:                  3003,
+        }
+    }
+}
+
 impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
         let port = env::var("PORT")
