@@ -102,6 +102,7 @@ async fn create_node(
     req.validate()
         .map_err(|e| ApiError::Validation(e.to_string()))?;
 
+    let template_id = req.template_id;
     let node = state.nodes.create(&claims.sub, req).await?;
 
     // Auto-grant Owner permission for the creator so that require_role()
@@ -117,7 +118,12 @@ async fn create_node(
         .map_err(|e| ApiError::Internal(format!("auto-grant owner permission failed: {e}")))?;
 
     sync_wikilinks(&state, node.id, node.body.as_deref().unwrap_or("")).await?;
-    log_activity(&state, node.id, &claims, ActivityAction::Created, json!({ "title": node.title })).await;
+    let (action, meta) = if let Some(tid) = template_id {
+        (ActivityAction::CreatedFromTemplate, json!({ "title": node.title, "template_id": tid }))
+    } else {
+        (ActivityAction::Created, json!({ "title": node.title }))
+    };
+    log_activity(&state, node.id, &claims, action, meta).await;
     Ok((StatusCode::CREATED, Json(node)))
 }
 

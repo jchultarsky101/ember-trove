@@ -70,6 +70,7 @@ pub fn CreateNodeModal(
             body: body_opt,
             metadata: serde_json::Value::Object(serde_json::Map::new()),
             status: None,
+            template_id: None,
         };
         loading.set(true);
         error.set(None);
