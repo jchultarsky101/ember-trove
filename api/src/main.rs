@@ -32,6 +32,7 @@ use repo::{
     edge::PgEdgeRepo, favorite::PgFavoriteRepo, graph::PgGraphRepo, node::PgNodeRepo,
     node_version::PgNodeVersionRepo, note::PgNoteRepo, permission::PgPermissionRepo,
     search::PgSearchRepo, share_token::PgShareTokenRepo, tag::PgTagRepo, task::PgTaskRepo,
+    template::PgTemplateRepo,
 };
 use state::AppState;
 
@@ -146,6 +147,7 @@ async fn main() -> anyhow::Result<()> {
         share_tokens: Arc::new(PgShareTokenRepo::new(pool.clone())),
         activity: Arc::new(PgActivityRepo::new(pool.clone())),
         node_versions: Arc::new(PgNodeVersionRepo::new(pool.clone())),
+        templates: Arc::new(PgTemplateRepo::new(pool.clone())),
         object_store,
         oidc,
         cognito_admin,

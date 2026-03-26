@@ -1,0 +1,68 @@
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    routing::get,
+    Extension, Json, Router,
+};
+use common::{
+    auth::AuthClaims,
+    id::TemplateId,
+    template::{CreateTemplateRequest, NodeTemplate, UpdateTemplateRequest},
+};
+use garde::Validate;
+use uuid::Uuid;
+
+use crate::{error::ApiError, state::AppState};
+
+pub fn router() -> Router<AppState> {
+    Router::new()
+        .route("/", get(list_templates).post(create_template))
+        .route("/{id}", get(get_template).put(update_template).delete(delete_template))
+}
+
+async fn list_templates(
+    State(state): State<AppState>,
+    Extension(_claims): Extension<AuthClaims>,
+) -> Result<Json<Vec<NodeTemplate>>, ApiError> {
+    let templates = state.templates.list().await?;
+    Ok(Json(templates))
+}
+
+async fn get_template(
+    State(state): State<AppState>,
+    Extension(_claims): Extension<AuthClaims>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<NodeTemplate>, ApiError> {
+    let template = state.templates.get(TemplateId(id)).await?;
+    Ok(Json(template))
+}
+
+async fn create_template(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Json(req): Json<CreateTemplateRequest>,
+) -> Result<(StatusCode, Json<NodeTemplate>), ApiError> {
+    req.validate().map_err(|e| ApiError::Validation(e.to_string()))?;
+    let template = state.templates.create(&claims.sub, req).await?;
+    Ok((StatusCode::CREATED, Json(template)))
+}
+
+async fn update_template(
+    State(state): State<AppState>,
+    Extension(_claims): Extension<AuthClaims>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<UpdateTemplateRequest>,
+) -> Result<Json<NodeTemplate>, ApiError> {
+    req.validate().map_err(|e| ApiError::Validation(e.to_string()))?;
+    let template = state.templates.update(TemplateId(id), req).await?;
+    Ok(Json(template))
+}
+
+async fn delete_template(
+    State(state): State<AppState>,
+    Extension(_claims): Extension<AuthClaims>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    state.templates.delete(TemplateId(id)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}

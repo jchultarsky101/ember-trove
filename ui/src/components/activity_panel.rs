@@ -84,6 +84,7 @@ fn action_colour(action: &ActivityAction) -> &'static str {
         ActivityAction::PermissionGranted | ActivityAction::PermissionRevoked => "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
         ActivityAction::Shared => "bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300",
         ActivityAction::Exported => "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300",
+        ActivityAction::CreatedFromTemplate => "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
     }
 }
 

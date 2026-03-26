@@ -32,6 +32,7 @@ pub enum ActivityAction {
     PermissionRevoked,
     Shared,
     Exported,
+    CreatedFromTemplate,
 }
 
 impl ActivityAction {
@@ -49,6 +50,7 @@ impl ActivityAction {
             Self::PermissionRevoked => "permission_revoked",
             Self::Shared => "shared",
             Self::Exported => "exported",
+            Self::CreatedFromTemplate => "created_from_template",
         }
     }
 
@@ -64,6 +66,7 @@ impl ActivityAction {
             "permission_revoked" => Some(Self::PermissionRevoked),
             "shared" => Some(Self::Shared),
             "exported" => Some(Self::Exported),
+            "created_from_template" => Some(Self::CreatedFromTemplate),
             _ => None,
         }
     }
@@ -82,6 +85,7 @@ impl ActivityAction {
             Self::PermissionRevoked => "person_remove",
             Self::Shared => "link",
             Self::Exported => "download",
+            Self::CreatedFromTemplate => "content_copy",
         }
     }
 
@@ -99,6 +103,7 @@ impl ActivityAction {
             Self::PermissionRevoked => "revoked access",
             Self::Shared => "created share link",
             Self::Exported => "exported",
+            Self::CreatedFromTemplate => "created from template",
         }
     }
 }
@@ -122,6 +127,7 @@ mod tests {
             ActivityAction::PermissionRevoked,
             ActivityAction::Shared,
             ActivityAction::Exported,
+            ActivityAction::CreatedFromTemplate,
         ];
         for action in &actions {
             let s = action.as_str();

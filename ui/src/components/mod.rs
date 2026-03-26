@@ -26,3 +26,4 @@ pub mod tag_bar;
 pub mod tag_manager;
 pub mod task_panel;
 pub mod toast;
+pub mod templates_view;

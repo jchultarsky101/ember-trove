@@ -13,7 +13,7 @@ use crate::{
         activity::ActivityRepo, attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo,
         favorite::FavoriteRepo, graph::GraphRepo, node::NodeRepo, node_version::NodeVersionRepo,
         note::NoteRepo, permission::PermissionRepo, search::SearchRepo,
-        share_token::ShareTokenRepo, tag::TagRepo, task::TaskRepo,
+        share_token::ShareTokenRepo, tag::TagRepo, task::TaskRepo, template::TemplateRepo,
     },
 };
 
@@ -34,6 +34,7 @@ pub struct AppState {
     pub share_tokens: Arc<dyn ShareTokenRepo>,
     pub activity: Arc<dyn ActivityRepo>,
     pub node_versions: Arc<dyn NodeVersionRepo>,
+    pub templates: Arc<dyn TemplateRepo>,
     pub object_store: Arc<dyn ObjectStore>,
     pub oidc: Option<Arc<OidcClient>>,
     /// Cognito admin client — `None` when `COGNITO_USER_POOL_ID` is not set.

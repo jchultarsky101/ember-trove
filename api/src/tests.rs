@@ -30,13 +30,15 @@ use common::{
     edge::{CreateEdgeRequest, Edge, EdgeWithTitles},
     favorite::{CreateFavoriteRequest, Favorite},
     graph::NodePosition,
-    id::{AttachmentId, EdgeId, FavoriteId, NodeId, PermissionId, ShareTokenId, TagId, TaskId},
+    id::{AttachmentId, EdgeId, FavoriteId, NodeId, PermissionId, ShareTokenId, TagId, TaskId,
+         TemplateId},
     node::{CreateNodeRequest, Node, NodeListParams, NodeTitleEntry, UpdateNodeRequest},
     note::{CreateNoteRequest, FeedNote, Note},
     permission::{GrantPermissionRequest, Permission, PermissionRole},
     search::{SearchQuery, SearchResponse},
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
     task::{CreateTaskRequest, MyDayTask, Task, TaskCounts, UpdateTaskRequest},
+    template::{CreateTemplateRequest, NodeTemplate, UpdateTemplateRequest},
 };
 use http_body_util::BodyExt;
 use tower::ServiceExt;
@@ -50,7 +52,7 @@ use crate::{
         activity::ActivityRepo, attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo,
         favorite::FavoriteRepo, graph::GraphRepo, node::NodeRepo, node_version::NodeVersionRepo,
         note::NoteRepo, permission::PermissionRepo, search::SearchRepo,
-        share_token::ShareTokenRepo, tag::TagRepo, task::TaskRepo,
+        share_token::ShareTokenRepo, tag::TagRepo, task::TaskRepo, template::TemplateRepo,
     },
     routes::build_router,
     state::AppState,
@@ -204,6 +206,16 @@ impl NodeVersionRepo for StubNodeVersionRepo {
     async fn get(&self, _: common::id::NodeVersionId) -> Result<common::node_version::NodeVersion, EmberTroveError> { unimplemented!() }
 }
 
+struct StubTemplateRepo;
+#[async_trait]
+impl TemplateRepo for StubTemplateRepo {
+    async fn list(&self) -> Result<Vec<NodeTemplate>, EmberTroveError> { unimplemented!() }
+    async fn get(&self, _: TemplateId) -> Result<NodeTemplate, EmberTroveError> { unimplemented!() }
+    async fn create(&self, _: &str, _: CreateTemplateRequest) -> Result<NodeTemplate, EmberTroveError> { unimplemented!() }
+    async fn update(&self, _: TemplateId, _: UpdateTemplateRequest) -> Result<NodeTemplate, EmberTroveError> { unimplemented!() }
+    async fn delete(&self, _: TemplateId) -> Result<(), EmberTroveError> { unimplemented!() }
+}
+
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
 fn test_state() -> AppState {
@@ -230,6 +242,7 @@ fn test_state() -> AppState {
         share_tokens:  Arc::new(StubShareTokenRepo),
         activity:      Arc::new(StubActivityRepo),
         node_versions: Arc::new(StubNodeVersionRepo),
+        templates:     Arc::new(StubTemplateRepo),
         object_store: Arc::new(NullObjectStore),
         oidc:          None,
         cognito_admin: None,
@@ -451,6 +464,19 @@ async fn favorites_list_route_registered() { assert_route_registered("GET", "/fa
 async fn notes_feed_route_registered()     { assert_route_registered("GET", "/notes").await; }
 #[tokio::test]
 async fn edges_list_route_registered()     { assert_route_registered("GET", "/edges").await; }
+
+// ── Template routes ───────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn templates_list_route_registered()   { assert_route_registered("GET",    "/templates").await; }
+#[tokio::test]
+async fn template_create_route_registered()  { assert_route_registered("POST",   "/templates").await; }
+#[tokio::test]
+async fn template_get_route_registered()     { assert_route_registered("GET",    &format!("/templates/{}", Uuid::new_v4())).await; }
+#[tokio::test]
+async fn template_update_route_registered()  { assert_route_registered("PUT",    &format!("/templates/{}", Uuid::new_v4())).await; }
+#[tokio::test]
+async fn template_delete_route_registered()  { assert_route_registered("DELETE", &format!("/templates/{}", Uuid::new_v4())).await; }
 
 // ── Permission DTO unit tests ─────────────────────────────────────────────────
 
