@@ -15,6 +15,7 @@ pub mod tag;
 pub mod favorite;
 pub mod note;
 pub mod node_version;
+pub mod template;
 pub mod share_token;
 pub mod task;
 

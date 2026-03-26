@@ -7,7 +7,7 @@ use common::{
 use leptos::prelude::*;
 use pulldown_cmark::{Options, Parser, html};
 
-use crate::app::View;
+use crate::app::{TemplatePrefill, View};
 use crate::templates::template_for_type;
 use crate::wikilink::preprocess_wikilinks;
 
@@ -65,22 +65,33 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     // that opening the editor from e.g. the Projects list defaults to Project.
     // In edit mode the spawn_local block below will override this immediately.
     let node_type_filter = use_context::<RwSignal<Option<String>>>();
-    let default_type = if node.is_none() {
-        node_type_filter
-            .and_then(|f| f.get_untracked())
-            .unwrap_or_else(|| "article".to_string())
+    let prefill_signal = use_context::<RwSignal<Option<TemplatePrefill>>>();
+
+    // If a TemplatePrefill context is set, consume it (clear immediately) and
+    // use its values as the create-mode defaults instead of the static templates.
+    let (default_type, initial_body, initial_template_id) = if node.is_none() {
+        if let Some(sig) = prefill_signal
+            && let Some(p) = sig.get_untracked()
+        {
+            sig.set(None);
+            (p.node_type, p.body, Some(p.template_id))
+        } else {
+            let nt = node_type_filter
+                .and_then(|f| f.get_untracked())
+                .unwrap_or_else(|| "article".to_string());
+            let body = template_for_type(&nt).to_string();
+            (nt, body, None)
+        }
     } else {
-        "article".to_string()
+        ("article".to_string(), String::new(), None)
     };
+
     let node_type = RwSignal::new(default_type.clone());
-    // In create mode, pre-populate the body with the template for the selected
-    // type. In edit mode spawn_local below will overwrite this with the real body.
-    let initial_body = if node.is_none() {
-        template_for_type(&default_type).to_string()
-    } else {
-        String::new()
-    };
+    // In create mode, pre-populate the body from template or static scaffold.
+    // In edit mode spawn_local below will overwrite this with the real body.
     let body = RwSignal::new(initial_body);
+    // Template ID used when creating a node from a template (for activity log).
+    let template_id_for_create = RwSignal::new(initial_template_id);
     let status = RwSignal::new("draft".to_string());
     let saving = RwSignal::new(false);
     let error_msg = RwSignal::new(Option::<String>::None);
@@ -136,6 +147,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                     body: Some(b),
                     metadata: serde_json::Value::Object(serde_json::Map::new()),
                     status: Some(parse_status(&st_str)),
+                    template_id: template_id_for_create.get_untracked(),
                 };
                 crate::api::create_node(&req).await
             };

@@ -1,4 +1,4 @@
-use common::{id::NodeId, tag::Tag};
+use common::{id::{NodeId, TemplateId}, tag::Tag};
 use leptos::{ev, prelude::*};
 
 use crate::{
@@ -53,6 +53,15 @@ pub enum View {
     MyDay,
     Notes,
     Backup,
+    Templates,
+}
+
+/// Pre-fill data passed from TemplatesView to NodeEditor when "Use" is clicked.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TemplatePrefill {
+    pub node_type: String,
+    pub body: String,
+    pub template_id: TemplateId,
 }
 
 // ── App root ───────────────────────────────────────────────────────────────
@@ -128,6 +137,10 @@ pub fn App() -> impl IntoView {
     // Toast notification state.
     let toast_state = ToastState::new();
     provide_context(toast_state);
+
+    // Template prefill — set by TemplatesView "Use", consumed by NodeEditor on create.
+    let template_prefill: RwSignal<Option<TemplatePrefill>> = RwSignal::new(None);
+    provide_context(template_prefill);
 
     // Keyboard shortcuts help modal visibility.
     let show_shortcuts = RwSignal::new(false);

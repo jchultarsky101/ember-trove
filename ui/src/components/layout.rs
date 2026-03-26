@@ -8,7 +8,8 @@ use crate::{
         graph_view::GraphView, modals::create_node::CreateNodeModal, my_day_view::MyDayView,
         node_editor::NodeEditor, node_list::NodeList, node_view::NodeView,
         notes_view::NotesView, project_dashboard::ProjectDashboard, search_view::SearchView,
-        sidebar::Sidebar, tag_manager::TagManager, toast::ToastOverlay,
+        sidebar::Sidebar, tag_manager::TagManager, templates_view::TemplatesView,
+        toast::ToastOverlay,
     },
 };
 
@@ -222,6 +223,7 @@ fn ViewSwitch() -> impl IntoView {
         View::MyDay => view! { <MyDayView /> }.into_any(),
         View::Notes => view! { <NotesView /> }.into_any(),
         View::Backup => view! { <BackupView /> }.into_any(),
+        View::Templates => view! { <TemplatesView /> }.into_any(),
     }
 }
 

@@ -92,6 +92,11 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                 on_click=move || { current_view.set(View::Notes); on_nav.run(()); }
                 collapsed=collapsed
             />
+            <SidebarLink
+                icon="content_copy" label="Templates"
+                on_click=move || { current_view.set(View::Templates); on_nav.run(()); }
+                collapsed=collapsed
+            />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             <SidebarLink
                 icon="wb_sunny" label="My Day"

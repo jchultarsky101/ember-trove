@@ -3,7 +3,7 @@ use garde::Validate;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::id::{NodeId, TagId};
+use crate::id::{NodeId, TagId, TemplateId};
 use crate::tag::Tag;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -52,6 +52,11 @@ pub struct CreateNodeRequest {
     pub metadata: serde_json::Value,
     #[garde(skip)]
     pub status: Option<NodeStatus>,
+    /// If the node was created from a template, record the template ID here
+    /// for attribution in the activity log.
+    #[garde(skip)]
+    #[serde(default)]
+    pub template_id: Option<TemplateId>,
 }
 
 fn default_metadata() -> serde_json::Value {

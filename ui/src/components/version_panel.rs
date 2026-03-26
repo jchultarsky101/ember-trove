@@ -42,15 +42,15 @@ pub fn VersionPanel(
     let do_restore = move |version_id: uuid::Uuid| {
         restoring.set(Some(version_id));
         let on_restore = on_restore;
-        spawn_local(async move {
+        leptos::task::spawn_local(async move {
             match api::restore_version(node_id, version_id).await {
                 Ok(_) => {
-                    push_toast("Body restored to selected version.".to_string(), ToastLevel::Success);
+                    push_toast(ToastLevel::Success, "Body restored to selected version.");
                     refresh.update(|n| *n += 1);
                     on_restore.run(());
                 }
                 Err(e) => {
-                    push_toast(format!("Restore failed: {e}"), ToastLevel::Error);
+                    push_toast(ToastLevel::Error, format!("Restore failed: {e}"));
                 }
             }
             restoring.set(None);
