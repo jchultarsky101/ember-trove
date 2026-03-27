@@ -4,6 +4,37 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.47.0] - 2026-03-27
+
+### Added
+- **Graph edge delete** — hovering an edge now shows a red "Delete edge" button at the bottom of the hover card. Clicking it calls `DELETE /api/edges/{id}` and removes the edge from the graph reactively without a page reload.
+- **Add Edge mode in graph** — new "Add Edge" toolbar button (top-right, amber when active). Click it to enter edge-create mode (cursor → crosshair). Click a source node (amber dashed ring appears), then a target node to open a type-picker popup (edge type select + optional label). Confirm to create the edge immediately. Node dragging is disabled while in this mode; Cancel or clicking the toolbar button again exits.
+- **Edge count badge on node cards** — nodes that participate in at least one edge now show a `link` icon + count badge below the date in the card's top-right corner. `Node` DTO gains `edge_count: u32`; the `list_nodes` SQL query uses a `LEFT JOIN` subquery to count edges (source OR target) per node.
+
+---
+
+## [1.46.0] - 2026-03-27
+
+### Added
+- **Template picker in quick-capture modal** — the FAB / `n`-shortcut modal now shows a "Template (optional)" select alongside the Type select. Choosing a template pre-fills the Notes textarea and sets the node type to match; `template_id` is passed in `CreateNodeRequest` for activity-log attribution.
+- **Template picker in node editor (create mode)** — a compact "— Template —" select appears in the node editor header only when creating a new node. Selecting a template overwrites body and type. Both pickers use `LocalResource<Vec<NodeTemplate>>` mirrored into an `RwSignal` for untracked reads in `on:change` closures.
+
+---
+
+## [1.45.3] - 2026-03-27
+
+### Changed
+- **Node card body preview expanded to 3 lines** — CSS class changed from `truncate` (1 line) to `line-clamp-3`; `body_preview` character cap raised from 120 to 300 to ensure 3 lines of text are available at typical card widths.
+
+---
+
+## [1.45.2] - 2026-03-27
+
+### Changed
+- Documentation update: README, CHANGELOG, `docs/deploy-aws.md`, and `CLAUDE.md` updated with session learnings (boto3 Cognito CSS application, SVG z-order, `pointer-events`, newtype context pattern, Cognito CSS allowed-class list).
+
+---
+
 ## [1.45.1] - 2026-03-27
 
 ### Changed
