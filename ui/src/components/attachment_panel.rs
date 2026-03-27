@@ -35,7 +35,7 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /// Collect files from a FileList into the pending queue.
+    // Collect files from a FileList into the pending queue.
     let queue_file_list = move |fl: web_sys::FileList| {
         let files: Vec<web_sys::File> = (0..fl.length())
             .filter_map(|i| fl.get(i))

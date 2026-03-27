@@ -1,4 +1,8 @@
-use common::{node::Node, tag::Tag};
+use common::{
+    id::TagId,
+    node::Node,
+    tag::Tag,
+};
 use leptos::prelude::*;
 
 use crate::app::View;
@@ -109,6 +113,9 @@ pub fn NodeList() -> impl IntoView {
             crate::api::fetch_nodes_filtered(status.as_deref(), tag.map(|t| t.id.0)).await
         }
     });
+
+    // All available tags — used by the per-card tag picker.
+    let all_tags = LocalResource::new(crate::api::fetch_tags);
 
     view! {
         <div class="flex flex-col h-full">
@@ -306,7 +313,18 @@ pub fn NodeList() -> impl IntoView {
                                     // then secondary sort by the chosen SortKey.
                                     let mut sorted = sort_key.get().sort_nodes(filtered);
                                     sorted.sort_by_key(|n| !n.pinned); // stable: false < true, so pinned (true) → !true = false sorts first
-                                    view! { <NodeCards nodes=sorted current_view=current_view /> }.into_any()
+                                    // Snapshot available tags (empty vec if resource hasn't resolved yet).
+                                    let available_tags = all_tags
+                                        .get()
+                                        .and_then(|r| r.ok())
+                                        .unwrap_or_default();
+                                    view! {
+                                        <NodeCards
+                                            nodes=sorted
+                                            current_view=current_view
+                                            available_tags=available_tags
+                                        />
+                                    }.into_any()
                                 }
                                 Err(e) => view! {
                                     <div class="p-6 text-red-500 text-sm">{format!("Error: {e}")}</div>
@@ -323,9 +341,18 @@ pub fn NodeList() -> impl IntoView {
 // ── NodeCards ──────────────────────────────────────────────────────────────────
 
 #[component]
-fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
+fn NodeCards(
+    nodes: Vec<Node>,
+    current_view: RwSignal<View>,
+    available_tags: Vec<Tag>,
+) -> impl IntoView {
     let tag_filter =
         use_context::<RwSignal<Option<Tag>>>().unwrap_or_else(|| RwSignal::new(None));
+    let refresh =
+        use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
+
+    // Wrap in StoredValue so it is Copy and can be captured across per-card closures.
+    let available_tags = StoredValue::new(available_tags);
 
     view! {
         <ul class="divide-y divide-stone-200 dark:divide-stone-800">
@@ -335,7 +362,12 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
                 let st      = format!("{:?}", node.status).to_lowercase();
                 let updated = node.updated_at.format("%b %d, %Y").to_string();
                 let tags    = node.tags.clone();
+                // Snapshot of currently-applied tags for this card (used in picker state).
+                let node_tags_stored = StoredValue::new(node.tags.clone());
                 let pinned  = node.pinned;
+
+                // Per-card picker visibility signal.
+                let show_picker = RwSignal::new(false);
 
                 let t_icon  = type_icon(&nt);
                 let t_label = type_label(&nt);
@@ -391,34 +423,138 @@ fn NodeCards(nodes: Vec<Node>, current_view: RwSignal<View>) -> impl IntoView {
                                     })}
                                 </div>
 
-                                // ── Row 2: tag pills (only if present) ──────────────
-                                {(!tags.is_empty()).then(|| {
-                                    view! {
-                                        <div class="flex flex-wrap gap-1 mt-1.5">
-                                            {tags.into_iter().map(|tag| {
-                                                let tf    = tag.clone();
-                                                let color = tag.color.clone();
-                                                let name  = tag.name.clone();
-                                                let tip   = format!("Filter: {name}");
-                                                view! {
-                                                    <button
-                                                        class="px-2 py-0.5 text-xs rounded-full
-                                                               text-white hover:opacity-80
-                                                               transition-opacity whitespace-nowrap"
-                                                        style=format!("background-color: {color}")
-                                                        title=tip
-                                                        on:click=move |ev| {
-                                                            ev.stop_propagation();
-                                                            tag_filter.set(Some(tf.clone()));
-                                                        }
-                                                    >
-                                                        {name}
-                                                    </button>
+                                // ── Row 2: tag pills + inline tag picker ─────────────
+                                <div class="flex flex-wrap gap-1 mt-1.5 items-center">
+                                    // Existing tag pills (clicking sets list-level tag filter).
+                                    {tags.into_iter().map(|tag| {
+                                        let tf    = tag.clone();
+                                        let color = tag.color.clone();
+                                        let name  = tag.name.clone();
+                                        let tip   = format!("Filter: {name}");
+                                        view! {
+                                            <button
+                                                class="px-2 py-0.5 text-xs rounded-full
+                                                       text-white hover:opacity-80
+                                                       transition-opacity whitespace-nowrap"
+                                                style=format!("background-color: {color}")
+                                                title=tip
+                                                on:click=move |ev| {
+                                                    ev.stop_propagation();
+                                                    tag_filter.set(Some(tf.clone()));
                                                 }
-                                            }).collect::<Vec<_>>()}
-                                        </div>
-                                    }
-                                })}
+                                            >
+                                                {name}
+                                            </button>
+                                        }
+                                    }).collect::<Vec<_>>()}
+
+                                    // ── Tag picker button + dropdown ─────────────────
+                                    <div class="relative">
+                                        <button
+                                            class="flex items-center justify-center w-5 h-5 rounded-full
+                                                   text-stone-300 dark:text-stone-600
+                                                   hover:text-amber-500 dark:hover:text-amber-400
+                                                   hover:bg-stone-100 dark:hover:bg-stone-800
+                                                   transition-colors"
+                                            title="Add or remove tags"
+                                            on:click=move |ev| {
+                                                ev.stop_propagation();
+                                                show_picker.update(|v| *v = !*v);
+                                            }
+                                        >
+                                            <span class="material-symbols-outlined" style="font-size: 14px;">
+                                                "label"
+                                            </span>
+                                        </button>
+
+                                        {move || show_picker.get().then(|| {
+                                            let all = available_tags.get_value();
+                                            let current_ids: Vec<TagId> = node_tags_stored
+                                                .get_value()
+                                                .iter()
+                                                .map(|t| t.id)
+                                                .collect();
+                                            view! {
+                                                // Click-outside overlay — closes picker without navigating.
+                                                <div
+                                                    class="fixed inset-0 z-10"
+                                                    on:click=move |ev: web_sys::MouseEvent| {
+                                                        ev.stop_propagation();
+                                                        show_picker.set(false);
+                                                    }
+                                                />
+                                                // Dropdown panel
+                                                <div class="absolute left-0 top-full mt-1 z-20 w-52
+                                                    bg-white dark:bg-stone-900 rounded-xl shadow-xl
+                                                    border border-stone-200 dark:border-stone-700
+                                                    overflow-hidden">
+                                                    {if all.is_empty() {
+                                                        view! {
+                                                            <div class="px-3 py-2 text-xs
+                                                                text-stone-400 dark:text-stone-500">
+                                                                "No tags defined"
+                                                            </div>
+                                                        }.into_any()
+                                                    } else {
+                                                        view! {
+                                                            <div>
+                                                                {all.into_iter().map(|tag| {
+                                                                    let tag_id  = tag.id;
+                                                                    let color   = tag.color.clone();
+                                                                    let name    = tag.name.clone();
+                                                                    let applied = current_ids.contains(&tag_id);
+                                                                    let node_id = id;
+                                                                    view! {
+                                                                        <button
+                                                                            class="w-full text-left px-3 py-1.5 text-xs
+                                                                                flex items-center gap-2 transition-colors
+                                                                                hover:bg-stone-50 dark:hover:bg-stone-800"
+                                                                            on:click=move |ev| {
+                                                                                ev.stop_propagation();
+                                                                                show_picker.set(false);
+                                                                                let r = refresh;
+                                                                                wasm_bindgen_futures::spawn_local(async move {
+                                                                                    let res = if applied {
+                                                                                        crate::api::detach_tag(node_id, tag_id).await
+                                                                                    } else {
+                                                                                        crate::api::attach_tag(node_id, tag_id).await
+                                                                                    };
+                                                                                    if res.is_ok() {
+                                                                                        r.update(|n| *n += 1);
+                                                                                    }
+                                                                                });
+                                                                            }
+                                                                        >
+                                                                            // Colour swatch
+                                                                            <span
+                                                                                class="w-2 h-2 rounded-full flex-shrink-0"
+                                                                                style=format!("background-color: {color}")
+                                                                            />
+                                                                            // Tag name
+                                                                            <span class="flex-1 text-stone-700 dark:text-stone-300">
+                                                                                {name}
+                                                                            </span>
+                                                                            // Checkmark if currently applied
+                                                                            {applied.then(|| view! {
+                                                                                <span
+                                                                                    class="material-symbols-outlined
+                                                                                        text-amber-500 dark:text-amber-400"
+                                                                                    style="font-size: 14px;"
+                                                                                >
+                                                                                    "check"
+                                                                                </span>
+                                                                            })}
+                                                                        </button>
+                                                                    }
+                                                                }).collect::<Vec<_>>()}
+                                                            </div>
+                                                        }.into_any()
+                                                    }}
+                                                </div>
+                                            }
+                                        })}
+                                    </div>
+                                </div>
 
                                 // ── Row 3: body preview ──────────────────────────────
                                 {node.body.as_deref().and_then(body_preview).map(|preview| view! {
