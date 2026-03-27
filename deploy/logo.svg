@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Stone-50 background circle -->
+  <circle cx="100" cy="100" r="100" fill="#fafaf9"/>
+  <!-- Outer flame: amber → red → orange gradient -->
+  <defs>
+    <linearGradient id="flame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="50%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#f97316"/>
+    </linearGradient>
+  </defs>
+  <!-- Flame paths scaled from 64×64 viewBox to fit inside 200×200 with padding -->
+  <g transform="translate(37.5, 37.5) scale(1.953125)">
+    <path d="M32 4 C24 16, 12 24, 12 38 C12 50, 20 60, 32 60 C44 60, 52 50, 52 38 C52 24, 40 16, 32 4Z"
+          fill="url(#flame)" opacity="0.9"/>
+    <path d="M32 22 C28 30, 22 34, 22 42 C22 50, 26 54, 32 54 C38 54, 42 50, 42 42 C42 34, 36 30, 32 22Z"
+          fill="#fbbf24" opacity="0.85"/>
+    <circle cx="32" cy="38" r="3" fill="#ffffff" opacity="0.9"/>
+  </g>
+</svg>
