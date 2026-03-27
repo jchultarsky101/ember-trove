@@ -1,4 +1,8 @@
-use common::node::{CreateNodeRequest, NodeType};
+use common::{
+    id::TemplateId,
+    node::{CreateNodeRequest, NodeType},
+    template::NodeTemplate,
+};
 use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
@@ -10,7 +14,8 @@ use crate::{
 
 /// Quick-capture modal — lightweight node creation without leaving the current view.
 ///
-/// Fields: title (required), node type (select), body (optional textarea).
+/// Fields: title (required), node type (select), optional template picker,
+/// body (optional textarea).
 /// On success: bumps the global `refresh` signal and navigates to the new node.
 /// Closes on Escape or Cancel.
 #[component]
@@ -24,6 +29,8 @@ pub fn CreateNodeModal(
     let title = RwSignal::new(String::new());
     let body = RwSignal::new(String::new());
     let node_type_str = RwSignal::new("article".to_string());
+    let template_id_for_create: RwSignal<Option<TemplateId>> = RwSignal::new(None);
+    let selected_template_value = RwSignal::new(String::new());
     let loading = RwSignal::new(false);
     let error: RwSignal<Option<String>> = RwSignal::new(None);
 
@@ -34,11 +41,23 @@ pub fn CreateNodeModal(
     let node_type_filter: Option<RwSignal<Option<String>>> =
         use_context::<RwSignal<Option<String>>>();
 
+    // Fetch the user's saved templates for the picker.
+    let templates_resource = LocalResource::new(crate::api::list_templates);
+    // Mirror into a plain signal so the on:change handler can read untracked.
+    let available_templates: RwSignal<Vec<NodeTemplate>> = RwSignal::new(vec![]);
+    Effect::new(move |_| {
+        if let Some(Ok(ts)) = templates_resource.get() {
+            available_templates.set(ts);
+        }
+    });
+
     // Reset fields every time the modal opens.
     Effect::new(move |_| {
         if show.get() {
             title.set(String::new());
             body.set(String::new());
+            template_id_for_create.set(None);
+            selected_template_value.set(String::new());
             // Pre-select type from the active filter (falls back to "article").
             let default_type = node_type_filter
                 .and_then(|f| f.get_untracked())
@@ -70,7 +89,7 @@ pub fn CreateNodeModal(
             body: body_opt,
             metadata: serde_json::Value::Object(serde_json::Map::new()),
             status: None,
-            template_id: None,
+            template_id: template_id_for_create.get_untracked(),
         };
         loading.set(true);
         error.set(None);
@@ -158,27 +177,75 @@ pub fn CreateNodeModal(
                         />
                     </div>
 
-                    // Type select
-                    <div class="flex flex-col gap-1">
-                        <label class="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">
-                            "Type"
-                        </label>
-                        <select
-                            class="w-full px-3 py-2 rounded-lg text-sm
-                                   bg-stone-50 dark:bg-stone-800
-                                   border border-stone-200 dark:border-stone-700
-                                   text-stone-900 dark:text-stone-100
-                                   focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400
-                                   transition-colors cursor-pointer"
-                            prop:value=move || node_type_str.get()
-                            on:change=move |ev| node_type_str.set(event_target_value(&ev))
-                        >
-                            <option value="article">"Article"</option>
-                            <option value="project">"Project"</option>
-                            <option value="area">"Area"</option>
-                            <option value="resource">"Resource"</option>
-                            <option value="reference">"Reference"</option>
-                        </select>
+                    // Type + Template row
+                    <div class="flex gap-3">
+                        // Type select
+                        <div class="flex flex-col gap-1 w-36 shrink-0">
+                            <label class="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">
+                                "Type"
+                            </label>
+                            <select
+                                class="w-full px-3 py-2 rounded-lg text-sm
+                                       bg-stone-50 dark:bg-stone-800
+                                       border border-stone-200 dark:border-stone-700
+                                       text-stone-900 dark:text-stone-100
+                                       focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400
+                                       transition-colors cursor-pointer"
+                                prop:value=move || node_type_str.get()
+                                on:change=move |ev| node_type_str.set(event_target_value(&ev))
+                            >
+                                <option value="article">"Article"</option>
+                                <option value="project">"Project"</option>
+                                <option value="area">"Area"</option>
+                                <option value="resource">"Resource"</option>
+                                <option value="reference">"Reference"</option>
+                            </select>
+                        </div>
+
+                        // Template picker
+                        <div class="flex flex-col gap-1 flex-1">
+                            <label class="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">
+                                "Template "
+                                <span class="normal-case font-normal text-stone-400 dark:text-stone-500">"(optional)"</span>
+                            </label>
+                            <select
+                                class="w-full px-3 py-2 rounded-lg text-sm
+                                       bg-stone-50 dark:bg-stone-800
+                                       border border-stone-200 dark:border-stone-700
+                                       text-stone-900 dark:text-stone-100
+                                       focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400
+                                       transition-colors cursor-pointer"
+                                prop:value=move || selected_template_value.get()
+                                on:change=move |ev| {
+                                    let val = event_target_value(&ev);
+                                    selected_template_value.set(val.clone());
+                                    if val.is_empty() {
+                                        template_id_for_create.set(None);
+                                    } else if let Ok(tid) = val.parse::<TemplateId>() {
+                                        let templates = available_templates.get_untracked();
+                                        if let Some(t) = templates.into_iter().find(|t| t.id == tid) {
+                                            let type_str = match t.node_type {
+                                                NodeType::Project   => "project",
+                                                NodeType::Area      => "area",
+                                                NodeType::Resource  => "resource",
+                                                NodeType::Reference => "reference",
+                                                NodeType::Article   => "article",
+                                            };
+                                            body.set(t.body.clone());
+                                            node_type_str.set(type_str.to_string());
+                                            template_id_for_create.set(Some(tid));
+                                        }
+                                    }
+                                }
+                            >
+                                <option value="">"— No template —"</option>
+                                {move || available_templates.get().into_iter().map(|t| {
+                                    let name = t.name.clone();
+                                    let id = t.id.to_string();
+                                    view! { <option value=id>{name}</option> }
+                                }).collect_view()}
+                            </select>
+                        </div>
                     </div>
 
                     // Body textarea (optional)
