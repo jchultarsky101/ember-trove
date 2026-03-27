@@ -22,13 +22,13 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::{MouseEvent, WheelEvent};
 
 use common::{
-    edge::{Edge, EdgeType},
-    id::{NodeId, TagId},
+    edge::{CreateEdgeRequest, Edge, EdgeType},
+    id::{EdgeId, NodeId, TagId},
     node::{Node, NodeType},
 };
 
 use crate::{
-    api::{fetch_all_edges, fetch_nodes, fetch_positions, save_position},
+    api::{create_edge, delete_edge, fetch_all_edges, fetch_nodes, fetch_positions, save_position},
     app::View,
     components::node_meta::{status_color_hex, status_label, type_icon, type_label},
 };
@@ -56,6 +56,7 @@ struct NodeHoverInfo {
 
 #[derive(Clone)]
 struct EdgeHover {
+    edge_id: Uuid,
     type_label: &'static str,
     custom_label: Option<String>,
     src_title: String,
@@ -386,6 +387,18 @@ pub fn GraphView() -> impl IntoView {
     let edge_hover: RwSignal<Option<EdgeHover>> = RwSignal::new(None);
     let node_hover: RwSignal<Option<NodeHoverInfo>> = RwSignal::new(None);
 
+    // ── Edge-create mode signals ──────────────────────────────────────────────
+    // Activated by the "Add Edge" toolbar button.
+    let edge_create_mode = RwSignal::new(false);
+    // First node clicked while in edge-create mode becomes the source.
+    let edge_src: RwSignal<Option<Uuid>> = RwSignal::new(None);
+    // When both src and tgt are chosen, this holds (src, tgt) to show the popup.
+    let edge_pair: RwSignal<Option<(Uuid, Uuid)>> = RwSignal::new(None);
+    // Popup form state.
+    let new_edge_type = RwSignal::new("references".to_string());
+    let new_edge_label = RwSignal::new(String::new());
+    let edge_saving = RwSignal::new(false);
+
     // ── Type-visibility filter signals ───────────────────────────────────────
     // Each signal controls whether nodes of that type are rendered.
     let show_articles:   RwSignal<bool> = RwSignal::new(true);
@@ -442,6 +455,33 @@ pub fn GraphView() -> impl IntoView {
             // ── Legend overlay ───────────────────────────────────────────────
             // ── Toolbar (top-right) ──────────────────────────────────────────
             <div class="absolute top-3 right-3 z-10 flex items-center gap-2">
+                // Add Edge button — toggles edge-create mode.
+                <button
+                    class=move || {
+                        let base = "px-2.5 py-1 rounded-lg text-xs font-medium backdrop-blur-sm \
+                                    border cursor-pointer transition-colors flex items-center gap-1";
+                        if edge_create_mode.get() {
+                            format!("{base} bg-amber-500/90 border-amber-600 text-white")
+                        } else {
+                            format!("{base} bg-white/80 dark:bg-stone-900/85 \
+                                     border-stone-200 dark:border-stone-700 \
+                                     text-stone-600 dark:text-stone-300 \
+                                     hover:bg-stone-50 dark:hover:bg-stone-800")
+                        }
+                    }
+                    title="Add a new edge between two nodes (click source then target)"
+                    on:click=move |_| {
+                        let entering = !edge_create_mode.get_untracked();
+                        edge_create_mode.set(entering);
+                        if !entering {
+                            edge_src.set(None);
+                            edge_pair.set(None);
+                        }
+                    }
+                >
+                    <span class="material-symbols-outlined" style="font-size: 14px;">"add_link"</span>
+                    {move || if edge_create_mode.get() { "Cancel" } else { "Add Edge" }}
+                </button>
                 <button
                     class="px-2.5 py-1 rounded-lg text-xs font-medium
                            bg-white/80 dark:bg-stone-900/85 backdrop-blur-sm
@@ -458,6 +498,122 @@ pub fn GraphView() -> impl IntoView {
                     "Fit"
                 </button>
             </div>
+
+            // ── Add Edge popup ───────────────────────────────────────────────
+            // Shows when both source and target have been selected in edge-create mode.
+            {move || edge_pair.get().map(|(_src_id, _tgt_id)| {
+                view! {
+                    <div class="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                        <div
+                            class="pointer-events-auto bg-white dark:bg-stone-900
+                                   rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700
+                                   p-5 flex flex-col gap-3 w-72"
+                            on:click=|ev: MouseEvent| ev.stop_propagation()
+                        >
+                            <h3 class="text-sm font-semibold text-stone-900 dark:text-stone-100">
+                                "New Edge"
+                            </h3>
+                            // Edge type select
+                            <div class="flex flex-col gap-1">
+                                <label class="text-xs text-stone-500 dark:text-stone-400 uppercase tracking-wide font-medium">
+                                    "Type"
+                                </label>
+                                <select
+                                    class="w-full px-3 py-1.5 rounded-lg text-sm
+                                           bg-stone-50 dark:bg-stone-800
+                                           border border-stone-200 dark:border-stone-700
+                                           text-stone-900 dark:text-stone-100
+                                           focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                    prop:value=move || new_edge_type.get()
+                                    on:change=move |ev| new_edge_type.set(event_target_value(&ev))
+                                >
+                                    <option value="references">"References"</option>
+                                    <option value="contains">"Contains"</option>
+                                    <option value="related_to">"Related to"</option>
+                                    <option value="depends_on">"Depends on"</option>
+                                    <option value="derived_from">"Derived from"</option>
+                                </select>
+                            </div>
+                            // Optional label
+                            <div class="flex flex-col gap-1">
+                                <label class="text-xs text-stone-500 dark:text-stone-400 uppercase tracking-wide font-medium">
+                                    "Label "
+                                    <span class="normal-case font-normal">"(optional)"</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. uses, extends…"
+                                    class="w-full px-3 py-1.5 rounded-lg text-sm
+                                           bg-stone-50 dark:bg-stone-800
+                                           border border-stone-200 dark:border-stone-700
+                                           text-stone-900 dark:text-stone-100
+                                           placeholder-stone-400
+                                           focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                    prop:value=move || new_edge_label.get()
+                                    on:input=move |ev| new_edge_label.set(event_target_value(&ev))
+                                />
+                            </div>
+                            // Buttons
+                            <div class="flex gap-2 justify-end pt-1">
+                                <button
+                                    class="px-3 py-1.5 text-sm rounded-lg
+                                           text-stone-600 dark:text-stone-400
+                                           hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+                                    on:click=move |_| {
+                                        edge_pair.set(None);
+                                        edge_src.set(None);
+                                        edge_create_mode.set(false);
+                                        new_edge_type.set("references".to_string());
+                                        new_edge_label.set(String::new());
+                                    }
+                                >
+                                    "Cancel"
+                                </button>
+                                <button
+                                    class="px-3 py-1.5 text-sm font-medium rounded-lg
+                                           bg-amber-600 hover:bg-amber-700 text-white
+                                           disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    disabled=move || edge_saving.get()
+                                    on:click=move |_| {
+                                        let Some((src, tgt)) = edge_pair.get_untracked() else { return };
+                                        let et = match new_edge_type.get_untracked().as_str() {
+                                            "contains"     => EdgeType::Contains,
+                                            "related_to"   => EdgeType::RelatedTo,
+                                            "depends_on"   => EdgeType::DependsOn,
+                                            "derived_from" => EdgeType::DerivedFrom,
+                                            _              => EdgeType::References,
+                                        };
+                                        let lbl = {
+                                            let s = new_edge_label.get_untracked();
+                                            if s.trim().is_empty() { None } else { Some(s) }
+                                        };
+                                        let req = CreateEdgeRequest {
+                                            source_id: NodeId(src),
+                                            target_id: NodeId(tgt),
+                                            edge_type: et,
+                                            label: lbl,
+                                        };
+                                        edge_saving.set(true);
+                                        spawn_local(async move {
+                                            if let Ok(new_edge) = create_edge(&req).await {
+                                                edges_sig.update(|v| v.push(new_edge));
+                                            }
+                                            edge_saving.set(false);
+                                            edge_pair.set(None);
+                                            edge_src.set(None);
+                                            edge_create_mode.set(false);
+                                            new_edge_type.set("references".to_string());
+                                            new_edge_label.set(String::new());
+                                        });
+                                    }
+                                >
+                                    {move || if edge_saving.get() { "Saving…" } else { "Create" }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            })}
 
             // ── Legend + type filter overlay (bottom-left) ───────────────────
             <div class="absolute bottom-4 left-4 z-10
@@ -580,6 +736,7 @@ pub fn GraphView() -> impl IntoView {
                         let marker_id = edge_marker_id(&edge.edge_type);
 
                         let hover_info = EdgeHover {
+                            edge_id: edge.id.0,
                             type_label: edge_label(&edge.edge_type),
                             custom_label: edge.label.clone(),
                             src_title: title_map.get(&src).cloned().unwrap_or_default(),
@@ -765,7 +922,13 @@ pub fn GraphView() -> impl IntoView {
 
                         view! {
                             <g
-                                style="cursor: grab;"
+                                style=move || {
+                                    if edge_create_mode.get() {
+                                        "cursor: crosshair;"
+                                    } else {
+                                        "cursor: grab;"
+                                    }
+                                }
                                 on:click=move |ev: MouseEvent| {
                                     // Suppress the click that follows a drag.
                                     if did_drag.get_untracked() {
@@ -773,16 +936,27 @@ pub fn GraphView() -> impl IntoView {
                                         ev.stop_propagation();
                                         return;
                                     }
-                                    // Suppress if a tag dot was just clicked (Leptos event
-                                    // delegation fires parent handlers despite stop_propagation).
+                                    // Suppress if a tag dot was just clicked.
                                     if dot_clicked.get_untracked() {
                                         dot_clicked.set(false);
                                         ev.stop_propagation();
+                                        return;
+                                    }
+                                    // Edge-create mode: first click = source, second = target.
+                                    if edge_create_mode.get_untracked() {
+                                        ev.stop_propagation();
+                                        match edge_src.get_untracked() {
+                                            None => { edge_src.set(Some(id)); }
+                                            Some(src) if src == id => { edge_src.set(None); }
+                                            Some(src) => { edge_pair.set(Some((src, id))); }
+                                        }
                                     }
                                 }
                                 on:dblclick=move |ev: MouseEvent| {
                                     ev.stop_propagation();
-                                    current_view.set(View::NodeDetail(node_id));
+                                    if !edge_create_mode.get_untracked() {
+                                        current_view.set(View::NodeDetail(node_id));
+                                    }
                                 }
                                 on:mouseover=move |ev: MouseEvent| {
                                     ev.stop_propagation();
@@ -790,6 +964,10 @@ pub fn GraphView() -> impl IntoView {
                                 }
                                 on:mouseout=move |_| node_hover.set(None)
                                 on:mousedown=move |ev: MouseEvent| {
+                                    // Disable node dragging while in edge-create mode.
+                                    if edge_create_mode.get_untracked() {
+                                        return;
+                                    }
                                     ev.stop_propagation();
                                     ev.prevent_default();
                                     did_drag.set(false);
@@ -804,6 +982,26 @@ pub fn GraphView() -> impl IntoView {
                                 }
                             >
                                 <title>{title}</title>
+                                // Amber dashed ring when this node is the selected edge source.
+                                {move || (edge_src.get() == Some(id)).then(|| view! {
+                                    <circle
+                                        cx=move || {
+                                            format!(
+                                                "{:.1}",
+                                                positions.get().get(&id).map(|p| p.0).unwrap_or(W / 2.0)
+                                            )
+                                        }
+                                        cy=move || {
+                                            format!(
+                                                "{:.1}",
+                                                positions.get().get(&id).map(|p| p.1).unwrap_or(H / 2.0)
+                                            )
+                                        }
+                                        r="32"
+                                        style="fill: none; stroke: #f59e0b; stroke-width: 2px; \
+                                               stroke-dasharray: 5,3; opacity: 0.95;"
+                                    />
+                                })}
                                 // Amber outer ring for pinned nodes — drawn behind the shape.
                                 {is_pinned.then(|| view! {
                                     <circle
@@ -954,6 +1152,8 @@ pub fn GraphView() -> impl IntoView {
                 let svg_cursor = move || {
                     if drag_node.get().is_some() || panning.get() {
                         "cursor: grabbing;"
+                    } else if edge_create_mode.get() {
+                        "cursor: crosshair;"
                     } else {
                         "cursor: default;"
                     }
@@ -961,6 +1161,8 @@ pub fn GraphView() -> impl IntoView {
 
                 // ── Edge hover card ──────────────────────────────────────────
                 // Rendered last so it sits on top of all edges and nodes.
+                // Contains type label, direction, optional custom label, and a
+                // Delete button (pointer-events: auto on the button only).
                 let hover_card = move || {
                     edge_hover.get().map(|h| {
                         let pos = positions.get();
@@ -983,17 +1185,19 @@ pub fn GraphView() -> impl IntoView {
                             .filter(|s| !s.is_empty())
                             .map(|s| truncate(s, 28));
 
+                        // Extra row for the Delete button.
                         let line_count = if custom_lbl.is_some() { 3.0_f64 } else { 2.0_f64 };
-                        let card_h = line_count * 14.0 + 10.0;
+                        let card_h = line_count * 14.0 + 28.0; // +18 for delete button row
                         let max_chars = [
                             relation.len(),
                             arrow_line.len(),
                             custom_lbl.as_deref().map(str::len).unwrap_or(0),
+                            12, // "Delete edge" button text minimum
                         ]
                         .into_iter()
                         .max()
                         .unwrap_or(0);
-                        let card_w = (max_chars as f64 * 5.8 + 16.0_f64).max(80.0_f64);
+                        let card_w = (max_chars as f64 * 5.8 + 16.0_f64).max(100.0_f64);
 
                         let cx_s = format!("{:.1}", cx);
                         let card_x = format!("{:.1}", cx - card_w / 2.0);
@@ -1001,6 +1205,13 @@ pub fn GraphView() -> impl IntoView {
                         let y_rel = format!("{:.1}", cy + 9.0);
                         let y_arrow = format!("{:.1}", cy + 23.0);
                         let y_cust = format!("{:.1}", cy + 37.0);
+
+                        // Delete button positioned at card bottom.
+                        let y_btn_top = cy - 5.0 + card_h - 18.0;
+                        let btn_w = 80.0_f64;
+                        let btn_x = cx - btn_w / 2.0;
+                        let y_btn_text = y_btn_top + 11.0;
+                        let edge_id = h.edge_id;
 
                         view! {
                             <g style="pointer-events: none;">
@@ -1040,6 +1251,38 @@ pub fn GraphView() -> impl IntoView {
                                         </text>
                                     }
                                 })}
+                                // Delete button — pointer-events: auto so it's clickable.
+                                <g
+                                    style="pointer-events: auto; cursor: pointer;"
+                                    on:click=move |ev: MouseEvent| {
+                                        ev.stop_propagation();
+                                        let eid = EdgeId(edge_id);
+                                        edge_hover.set(None);
+                                        spawn_local(async move {
+                                            if delete_edge(eid).await.is_ok() {
+                                                edges_sig.update(|v| v.retain(|e| e.id.0 != edge_id));
+                                            }
+                                        });
+                                    }
+                                >
+                                    <rect
+                                        x=format!("{:.1}", btn_x)
+                                        y=format!("{:.1}", y_btn_top)
+                                        width=format!("{:.1}", btn_w)
+                                        height="16"
+                                        rx="3"
+                                        style="fill: rgba(220,38,38,0.85); \
+                                               stroke: rgba(255,255,255,0.2); stroke-width: 0.5;"
+                                    />
+                                    <text
+                                        x=format!("{:.1}", cx)
+                                        y=format!("{:.1}", y_btn_text)
+                                        style="text-anchor: middle; font-size: 8.5px; \
+                                               font-weight: 600; fill: #ffffff;"
+                                    >
+                                        "Delete edge"
+                                    </text>
+                                </g>
                             </g>
                         }
                         .into_any()
