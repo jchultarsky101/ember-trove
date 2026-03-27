@@ -37,6 +37,13 @@ pub fn storage_set(key: &str, value: &str) {
 #[derive(Clone, Copy)]
 pub struct TaskRefresh(pub RwSignal<u32>);
 
+// ── Quick-capture modal visibility ─────────────────────────────────────────
+// Lifted to App root so the global `n` keyboard shortcut and the FAB both
+// drive the same signal. Newtype avoids collision with other RwSignal<bool>.
+
+#[derive(Clone, Copy)]
+pub struct ShowCapture(pub RwSignal<bool>);
+
 // ── Current view ───────────────────────────────────────────────────────────
 
 #[allow(dead_code)]
@@ -136,6 +143,10 @@ pub fn App() -> impl IntoView {
     let task_refresh = TaskRefresh(RwSignal::new(0u32));
     provide_context(task_refresh);
 
+    // Quick-capture modal — shared between `n` shortcut and the FAB button.
+    let show_capture = ShowCapture(RwSignal::new(false));
+    provide_context(show_capture);
+
     // Toast notification state.
     let toast_state = ToastState::new();
     provide_context(toast_state);
@@ -157,7 +168,7 @@ pub fn App() -> impl IntoView {
     // any contenteditable element.
     //
     // Shortcuts:
-    //   n   → New node
+    //   n   → Quick-capture modal (same as FAB)
     //   g   → Graph view
     //   /   → Search (also prevents the browser's built-in page-find)
     //   Esc → Back to node list (from detail / edit / create); close modal
@@ -190,7 +201,7 @@ pub fn App() -> impl IntoView {
 
         match ev.key().as_str() {
             "?" => show_shortcuts.update(|v| *v = !*v),
-            "n" => current_view.set(View::NodeCreate),
+            "n" => show_capture.0.set(true),
             "g" => current_view.set(View::Graph),
             "/" => {
                 ev.prevent_default();
