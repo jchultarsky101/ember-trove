@@ -626,6 +626,7 @@ pub fn GraphView() -> impl IntoView {
                         // Estimate background-pill width from title char count.
                         let bg_w = (title.chars().count() as f64 * 5.4 + 10.0_f64).max(32.0_f64);
 
+                        let is_pinned = node.pinned;
                         let shape_el: AnyView = match node_type {
                             NodeType::Article => view! {
                                 <circle
@@ -757,6 +758,25 @@ pub fn GraphView() -> impl IntoView {
                                 }
                             >
                                 <title>{title}</title>
+                                // Amber outer ring for pinned nodes — drawn behind the shape.
+                                {is_pinned.then(|| view! {
+                                    <circle
+                                        cx=move || {
+                                            format!(
+                                                "{:.1}",
+                                                positions.get().get(&id).map(|p| p.0).unwrap_or(W / 2.0)
+                                            )
+                                        }
+                                        cy=move || {
+                                            format!(
+                                                "{:.1}",
+                                                positions.get().get(&id).map(|p| p.1).unwrap_or(H / 2.0)
+                                            )
+                                        }
+                                        r="29"
+                                        style="fill: none; stroke: #f59e0b; stroke-width: 2.5px; opacity: 0.9;"
+                                    />
+                                })}
                                 {shape_el}
                                 // Semi-transparent pill behind title text.
                                 <rect
