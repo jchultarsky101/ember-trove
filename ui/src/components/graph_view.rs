@@ -23,7 +23,7 @@ use web_sys::{MouseEvent, WheelEvent};
 
 use common::{
     edge::{Edge, EdgeType},
-    id::NodeId,
+    id::{NodeId, TagId},
     node::{Node, NodeType},
 };
 
@@ -394,6 +394,14 @@ pub fn GraphView() -> impl IntoView {
     let show_resources:  RwSignal<bool> = RwSignal::new(true);
     let show_references: RwSignal<bool> = RwSignal::new(true);
 
+    // ── Tag filter signal ────────────────────────────────────────────────────
+    // When Some(tag_id), only nodes with that tag are rendered.
+    // Set by clicking a tag dot; cleared by clicking the same dot or the × button.
+    let tag_filter: RwSignal<Option<TagId>> = RwSignal::new(None);
+    // Guard: prevents the <g> on:click from firing after a dot click
+    // (Leptos event delegation fires parent handlers even after stop_propagation).
+    let dot_clicked = RwSignal::new(false);
+
     Effect::new(move |_| {
         spawn_local(async move {
             match fetch_nodes().await {
@@ -466,6 +474,20 @@ pub fn GraphView() -> impl IntoView {
                     <LegendToggle label="Resource"  color="#9333ea" shape="hexagon"  show=show_resources />
                     <LegendToggle label="Reference" color="#dc2626" shape="triangle" show=show_references />
                 </div>
+                // Tag filter active indicator — shown when a tag dot has been clicked.
+                {move || tag_filter.get().map(|_| view! {
+                    <div class="flex items-center gap-1.5 mt-1 pt-1
+                                border-t border-stone-200 dark:border-stone-700">
+                        <span class="text-amber-600 dark:text-amber-400 text-[10px] font-semibold
+                                     uppercase tracking-wide">"Tag filter active"</span>
+                        <button
+                            class="ml-auto text-stone-400 hover:text-stone-600 dark:hover:text-stone-200
+                                   text-xs font-bold leading-none"
+                            title="Clear tag filter"
+                            on:click=move |_| tag_filter.set(None)
+                        >"×"</button>
+                    </div>
+                })}
                 // Edge line styles (non-interactive)
                 <p class="font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide
                            text-[10px] mt-1 mb-0.5">"Edges"</p>
@@ -507,15 +529,22 @@ pub fn GraphView() -> impl IntoView {
                     .into_any();
                 }
 
-                // Apply type-visibility filter.
+                // Apply type-visibility filter + optional tag filter.
+                let active_tag = tag_filter.get();
                 let nodes: Vec<Node> = all_nodes
                     .into_iter()
-                    .filter(|n| match &n.node_type {
-                        NodeType::Article   => show_articles.get(),
-                        NodeType::Project   => show_projects.get(),
-                        NodeType::Area      => show_areas.get(),
-                        NodeType::Resource  => show_resources.get(),
-                        NodeType::Reference => show_references.get(),
+                    .filter(|n| {
+                        let type_visible = match &n.node_type {
+                            NodeType::Article   => show_articles.get(),
+                            NodeType::Project   => show_projects.get(),
+                            NodeType::Area      => show_areas.get(),
+                            NodeType::Resource  => show_resources.get(),
+                            NodeType::Reference => show_references.get(),
+                        };
+                        let tag_visible = active_tag
+                            .map(|tid| n.tags.iter().any(|t| t.id == tid))
+                            .unwrap_or(true);
+                        type_visible && tag_visible
                     })
                     .collect();
 
@@ -630,12 +659,12 @@ pub fn GraphView() -> impl IntoView {
                         // Material Symbols ligature for the node-type icon.
                         let icon_glyph: &'static str =
                             type_icon(&format!("{:?}", node_type).to_lowercase());
-                        // Collect tag colours (up to 5) for the dot overlay.
-                        let tag_colors: Vec<String> = node
+                        // Collect (TagId, colour) pairs (up to 5) for the dot overlay.
+                        let tag_colors: Vec<(TagId, String)> = node
                             .tags
                             .iter()
                             .take(5)
-                            .map(|t| t.color.clone())
+                            .map(|t| (t.id, t.color.clone()))
                             .collect();
                         let shape_el: AnyView = match node_type {
                             NodeType::Article => view! {
@@ -741,6 +770,13 @@ pub fn GraphView() -> impl IntoView {
                                     // Suppress the click that follows a drag.
                                     if did_drag.get_untracked() {
                                         did_drag.set(false);
+                                        ev.stop_propagation();
+                                        return;
+                                    }
+                                    // Suppress if a tag dot was just clicked (Leptos event
+                                    // delegation fires parent handlers despite stop_propagation).
+                                    if dot_clicked.get_untracked() {
+                                        dot_clicked.set(false);
                                         ev.stop_propagation();
                                     }
                                 }
@@ -858,10 +894,11 @@ pub fn GraphView() -> impl IntoView {
                                 </text>
                                 // Tag colour dots — rendered after the title pill so they always
                                 // paint on top. Positioned at cy+42, below the pill (cy+22..cy+36).
-                                {tag_colors.iter().enumerate().map(|(i, color)| {
-                                    let dot_style = format!(
-                                        "fill: {color}; stroke: #ffffff; stroke-width: 1px; pointer-events: none;"
-                                    );
+                                // Clicking a dot sets/clears the tag filter. The active dot gets
+                                // an amber outline and is slightly larger.
+                                {tag_colors.iter().enumerate().map(|(i, (tag_id, color))| {
+                                    let tag_id = *tag_id;
+                                    let color = color.clone();
                                     let n_f = tag_colors.len() as f64;
                                     let i_f = i as f64;
                                     view! {
@@ -888,8 +925,23 @@ pub fn GraphView() -> impl IntoView {
                                                         + 42.0
                                                 )
                                             }
-                                            r="3.5"
-                                            style=dot_style
+                                            r=move || {
+                                                if tag_filter.get() == Some(tag_id) { "5.0" } else { "3.5" }
+                                            }
+                                            style=move || {
+                                                if tag_filter.get() == Some(tag_id) {
+                                                    format!("fill: {color}; stroke: #d97706; stroke-width: 2px; cursor: pointer; pointer-events: auto;")
+                                                } else {
+                                                    format!("fill: {color}; stroke: #ffffff; stroke-width: 1px; cursor: pointer; pointer-events: auto;")
+                                                }
+                                            }
+                                            on:click=move |ev: MouseEvent| {
+                                                ev.stop_propagation();
+                                                dot_clicked.set(true);
+                                                tag_filter.update(|f| {
+                                                    *f = if *f == Some(tag_id) { None } else { Some(tag_id) };
+                                                });
+                                            }
                                         />
                                     }
                                 }).collect_view()}
