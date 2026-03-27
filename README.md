@@ -16,19 +16,27 @@ Ember Trove is a web-based personal knowledge management (PKM) application where
 
 ### Key Features
 
-- **Graph-centric** — nodes and typed directional edges form a navigable knowledge graph with a visual graph view.
-- **Markdown-native** — split-pane editor with live preview, rendered via `pulldown-cmark` + `ammonia`.
-- **Full-text + fuzzy search** — PostgreSQL `tsvector` full-text search and `pg_trgm` trigram similarity, covering nodes, notes, and tasks.
-- **Multi-tag filtering** — AND/OR tag filters across node list and search results.
-- **S3 attachments** — file upload / download via MinIO (local) or Lightsail Object Storage / AWS S3.
-- **Tasks & My Day** — per-node task lists with a daily planning view.
-- **Notes feed** — append-only timestamped notes per node, surfaced in a global feed.
-- **Quick capture** — floating action button for rapid node creation from anywhere in the app.
-- **User management** — admin UI backed by Keycloak (local) or Amazon Cognito (production).
-- **Single-user mode** — all authenticated users see and can annotate all nodes; `owner_id` is preserved for audit but not used for access filtering.
+- **Graph-centric** — nodes and typed directional edges form a navigable knowledge graph with a visual graph view. Node shapes encode type; colours encode status. Click tag dots to filter the graph by tag.
+- **Markdown-native** — split-pane editor with collapsible live preview (auto-hidden on mobile), rendered via `pulldown-cmark` + `ammonia`. Wiki-link `[[title]]` syntax auto-creates edges and provides autocomplete.
+- **Full-text + fuzzy search** — PostgreSQL `tsvector` full-text search and `pg_trgm` trigram similarity, covering nodes, notes, and tasks. Length-normalised ranking with visual relevance indicator. Save and restore search presets.
+- **Multi-tag filtering** — AND/OR tag filters across node list, search results, and graph view. Tags can be attached directly from the node list without opening the node.
+- **S3 attachments** — bulk drag-and-drop upload; inline preview for images and PDFs. Stored in MinIO (local) or Lightsail Object Storage / AWS S3.
+- **Tasks & My Day** — per-node task lists with create / toggle / edit / delete. Daily planning view aggregates today's tasks across all nodes.
+- **Notes feed** — append-only timestamped notes per node, editable after creation, surfaced in a global newest-first feed.
+- **Node versioning** — body snapshot on every save; version history timeline with one-click restore.
+- **Activity log** — per-node audit trail of 10 action types (created, updated, tag changes, permission changes, attachments, etc.).
+- **Node pinning** — pin important nodes; pinned nodes sort first in the list and are highlighted with an amber ring in the graph. `p` key toggles pin on the open node.
+- **Node templates** — create reusable Markdown templates for each node type; "Use" pre-fills the editor body.
+- **Quick capture** — floating amber FAB (bottom-right) and `n` keyboard shortcut both open a lightweight modal for rapid node creation. Type, title, and optional body; Ctrl+Enter to save.
+- **Keyboard shortcuts** — `n` new node · `g` graph · `/` search · `p` pin · `?` shortcut help · `Esc` back. All suppressed inside form fields.
+- **Multi-user permissions** — nodes are **private by default**. Owners can invite others by email with Viewer / Editor / Owner roles. Bulk permission management available in the admin panel.
+- **User management** — admin UI backed by Amazon Cognito (production) or Keycloak (local). User invite emails via AWS SES.
+- **Public share links** — generate opaque share tokens for read-only access to a node without login.
+- **Export** — download any node as Markdown (with YAML front-matter) or JSON.
 - **Light / dark mode** — class-based Tailwind v4 warm ember theme, persisted in `localStorage`.
 - **Mobile-responsive** — hamburger top bar on mobile; sidebar slides in as an overlay.
-- **Self-hosted** — fully Dockerised with both a local dev stack and a production AWS deployment guide.
+- **Cognito hosted UI** — custom CSS and flame-icon logo matching the app's stone/amber palette.
+- **Self-hosted** — fully Dockerised with both a local dev stack and a production AWS deployment guide. CD pipeline via GitHub Actions on `v*.*.*` tags.
 
 ---
 
@@ -40,8 +48,8 @@ Ember Trove is a web-based personal knowledge management (PKM) application where
 | Frontend    | Leptos 0.8 CSR/WASM · Tailwind CSS v4   |
 | Database    | PostgreSQL 16 · sqlx 0.8               |
 | File Store  | S3-compatible (MinIO / Lightsail Object Storage / AWS S3) |
-| Auth (local)| OIDC via Keycloak                       |
-| Auth (prod) | Amazon Cognito                          |
+| Auth (local)| OIDC via Keycloak (dev) / Cognito       |
+| Auth (prod) | Amazon Cognito (hosted UI + custom CSS) |
 | Markdown    | pulldown-cmark · ammonia               |
 | OpenAPI     | utoipa + Swagger UI                     |
 | Build       | Trunk (UI) · cargo workspace            |
@@ -57,7 +65,7 @@ ember-trove/
 ├── common/               # shared DTOs, error types, ID newtypes
 ├── api/                  # Axum REST backend  — port 3003
 ├── ui/                   # Leptos/Trunk WASM  — port 8003
-├── migrations/           # sqlx migrations (PostgreSQL schema)
+├── migrations/           # sqlx migrations (PostgreSQL schema, 017 files)
 ├── docs/                 # Deployment and operations guides
 └── deploy/
     ├── Dockerfile.api
@@ -67,7 +75,9 @@ ember-trove/
     ├── nginx.conf                 # dev nginx config
     ├── nginx.prod.conf            # production nginx config (TLS)
     ├── .env.prod.template         # production env var template
-    └── k8s/              # Kubernetes manifests
+    ├── cognito.css                # Cognito hosted UI custom stylesheet
+    ├── logo.png                   # Cognito hosted UI logo
+    └── backup.sh                  # PostgreSQL backup/restore to S3
 ```
 
 ---
@@ -335,6 +345,7 @@ All API configuration is provided via environment variables.
 | `COGNITO_REGION` | Cognito | AWS region of the User Pool |
 | `AWS_ACCESS_KEY_ID` | Cognito | IAM key for Cognito admin operations |
 | `AWS_SECRET_ACCESS_KEY` | Cognito | IAM secret for Cognito admin operations |
+| `SES_FROM_EMAIL` | Optional | From-address for node invite emails via AWS SES v2; if unset, invites work but no email is sent |
 | `S3_ENDPOINT` | S3 | S3-compatible endpoint URL (omit for native AWS S3) |
 | `S3_BUCKET` | S3 | Bucket name |
 | `S3_ACCESS_KEY` | S3 | S3 access key |
@@ -389,12 +400,13 @@ All routes are nested under `/api`. Interactive docs at `/swagger-ui/` when the 
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/nodes` | List nodes (status, tag_id, tag_ids, pagination) |
-| POST | `/api/nodes` | Create node |
+| GET | `/api/nodes` | List nodes (status, tag_id, tag_ids, pinned, pagination) |
+| POST | `/api/nodes` | Create node (auto-grants Owner permission to creator) |
 | GET | `/api/nodes/{id}` | Get node by UUID |
 | GET | `/api/nodes/slug/{slug}` | Get node by slug |
-| PUT | `/api/nodes/{id}` | Update node |
+| PUT | `/api/nodes/{id}` | Update node (snapshots version on save) |
 | DELETE | `/api/nodes/{id}` | Delete node (cascading) |
+| PUT | `/api/nodes/{id}/pin` | Toggle pinned state (owner-only) |
 | GET | `/api/nodes/{id}/neighbors` | Linked neighbour nodes |
 | GET | `/api/nodes/{id}/backlinks` | Nodes that link to this node |
 | GET | `/api/nodes/{id}/edges` | All edges involving this node |
@@ -402,9 +414,15 @@ All routes are nested under `/api`. Interactive docs at `/swagger-ui/` when the 
 | POST | `/api/nodes/{id}/tags/{tag_id}` | Attach a tag |
 | DELETE | `/api/nodes/{id}/tags/{tag_id}` | Detach a tag |
 | GET | `/api/nodes/{id}/attachments` | List attachments |
-| POST | `/api/nodes/{id}/attachments` | Upload attachment (multipart) |
-| GET | `/api/nodes/{id}/permissions` | List permissions |
+| POST | `/api/nodes/{id}/attachments` | Upload attachment (multipart/form-data) |
+| GET | `/api/nodes/{id}/permissions` | List permission grants (viewer+) |
 | POST | `/api/nodes/{id}/permissions` | Grant permission to a user |
+| POST | `/api/nodes/{id}/invite` | Invite user by email (owner-only); sends SES email |
+| GET | `/api/nodes/{id}/activity` | Audit log for this node |
+| GET | `/api/nodes/{id}/versions` | Version history (body snapshots) |
+| POST | `/api/nodes/{id}/versions/{vid}/restore` | Restore a past version |
+| POST | `/api/nodes/{id}/share` | Create a public share token |
+| GET | `/api/nodes/{id}/share` | List share tokens for this node |
 
 ### Edges
 
@@ -431,6 +449,15 @@ All routes are nested under `/api`. Interactive docs at `/swagger-ui/` when the 
 | GET | `/api/search?q=…&status=published` | Filter by node status |
 | GET | `/api/search?q=…&tag_ids={uuid,uuid}` | Filter by tags (OR mode) |
 | GET | `/api/search?q=…&tag_ids={uuid,uuid}&and_mode=true` | Filter by tags (AND mode) |
+| GET | `/api/search?q=…&fuzzy=true` | Force fuzzy (trigram) matching |
+
+### Search Presets
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/search-presets` | List saved search presets (owner-scoped) |
+| POST | `/api/search-presets` | Save a search preset |
+| DELETE | `/api/search-presets/{id}` | Delete a search preset |
 
 ### Attachments
 
@@ -460,10 +487,35 @@ All routes are nested under `/api`. Interactive docs at `/swagger-ui/` when the 
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/nodes/{id}/notes` | List notes for a node |
+| GET | `/api/nodes/{id}/notes` | List notes for a node (newest first) |
 | POST | `/api/nodes/{id}/notes` | Append a note |
+| PATCH | `/api/notes/{id}` | Edit a note body (owner-only) |
 | DELETE | `/api/notes/{id}` | Delete a note |
-| GET | `/api/notes/feed` | Global notes feed (all nodes, newest first) |
+| GET | `/api/notes/feed` | Global notes feed (all accessible nodes, newest first) |
+
+### Permissions (standalone)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/permissions` | List all grants for the caller (optionally filtered by `?node_id=`) |
+| PUT | `/api/permissions/{id}` | Update role on an existing grant |
+| DELETE | `/api/permissions/{id}` | Revoke a grant |
+
+### Templates
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/templates` | List node templates (owner-scoped) |
+| POST | `/api/templates` | Create a template |
+| PUT | `/api/templates/{id}` | Update a template |
+| DELETE | `/api/templates/{id}` | Delete a template |
+
+### Public Share Links
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/share/{token}` | Read-only public view — no login required |
+| DELETE | `/api/share/{token}` | Revoke a share token |
 
 ### Admin (admin role required)
 
@@ -476,6 +528,7 @@ All routes are nested under `/api`. Interactive docs at `/swagger-ui/` when the 
 | PUT | `/api/admin/users/{id}/roles` | Set roles for a user |
 | GET | `/api/admin/backup` | Stream full-system backup (NDJSON) |
 | POST | `/api/admin/restore` | Restore from backup file |
+| GET | `/api/metrics` | Operational metrics snapshot (version, uptime, pool stats, row counts) |
 
 ---
 
@@ -493,13 +546,45 @@ All routes are nested under `/api`. Interactive docs at `/swagger-ui/` when the 
 
 ### Edge Types
 
-| Type | Meaning |
-|------|---------|
-| `references` | Node A cites / links to Node B |
-| `contains` | Node A structurally contains Node B |
-| `related_to` | Bidirectional semantic relationship |
-| `depends_on` | Node A requires Node B |
-| `derived_from` | Node A was derived from Node B |
+| Type | Meaning | Graph style |
+|------|---------|-------------|
+| `references` | Node A cites / links to Node B | Amber, solid |
+| `contains` | Node A structurally contains Node B | Green, solid, thicker |
+| `related_to` | Bidirectional semantic relationship | Purple, dashed |
+| `depends_on` | Node A requires Node B | Orange, dotted |
+| `derived_from` | Node A was derived from Node B | Pink, long-dash |
+| `wiki_link` | Auto-created from `[[title]]` syntax in body | Blue, short-dash |
+
+### Node Statuses
+
+| Status | Meaning |
+|--------|---------|
+| `draft` | Work in progress, not yet published |
+| `published` | Visible in published-only search/filter |
+| `archived` | Hidden from default list; accessible by direct link |
+
+### Permission Roles
+
+| Role | Permissions |
+|------|-------------|
+| `viewer` | Read node and all sub-resources |
+| `editor` | Read + write node, notes, tasks, tags, edges |
+| `owner` | Full access including invite, pin, delete, and share |
+
+Nodes are **private by default** — only the creating user can see a node until they explicitly grant access. The `POST /api/nodes/{id}/invite` endpoint looks up or creates a Cognito account for the invited email and grants the specified role.
+
+---
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `n` | Open quick-capture modal (new node) |
+| `g` | Go to graph view |
+| `/` | Focus search |
+| `p` | Toggle pin on the open node |
+| `?` | Toggle keyboard shortcuts help overlay |
+| `Esc` | Back to node list / close modal |
 
 ---
 

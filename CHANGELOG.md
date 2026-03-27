@@ -4,6 +4,140 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.45.1] - 2026-03-27
+
+### Changed
+- **`n` keyboard shortcut now opens quick-capture modal** — previously `n` navigated to the full NodeEditor (`View::NodeCreate`); now it opens the same lightweight `CreateNodeModal` as the FAB, making both entry points consistent. `ShowCapture` context signal lifted to the App root so the keyboard handler and Layout share state without prop-drilling.
+
+---
+
+## [1.45.0] - 2026-03-27
+
+### Added
+- **Graph tag filter** — clicking a coloured tag dot on any graph node filters the graph to show only nodes that share that tag (and their connecting edges). The active dot renders larger with an amber stroke. A "Tag filter active · ×" row appears in the legend panel to clear the filter. Clicking the same dot again also clears it. Tag filter combines with the existing type-filter toggles.
+
+---
+
+## [1.44.1] - 2026-03-27
+
+### Fixed
+- **Graph tag dots hidden by title pill** — tag dots were rendered at `cy+27`, inside the title background pill (`cy+22` to `cy+36`), causing the pill to paint over them. Fixed by moving dots to `cy+42` (below the pill's bottom edge) and rendering the dot block after the title `<text>` element in SVG order so they always paint on top.
+
+---
+
+## [1.44.0] - 2026-03-27
+
+### Added
+- **Node-type icons on graph shapes** — Material Symbols Outlined ligature centred on each node shape (white, semi-transparent, `pointer-events: none`). Uses the same `type_icon()` helper as the sidebar and node lists. SVG `style=` attribute used to avoid Leptos 0.8 `attr:` prefix serialisation bug.
+
+---
+
+## [1.43.0] - 2026-03-27
+
+### Added
+- **Graph view tag colour overlay** — up to 5 small filled dots (r=3.5, white outline) rendered below each node shape, one per tag, using the tag's hex colour. Dots are horizontally centred and spaced 9 px apart. No backend changes required.
+
+---
+
+## [1.42.0] - 2026-03-27
+
+### Added
+- **Collapsible markdown preview in node editor** — the live preview pane can be toggled via a visibility icon button in the editor header. Initial visibility is determined from `window.innerWidth` (≥ 768 px → visible; mobile → hidden by default). Toggle state stored in `show_preview: RwSignal<bool>`. Amber styling on the button when preview is active.
+
+---
+
+## [1.41.0] - 2026-03-27
+
+### Added
+- **Saved search presets** — migration 017 adds `search_presets` table (owner-scoped). New DTOs: `SearchPresetId`, `SearchPreset`, `CreateSearchPresetRequest` in `common`. New repo: `SearchPresetRepo` / `PgSearchPresetRepo`. Routes: `GET /api/search-presets`, `POST /api/search-presets`, `DELETE /api/search-presets/{id}`. UI: "Presets ▾" dropdown in the SearchView filter bar — load a preset to restore all filters, delete with ×, or save the current search via an inline form. Total tests: 55.
+
+---
+
+## [1.40.0] - 2026-03-27
+
+### Added
+- **Node tagging from list view** — each node card in the list view now has a tag-picker dropdown. All tags are fetched once per list render; per-card `show_picker: RwSignal<bool>` controls visibility. Dropdown shows a colour swatch, tag name, and an amber checkmark for applied tags. Clicking attaches or detaches the tag immediately and refreshes the list. Fixes attachment drop-zone compile error by adding `DragEvent` and `DataTransfer` to web-sys features.
+
+---
+
+## [1.39.0] - 2026-03-27
+
+### Added
+- **Graph pinned-node highlight** — an amber hollow ring (`stroke: #f59e0b`, r=29) is drawn behind the node shape for pinned nodes, making them visually distinct in the graph view.
+
+---
+
+## [1.38.0] - 2026-03-27
+
+### Added
+- **`p` keyboard shortcut to toggle pin** — pressing `p` while a node detail is open toggles the node's pinned state (same as the pin button in the toolbar). `current_node_pinned: RwSignal<bool>` context is provided from the App root; `NodeView` writes it on load and keeps it in sync. Toast feedback. `ShortcutsModal` updated.
+
+---
+
+## [1.37.0] - 2026-03-27
+
+### Changed
+- **Attachment bulk upload** — the single-file picker is replaced by a drag-and-drop drop zone accepting multiple files simultaneously. Files are uploaded sequentially with a live `n/total` progress counter. A clear button resets the pending queue. No backend changes.
+
+---
+
+## [1.36.0] - 2026-03-27
+
+### Added
+- **Node pinning** — migration 016 adds `pinned BOOLEAN DEFAULT FALSE` to the `nodes` table. `PUT /api/nodes/{id}/pin` toggles pin state (owner-only). Node list sorted `pinned DESC, updated_at DESC`. Amber `push_pin` icon on pinned cards. Pin toggle button in the node-detail header.
+
+---
+
+## [1.35.0] - 2026-03-27
+
+### Changed
+- **Search ranking improvements** — `ts_rank_cd` now uses length normalisation (`|1`) so long documents do not unfairly dominate results. Fuzzy (ILIKE-only) body matches receive a 0.05 rank floor to distinguish them from zero-score results. The `12%` raw relevance figure in SearchView is replaced with a 3-bar visual indicator.
+
+---
+
+## [1.34.0] - 2026-03-27
+
+### Fixed
+- **Notes panel scrolling** — notes list now has `max-h-[28rem] overflow-y-auto` so long note histories scroll within the panel instead of expanding the page. A note-count badge is shown next to the panel header.
+- **CI test stability** — `AppState` in tests now uses `..Config::default()` to avoid compilation failures when `Config` gains new fields.
+
+---
+
+## [1.33.0] - 2026-03-27
+
+### Added
+- **Bulk permission management** — new "Bulk Permissions" view in the admin sidebar. Groups all permission rows across all nodes; supports inline role-change and revoke; resolves Cognito usernames for display; filter input for large permission lists; owner rows are read-only.
+
+---
+
+## [1.32.0] - 2026-03-27
+
+### Added
+- **Node templates** — migration 015 adds `node_templates` table. CRUD routes at `/api/templates`. `TemplatesView` in sidebar with inline Markdown editor and "Use" button. `TemplatePrefill` context pre-fills `NodeEditor` when creating a node from a template. Activity action `CreatedFromTemplate` recorded on use.
+
+---
+
+## [1.31.0] - 2026-03-27
+
+### Added
+- **Keyboard shortcuts help modal** — pressing `?` toggles an overlay listing all global shortcuts. Escape also closes it. Rendered via Leptos `<Portal>` (`ShortcutsModal` component).
+
+---
+
+## [1.30.0] - 2026-03-27
+
+### Added
+- **Node version history** — migration 014 adds `node_versions` table. `NodeVersionRepo` / `PgNodeVersionRepo` snapshot the node body on every save (fire-and-forget). Routes: `GET /api/nodes/{id}/versions`, `POST /api/nodes/{id}/versions/{vid}/restore`. `VersionPanel` collapsible timeline UI in the node-detail view.
+
+---
+
+## [1.29.0] - 2026-03-27
+
+### Added
+- **Activity / audit log** — migration 013 adds `node_activity` table. `ActivityAction` enum with 10 variants (Created, Updated, Published, Archived, TagAttached, TagDetached, PermissionGranted, PermissionRevoked, AttachmentUploaded, AttachmentDeleted). `GET /api/nodes/{id}/activity` returns a timestamped log. `ActivityPanel` collapsible timeline UI in the node-detail view. All mutating route handlers instrumented.
+
+---
+
 ## [1.28.0] - 2026-03-25
 
 ### Added

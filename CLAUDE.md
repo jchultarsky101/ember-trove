@@ -119,6 +119,9 @@ Follows standard Git Flow. `v1.0.0` is the first production tag on `main`.
 - **`grep`/`tail`/`head`/`rg` not available in Bash tool**: These standard utilities are missing
   or aliased away. Use Grep tool for content search; use Read tool with `offset`/`limit` instead
   of `tail`/`head`; pipe through `python3 -c` for JSON parsing instead of `jq`.
+- **`aws` CLI not in Bash tool PATH**: `aws` command is unavailable. Use `pip3 install boto3` then
+  call AWS APIs via Python: `boto3.client('cognito-idp', region_name='us-east-2')`. Works for
+  Cognito, S3, SES, etc.
 
 ## Leptos Patterns
 
@@ -158,6 +161,16 @@ Follows standard Git Flow. `v1.0.0` is the first production tag on `main`.
 - **Tailwind v4 `group-hover` opacity unreliable**: `opacity-0 group-hover:opacity-100`
   fails silently in Tailwind v4 (scoped to `@media (hover:hover)`). Use always-visible
   elements with a muted colour instead: e.g. `text-stone-300 hover:text-amber-500`.
+- **SVG z-order = DOM order**: SVG elements paint in the order they appear in the `view!` macro.
+  If element A must appear above element B, render A *after* B. Example: tag dots rendered before
+  the title pill were hidden by it — moving the dot block after `</text>` fixed it.
+- **SVG `pointer-events: none` blocks clicks**: Decorative SVG elements use `pointer-events: none`
+  in this codebase. To make an element clickable, change to `pointer-events: auto; cursor: pointer`
+  and add `on:click`. Also apply the `dot_clicked` guard (see event delegation note above) so the
+  parent `<g>` handler doesn't fire on the child click.
+- **Newtype for shared `RwSignal<bool>` context**: `provide_context(RwSignal<bool>)` collides when
+  multiple bool signals exist. Wrap in a newtype: `#[derive(Clone,Copy)] struct ShowCapture(pub RwSignal<bool>);`
+  then `provide_context(ShowCapture(...))`. Pattern used by `ShowCapture` and `TaskRefresh`.
 
 ## Browser Testing (mcp__Claude_in_Chrome)
 
@@ -187,6 +200,23 @@ Follows standard Git Flow. `v1.0.0` is the first production tag on `main`.
   `array_length($n::uuid[], 1) IS NULL` as a bypass guard (empty array → skip filter) combined
   with `HAVING (NOT $and_mode) OR COUNT(DISTINCT tag_id) = array_length($n::uuid[], 1)` to
   switch AND/OR logic — all in a single static parameterised query.
+
+## Cognito Hosted UI
+
+- **`SetUICustomization` allowlist**: Only documented class names are accepted; unlisted classes
+  (e.g. `.modalCustomizable`) cause `InvalidParameterException`. Allowlisted classes:
+  `.background-customizable`, `.banner-customizable`, `.logo-customizable`, `.label-customizable`,
+  `.inputField-customizable[:focus]`, `.submitButton-customizable[:hover]`,
+  `.idpButton-customizable[:hover]`, `.socialButton-customizable`, `.errorMessage-customizable`,
+  `.textDescription-customizable`, `.idpDescription-customizable`, `.redirect-customizable`,
+  `.legalText-customizable`, `.passwordCheck-valid/notValid-customizable`. Max 3 072 chars.
+- **CSS property chaining trick**: Extra properties (border-radius, box-shadow, font-family) can be
+  injected by appending them after a valid value: `border: 1px solid #ccc; border-radius: 6px;`.
+  Cognito passes the raw string through.
+- **Apply via boto3** (aws CLI unavailable in Bash tool):
+  `boto3.client('cognito-idp').set_ui_customization(UserPoolId=..., ClientId='ALL', CSS=css, ImageFile=logo_bytes)`
+- **Hosted UI URL**: `trove-chultarsky.auth.us-east-2.amazoncognito.com`; app client ID: `eogq2sehdad3uc8nmar7aneol`.
+- **Authoritative CSS source**: `deploy/cognito.css` + `deploy/logo.png` — edit and re-apply via boto3 after changes.
 
 ## Production Deployment
 
