@@ -38,6 +38,7 @@ pub struct Node {
     pub pinned: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub edge_count: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

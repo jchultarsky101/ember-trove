@@ -73,6 +73,9 @@ struct NodeRow {
     pinned: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+    /// Edge count: populated by list() via LEFT JOIN; defaults to 0 for single-row fetches.
+    #[sqlx(default)]
+    edge_count: i64,
 }
 
 impl NodeRow {
@@ -90,6 +93,7 @@ impl NodeRow {
             pinned: self.pinned,
             created_at: self.created_at,
             updated_at: self.updated_at,
+            edge_count: u32::try_from(self.edge_count).unwrap_or(0),
         })
     }
 }
@@ -267,7 +271,16 @@ impl NodeRepo for PgNodeRepo {
         let mut count_sql = String::from("SELECT COUNT(*) FROM nodes n");
         let mut data_sql = String::from(
             "SELECT n.id, n.owner_id, n.node_type::text, n.title, n.slug, n.body, \
-             n.metadata, n.status::text, n.pinned, n.created_at, n.updated_at FROM nodes n",
+             n.metadata, n.status::text, n.pinned, n.created_at, n.updated_at, \
+             COALESCE(ec.edge_count, 0)::bigint AS edge_count \
+             FROM nodes n \
+             LEFT JOIN ( \
+                 SELECT id, COUNT(*) AS edge_count FROM ( \
+                     SELECT source_id AS id FROM edges \
+                     UNION ALL \
+                     SELECT target_id AS id FROM edges \
+                 ) e GROUP BY id \
+             ) ec ON n.id = ec.id",
         );
 
         let mut conditions: Vec<String> = Vec::new();
