@@ -1,7 +1,7 @@
 use leptos::prelude::*;
 
 use crate::{
-    app::View,
+    app::{ShowCapture, View},
     auth::{AuthState, AuthStatus},
     components::{
         admin_view::AdminView, backup_view::BackupView,
@@ -21,7 +21,10 @@ pub type SidebarCollapsed = RwSignal<bool>;
 pub fn Layout(auth_state: AuthState) -> impl IntoView {
     let collapsed: SidebarCollapsed = RwSignal::new(false);
     let mobile_open: RwSignal<bool> = RwSignal::new(false);
-    let show_capture: RwSignal<bool> = RwSignal::new(false);
+    // Driven by the global `n` shortcut and the FAB — both set this context signal.
+    let show_capture = use_context::<ShowCapture>()
+        .expect("ShowCapture context missing")
+        .0;
 
     // Close mobile sidebar on any view change.
     let close_mobile = move || mobile_open.set(false);
