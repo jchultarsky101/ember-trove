@@ -6,7 +6,8 @@ use crate::{
     components::{
         dark_mode_toggle::Theme, layout::Layout,
         modals::shortcuts::ShortcutsModal,
-        public_share_view::PublicShareView, toast::ToastState,
+        public_share_view::PublicShareView,
+        toast::{push_toast, ToastLevel, ToastState},
     },
 };
 
@@ -143,6 +144,11 @@ pub fn App() -> impl IntoView {
     let template_prefill: RwSignal<Option<TemplatePrefill>> = RwSignal::new(None);
     provide_context(template_prefill);
 
+    // Current node pin state — written by NodeView when a node loads so the
+    // global `p` shortcut can toggle it without an extra API round-trip.
+    let current_node_pinned: RwSignal<bool> = RwSignal::new(false);
+    provide_context(current_node_pinned);
+
     // Keyboard shortcuts help modal visibility.
     let show_shortcuts = RwSignal::new(false);
 
@@ -189,6 +195,26 @@ pub fn App() -> impl IntoView {
             "/" => {
                 ev.prevent_default();
                 current_view.set(View::Search);
+            }
+            "p" => {
+                // Toggle pin on the currently open node.
+                if let View::NodeDetail(node_id) = current_view.get_untracked() {
+                    let new_pinned = !current_node_pinned.get_untracked();
+                    current_node_pinned.set(new_pinned);
+                    wasm_bindgen_futures::spawn_local(async move {
+                        match crate::api::set_node_pinned(node_id, new_pinned).await {
+                            Ok(_) => {
+                                refresh.update(|n| *n += 1);
+                                let msg = if new_pinned { "Node pinned." } else { "Node unpinned." };
+                                push_toast(ToastLevel::Success, msg);
+                            }
+                            Err(e) => {
+                                current_node_pinned.set(!new_pinned); // revert
+                                push_toast(ToastLevel::Error, format!("Pin failed: {e}"));
+                            }
+                        }
+                    });
+                }
             }
             "Escape" => {
                 if show_shortcuts.get_untracked() {
