@@ -1,7 +1,8 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::id::NodeId;
+use crate::id::{NodeId, SearchPresetId};
 use crate::node::{NodeStatus, NodeType};
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -41,4 +42,33 @@ pub struct SearchResponse {
     pub total: u64,
     pub page: u32,
     pub per_page: u32,
+}
+
+// ── Search presets ─────────────────────────────────────────────────────────────
+
+/// A saved combination of search query + filter settings.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct SearchPreset {
+    pub id: SearchPresetId,
+    pub owner_id: String,
+    pub name: String,
+    /// The text search query (may be empty).
+    pub query: String,
+    pub fuzzy: bool,
+    pub published_only: bool,
+    /// Comma-separated tag UUID strings (mirrors `SearchQuery::tag_ids`).
+    pub tag_ids: String,
+    /// `"or"` (default) or `"and"`.
+    pub tag_op: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CreateSearchPresetRequest {
+    pub name: String,
+    pub query: String,
+    pub fuzzy: bool,
+    pub published_only: bool,
+    pub tag_ids: String,
+    pub tag_op: String,
 }
