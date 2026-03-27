@@ -31,8 +31,8 @@ use repo::{
     activity::PgActivityRepo, attachment::PgAttachmentRepo, backup::PgBackupRepo,
     edge::PgEdgeRepo, favorite::PgFavoriteRepo, graph::PgGraphRepo, node::PgNodeRepo,
     node_version::PgNodeVersionRepo, note::PgNoteRepo, permission::PgPermissionRepo,
-    search::PgSearchRepo, share_token::PgShareTokenRepo, tag::PgTagRepo, task::PgTaskRepo,
-    template::PgTemplateRepo,
+    search::PgSearchRepo, search_presets::PgSearchPresetRepo, share_token::PgShareTokenRepo,
+    tag::PgTagRepo, task::PgTaskRepo, template::PgTemplateRepo,
 };
 use state::AppState;
 
@@ -148,6 +148,7 @@ async fn main() -> anyhow::Result<()> {
         activity: Arc::new(PgActivityRepo::new(pool.clone())),
         node_versions: Arc::new(PgNodeVersionRepo::new(pool.clone())),
         templates: Arc::new(PgTemplateRepo::new(pool.clone())),
+        search_presets: Arc::new(PgSearchPresetRepo::new(pool.clone())),
         object_store,
         oidc,
         cognito_admin,

@@ -7,7 +7,8 @@ use common::{
     favorite::{CreateFavoriteRequest, Favorite, ReorderFavoritesRequest},
     id::{AttachmentId, EdgeId, FavoriteId, NodeId, NoteId, TagId, TaskId},
     node::{CreateNodeRequest, Node, NodeListResponse, NodeTitleEntry, SetPinnedRequest, UpdateNodeRequest},
-    search::SearchResponse,
+    id::SearchPresetId,
+    search::{CreateSearchPresetRequest, SearchPreset, SearchResponse},
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
     note::{CreateNoteRequest, FeedNote, Note, UpdateNoteRequest},
     task::{CreateTaskRequest, MyDayTask, ProjectDashboardEntry, Task, UpdateTaskRequest},
@@ -969,6 +970,43 @@ pub async fn update_template(
 
 pub async fn delete_template(id: uuid::Uuid) -> Result<(), UiError> {
     let resp = Request::delete(&api_url(&format!("/templates/{id}")))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    if resp.ok() {
+        Ok(())
+    } else {
+        let status = resp.status();
+        let text = resp
+            .text()
+            .await
+            .unwrap_or_else(|_| "unknown error".to_string());
+        Err(UiError::api(status, text))
+    }
+}
+
+// ── Search presets ─────────────────────────────────────────────────────────────
+
+pub async fn fetch_search_presets() -> Result<Vec<SearchPreset>, UiError> {
+    let resp = Request::get(&api_url("/search-presets"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn create_search_preset(req: &CreateSearchPresetRequest) -> Result<SearchPreset, UiError> {
+    let resp = Request::post(&api_url("/search-presets"))
+        .json(req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn delete_search_preset(id: SearchPresetId) -> Result<(), UiError> {
+    let resp = Request::delete(&api_url(&format!("/search-presets/{id}")))
         .send()
         .await
         .map_err(|e| UiError::Network(e.to_string()))?;
