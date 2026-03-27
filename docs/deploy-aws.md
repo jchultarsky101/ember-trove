@@ -479,7 +479,24 @@ sudo certbot renew --dry-run
 
 ---
 
-## Step 13 — Create Additional Users (optional)
+## Step 13 — Customise the Cognito Hosted Login UI (optional)
+
+The repository ships `deploy/cognito.css` and `deploy/logo.png` — a stone/amber stylesheet and flame-icon logo that match the app's visual style. Apply them with the AWS CLI:
+
+```bash
+aws cognito-idp set-ui-customization \
+  --user-pool-id us-east-2_XXXXXXXXX \
+  --client-id ALL \
+  --image-file fileb://deploy/logo.png \
+  --css "$(cat deploy/cognito.css)" \
+  --region us-east-2
+```
+
+To edit the CSS, modify `deploy/cognito.css` (must stay ≤ 3 072 characters) and re-run the command. Only classes from the [Cognito allowlist](https://docs.aws.amazon.com/cognito/latest/developerguide/hosted-ui-classic-branding.html) are accepted; any unlisted class is silently ignored.
+
+---
+
+## Step 14 — Create Additional Users (optional)
 
 Use the AWS CLI to add more users:
 
@@ -505,7 +522,30 @@ Alternatively, users can be managed from within the app's **Admin** panel (admin
 
 ---
 
-## Updating to a New Version
+## Automatic Deployments (CD Pipeline)
+
+Once the repository secrets `LIGHTSAIL_HOST` and `LIGHTSAIL_SSH_KEY` are set and the repository variable `DEPLOY_ENABLED=true` is configured, every push of a `v*.*.*` tag triggers the `release.yml` GitHub Actions workflow automatically:
+
+1. Creates a GitHub Release for the tag
+2. SSH-connects to the Lightsail instance
+3. Runs `docker compose build` (Rust + WASM compilation on the server)
+4. Force-recreates the `api` and `ui` containers
+5. Health-checks `GET /api/health` with retries (up to 60 s)
+
+To trigger a deploy, simply tag and push:
+
+```bash
+git tag v1.2.3
+git push origin main --tags
+```
+
+Monitor progress in the **Actions** tab on GitHub.
+
+---
+
+## Updating to a New Version (manual)
+
+If you need to deploy without the CD pipeline:
 
 ```bash
 ssh -i /path/to/key.pem ubuntu@<static-ip>
