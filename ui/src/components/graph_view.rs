@@ -30,7 +30,7 @@ use common::{
 use crate::{
     api::{fetch_all_edges, fetch_nodes, fetch_positions, save_position},
     app::View,
-    components::node_meta::{status_color_hex, status_label, type_label},
+    components::node_meta::{status_color_hex, status_label, type_icon, type_label},
 };
 
 const W: f64 = 1000.0;
@@ -627,6 +627,9 @@ pub fn GraphView() -> impl IntoView {
                         let bg_w = (title.chars().count() as f64 * 5.4 + 10.0_f64).max(32.0_f64);
 
                         let is_pinned = node.pinned;
+                        // Material Symbols ligature for the node-type icon.
+                        let icon_glyph: &'static str =
+                            type_icon(&format!("{:?}", node_type).to_lowercase());
                         // Collect tag colours (up to 5) for the dot overlay.
                         let tag_colors: Vec<String> = node
                             .tags
@@ -785,6 +788,28 @@ pub fn GraphView() -> impl IntoView {
                                     />
                                 })}
                                 {shape_el}
+                                // Node-type icon centred on the shape (Material Symbols ligature).
+                                <text
+                                    x=move || {
+                                        format!(
+                                            "{:.1}",
+                                            positions.get().get(&id).map(|p| p.0).unwrap_or(W / 2.0)
+                                        )
+                                    }
+                                    y=move || {
+                                        format!(
+                                            "{:.1}",
+                                            positions.get().get(&id).map(|p| p.1).unwrap_or(H / 2.0)
+                                        )
+                                    }
+                                    style="text-anchor: middle; dominant-baseline: central; \
+                                           font-family: 'Material Symbols Outlined'; \
+                                           font-size: 14px; font-weight: 400; \
+                                           fill: rgba(255,255,255,0.92); pointer-events: none; \
+                                           user-select: none;"
+                                >
+                                    {icon_glyph}
+                                </text>
                                 // Tag colour dots — up to 5, centred just below the node shape.
                                 // Uses the tag's hex colour with a white outline for readability.
                                 {tag_colors.iter().enumerate().map(|(i, color)| {
