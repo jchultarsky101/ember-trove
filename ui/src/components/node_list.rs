@@ -564,11 +564,27 @@ fn NodeCards(
                                 })}
                             </div>
 
-                            // Date — top-right, subtle
-                            <span class="text-xs text-stone-400 dark:text-stone-500
-                                         shrink-0 mt-0.5 whitespace-nowrap">
-                                {updated}
-                            </span>
+                            // Right column: date + edge count badge
+                            <div class="flex flex-col items-end gap-1 shrink-0 mt-0.5">
+                                <span class="text-xs text-stone-400 dark:text-stone-500 whitespace-nowrap">
+                                    {updated}
+                                </span>
+                                // Edge count badge — only shown when node has edges.
+                                {(node.edge_count > 0).then(|| {
+                                    let count = node.edge_count;
+                                    view! {
+                                        <span class="inline-flex items-center gap-0.5
+                                                     text-xs text-stone-400 dark:text-stone-500"
+                                              title=format!("{count} edge(s)")>
+                                            <span class="material-symbols-outlined"
+                                                  style="font-size: 12px;">
+                                                "link"
+                                            </span>
+                                            {count}
+                                        </span>
+                                    }
+                                })}
+                            </div>
                         </div>
                     </li>
                 }
