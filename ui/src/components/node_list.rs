@@ -59,7 +59,7 @@ const SORT_OPTIONS: &[SortKey] = &[
 
 // ── Preview helper ─────────────────────────────────────────────────────────────
 
-/// Strip basic Markdown and return up to 120 chars as a plain-text preview.
+/// Strip basic Markdown and return up to 300 chars as a plain-text preview.
 fn body_preview(body: &str) -> Option<String> {
     let text: String = body
         .lines()
@@ -81,8 +81,8 @@ fn body_preview(body: &str) -> Option<String> {
     if chars.is_empty() {
         return None;
     }
-    let preview: String = chars.iter().take(120).collect();
-    Some(if chars.len() > 120 {
+    let preview: String = chars.iter().take(300).collect();
+    Some(if chars.len() > 300 {
         format!("{preview}\u{2026}")
     } else {
         preview
@@ -558,7 +558,7 @@ fn NodeCards(
 
                                 // ── Row 3: body preview ──────────────────────────────
                                 {node.body.as_deref().and_then(body_preview).map(|preview| view! {
-                                    <p class="text-xs text-stone-500 dark:text-stone-400 mt-1 truncate">
+                                    <p class="text-xs text-stone-500 dark:text-stone-400 mt-1 line-clamp-3">
                                         {preview}
                                     </p>
                                 })}
