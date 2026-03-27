@@ -55,6 +55,16 @@ fn wikilink_query_at(text: &str, cursor: usize) -> Option<String> {
     Some(after_open.to_string())
 }
 
+/// Returns `true` if the browser viewport is ≥ 768 px wide (≈ tablet or larger).
+/// Defaults to `true` (preview visible) if `window` is unavailable.
+fn is_wide_viewport() -> bool {
+    web_sys::window()
+        .and_then(|w| w.inner_width().ok())
+        .and_then(|v| v.as_f64())
+        .map(|w| w >= 768.0)
+        .unwrap_or(true)
+}
+
 #[component]
 pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
@@ -95,6 +105,9 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     let status = RwSignal::new("draft".to_string());
     let saving = RwSignal::new(false);
     let error_msg = RwSignal::new(Option::<String>::None);
+
+    // Preview visibility — starts visible on wide viewports, hidden on narrow.
+    let show_preview = RwSignal::new(is_wide_viewport());
 
     // Wiki-link autocomplete state.
     let wikilink_query = RwSignal::new(Option::<String>::None);
@@ -271,6 +284,23 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         <option value="published">"Published"</option>
                         <option value="archived">"Archived"</option>
                     </select>
+                    // Preview toggle button
+                    <button
+                        class=move || {
+                            let base = "p-1.5 rounded-lg transition-colors";
+                            if show_preview.get() {
+                                format!("{base} text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30")
+                            } else {
+                                format!("{base} text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800")
+                            }
+                        }
+                        title=move || if show_preview.get() { "Hide preview" } else { "Show preview" }
+                        on:click=move |_| show_preview.update(|v| *v = !*v)
+                    >
+                        <span class="material-symbols-outlined">
+                            {move || if show_preview.get() { "visibility" } else { "visibility_off" }}
+                        </span>
+                    </button>
                     <button
                         class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
                             hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
@@ -365,9 +395,12 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         })
                     }}
                 </div>
-                <div class="flex-1 overflow-auto p-6">
-                    <div class="prose max-w-none dark:prose-invert" inner_html=preview_html />
-                </div>
+                // Preview pane — conditionally rendered based on show_preview signal.
+                {move || show_preview.get().then(|| view! {
+                    <div class="flex-1 overflow-auto p-6">
+                        <div class="prose max-w-none dark:prose-invert" inner_html=preview_html />
+                    </div>
+                })}
             </div>
         </div>
     }
