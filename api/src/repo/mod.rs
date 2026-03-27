@@ -1,5 +1,6 @@
 pub mod activity;
 pub mod node_version;
+pub mod search_presets;
 pub mod template;
 pub mod attachment;
 pub mod backup;

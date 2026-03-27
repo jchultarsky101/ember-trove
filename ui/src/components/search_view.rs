@@ -1,4 +1,7 @@
-use common::{search::SearchResponse, tag::Tag};
+use common::{
+    search::{CreateSearchPresetRequest, SearchPreset, SearchResponse},
+    tag::Tag,
+};
 use leptos::prelude::*;
 
 use crate::app::View;
@@ -39,6 +42,16 @@ pub fn SearchView() -> impl IntoView {
     let all_tags: LocalResource<Vec<Tag>> = LocalResource::new(|| async {
         crate::api::fetch_tags().await.unwrap_or_default()
     });
+
+    // ── Search presets ────────────────────────────────────────────────────────
+    let preset_refresh = RwSignal::new(0u32);
+    let presets: LocalResource<Vec<SearchPreset>> = LocalResource::new(move || {
+        let _ = preset_refresh.get();
+        async move { crate::api::fetch_search_presets().await.unwrap_or_default() }
+    });
+    let show_preset_menu = RwSignal::new(false);
+    let show_save_form = RwSignal::new(false);
+    let preset_name: RwSignal<String> = RwSignal::new(String::new());
 
     let do_search = move || {
         let q = search_query.get_untracked().trim().to_string();
@@ -154,6 +167,222 @@ pub fn SearchView() -> impl IntoView {
 
                 // Custom tag picker — replaces native <select> which is unreliable in CSR/dark mode
                 <TagPicker all_tags=all_tags tag_filters=tag_filters />
+
+                // ── Saved presets picker ──────────────────────────────────────
+                <div class="relative">
+                    <button
+                        class="flex items-center gap-1 px-2 py-0.5 text-xs rounded-md
+                               border border-stone-300 dark:border-stone-600
+                               bg-white dark:bg-stone-800
+                               text-stone-500 dark:text-stone-400
+                               hover:border-amber-400 dark:hover:border-amber-500
+                               hover:text-stone-700 dark:hover:text-stone-200
+                               transition-colors"
+                        title="Saved search presets"
+                        on:click=move |_| show_preset_menu.update(|v| *v = !*v)
+                    >
+                        <span class="material-symbols-outlined" style="font-size: 13px;">"bookmarks"</span>
+                        "Presets"
+                        <span class="material-symbols-outlined" style="font-size: 13px;">
+                            {move || if show_preset_menu.get() { "expand_less" } else { "expand_more" }}
+                        </span>
+                    </button>
+
+                    {move || show_preset_menu.get().then(|| {
+                        view! {
+                            // Click-away backdrop
+                            <div
+                                class="fixed inset-0 z-10"
+                                on:click=move |_| {
+                                    show_preset_menu.set(false);
+                                    show_save_form.set(false);
+                                }
+                            />
+                            // Dropdown panel
+                            <div class="absolute left-0 top-full mt-1 z-20 w-64
+                                bg-white dark:bg-stone-900 rounded-xl shadow-xl
+                                border border-stone-200 dark:border-stone-700 overflow-hidden">
+
+                                // ── Preset list ────────────────────────────
+                                {move || {
+                                    let ps = presets.get().unwrap_or_default();
+                                    if ps.is_empty() {
+                                        view! {
+                                            <p class="px-3 py-2.5 text-xs
+                                                text-stone-400 dark:text-stone-500 italic">
+                                                "No presets saved"
+                                            </p>
+                                        }.into_any()
+                                    } else {
+                                        view! {
+                                            <div>
+                                                {ps.into_iter().map(|preset| {
+                                                    let preset_id = preset.id;
+                                                    let name = preset.name.clone();
+                                                    let q = preset.query.clone();
+                                                    let pf = preset.fuzzy;
+                                                    let pp = preset.published_only;
+                                                    let ptag_ids = preset.tag_ids.clone();
+                                                    let ptag_op = preset.tag_op.clone();
+                                                    view! {
+                                                        <div class="flex items-center
+                                                            hover:bg-stone-50 dark:hover:bg-stone-800">
+                                                            // Load preset button (entire row minus × btn)
+                                                            <button
+                                                                class="flex-1 text-left px-3 py-2 text-xs
+                                                                    text-stone-700 dark:text-stone-300"
+                                                                on:click=move |_| {
+                                                                    search_query.set(q.clone());
+                                                                    fuzzy.set(pf);
+                                                                    published_only.set(pp);
+                                                                    tag_op_and.set(ptag_op == "and");
+                                                                    let ids: Vec<String> = ptag_ids
+                                                                        .split(',')
+                                                                        .filter(|s| !s.is_empty())
+                                                                        .map(String::from)
+                                                                        .collect();
+                                                                    let resolved: Vec<Tag> = all_tags
+                                                                        .get()
+                                                                        .unwrap_or_default()
+                                                                        .into_iter()
+                                                                        .filter(|t| ids.contains(&t.id.0.to_string()))
+                                                                        .collect();
+                                                                    tag_filters.set(resolved);
+                                                                    show_preset_menu.set(false);
+                                                                }
+                                                            >
+                                                                {name}
+                                                            </button>
+                                                            // Delete × button
+                                                            <button
+                                                                class="px-2.5 py-2 text-stone-300
+                                                                    dark:text-stone-600
+                                                                    hover:text-red-500 dark:hover:text-red-400
+                                                                    transition-colors"
+                                                                title="Delete preset"
+                                                                on:click=move |_| {
+                                                                    let pr = preset_refresh;
+                                                                    wasm_bindgen_futures::spawn_local(async move {
+                                                                        if crate::api::delete_search_preset(preset_id)
+                                                                            .await
+                                                                            .is_ok()
+                                                                        {
+                                                                            pr.update(|n| *n += 1);
+                                                                        }
+                                                                    });
+                                                                }
+                                                            >
+                                                                <span class="material-symbols-outlined"
+                                                                    style="font-size: 13px;">"close"</span>
+                                                            </button>
+                                                        </div>
+                                                    }
+                                                }).collect::<Vec<_>>()}
+                                            </div>
+                                        }.into_any()
+                                    }
+                                }}
+
+                                // ── Save current search ─────────────────────
+                                <div class="border-t border-stone-100 dark:border-stone-800">
+                                    {move || {
+                                        if show_save_form.get() {
+                                            view! {
+                                                <div class="flex items-center gap-1.5 px-3 py-2">
+                                                    <input
+                                                        type="text"
+                                                        class="flex-1 text-xs px-2 py-1 rounded
+                                                            border border-stone-300 dark:border-stone-600
+                                                            bg-white dark:bg-stone-800
+                                                            text-stone-800 dark:text-stone-200
+                                                            focus:outline-none focus:border-amber-400
+                                                            dark:focus:border-amber-500"
+                                                        placeholder="Preset name\u{2026}"
+                                                        prop:value=move || preset_name.get()
+                                                        on:input=move |ev| preset_name.set(event_target_value(&ev))
+                                                    />
+                                                    <button
+                                                        class="text-xs px-2 py-1 rounded bg-amber-500 text-white
+                                                            hover:bg-amber-600 transition-colors"
+                                                        on:click=move |_| {
+                                                            let name = preset_name.get_untracked()
+                                                                .trim()
+                                                                .to_string();
+                                                            if name.is_empty() { return; }
+                                                            let q  = search_query.get_untracked();
+                                                            let f  = fuzzy.get_untracked();
+                                                            let p  = published_only.get_untracked();
+                                                            let tids = tag_filters
+                                                                .get_untracked()
+                                                                .iter()
+                                                                .map(|t| t.id.0.to_string())
+                                                                .collect::<Vec<_>>()
+                                                                .join(",");
+                                                            let top = if tag_op_and.get_untracked() {
+                                                                "and"
+                                                            } else {
+                                                                "or"
+                                                            };
+                                                            let pr = preset_refresh;
+                                                            let sn = preset_name;
+                                                            let sf = show_save_form;
+                                                            wasm_bindgen_futures::spawn_local(async move {
+                                                                let req = CreateSearchPresetRequest {
+                                                                    name,
+                                                                    query:          q,
+                                                                    fuzzy:          f,
+                                                                    published_only: p,
+                                                                    tag_ids:        tids,
+                                                                    tag_op:         top.to_string(),
+                                                                };
+                                                                if crate::api::create_search_preset(&req)
+                                                                    .await
+                                                                    .is_ok()
+                                                                {
+                                                                    pr.update(|n| *n += 1);
+                                                                    sn.set(String::new());
+                                                                    sf.set(false);
+                                                                }
+                                                            });
+                                                        }
+                                                    >
+                                                        "Save"
+                                                    </button>
+                                                    <button
+                                                        class="text-stone-400 hover:text-stone-600
+                                                            dark:hover:text-stone-300 transition-colors"
+                                                        on:click=move |_| {
+                                                            show_save_form.set(false);
+                                                            preset_name.set(String::new());
+                                                        }
+                                                    >
+                                                        <span class="material-symbols-outlined"
+                                                            style="font-size: 14px;">"close"</span>
+                                                    </button>
+                                                </div>
+                                            }.into_any()
+                                        } else {
+                                            view! {
+                                                <button
+                                                    class="w-full text-left flex items-center gap-2
+                                                        px-3 py-2 text-xs
+                                                        text-stone-500 dark:text-stone-400
+                                                        hover:bg-stone-50 dark:hover:bg-stone-800
+                                                        transition-colors"
+                                                    on:click=move |_| show_save_form.set(true)
+                                                >
+                                                    <span class="material-symbols-outlined"
+                                                        style="font-size: 13px;">"bookmark_add"</span>
+                                                    "Save current search"
+                                                </button>
+                                            }.into_any()
+                                        }
+                                    }}
+                                </div>
+                            </div>
+                        }
+                    })}
+                </div>
 
                 <div class="flex items-center gap-3 ml-auto">
                     {move || loading.get().then_some(view! {

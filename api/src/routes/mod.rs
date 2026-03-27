@@ -10,6 +10,7 @@ pub mod graph;
 pub mod nodes;
 pub mod permissions;
 pub mod search;
+pub mod search_presets;
 pub mod share;
 pub mod tags;
 pub mod tasks;
@@ -103,6 +104,7 @@ pub fn build_router(state: AppState) -> anyhow::Result<Router> {
         .nest("/favorites", favorites::router())
         .nest("/nodes/{node_id}/share", share::node_share_router())
         .nest("/templates", templates::router())
+        .nest("/search-presets", search_presets::router())
         .nest("/admin", admin::router())
         .nest("/admin/backups", backup::router())
         .nest("/metrics", metrics::router())
