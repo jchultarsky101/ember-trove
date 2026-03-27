@@ -11,6 +11,7 @@ const SHORTCUTS: &[Shortcut] = &[
     Shortcut { key: "n",      description: "New node" },
     Shortcut { key: "g",      description: "Graph view" },
     Shortcut { key: "/",      description: "Search" },
+    Shortcut { key: "p",      description: "Pin / unpin current node" },
     Shortcut { key: "Escape", description: "Back to node list" },
     Shortcut { key: "?",      description: "Show this help" },
 ];

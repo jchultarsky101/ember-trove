@@ -121,6 +121,13 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                             // Local pin state — initialised from the loaded node.
                             let pinned = RwSignal::new(n.pinned);
 
+                            // Sync into the global context so the `p` keyboard shortcut
+                            // can read and toggle it without an extra API round-trip.
+                            if let Some(ctx) = use_context::<RwSignal<bool>>() {
+                                ctx.set(n.pinned);
+                                Effect::new(move |_| ctx.set(pinned.get()));
+                            }
+
                             // Click delegation: intercept clicks on `.wikilink` anchors and
                             // navigate in-app instead of following the href.
                             let handle_wikilink_click = move |ev: leptos::ev::MouseEvent| {
