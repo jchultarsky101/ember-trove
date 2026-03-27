@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use common::{
-    id::NodeId,
+    id::{NodeId, TemplateId},
     node::{CreateNodeRequest, NodeStatus, NodeType, NodeTitleEntry, UpdateNodeRequest},
+    template::NodeTemplate,
 };
 use leptos::prelude::*;
 use pulldown_cmark::{Options, Parser, html};
@@ -102,6 +103,18 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     let body = RwSignal::new(initial_body);
     // Template ID used when creating a node from a template (for activity log).
     let template_id_for_create = RwSignal::new(initial_template_id);
+    // Selected template value string (drives the <select> prop:value binding).
+    let selected_template_value = RwSignal::new(String::new());
+
+    // Fetch templates for the create-mode picker (no-op overhead in edit mode
+    // since the picker is hidden; the resource is lazily evaluated).
+    let templates_resource = LocalResource::new(crate::api::list_templates);
+    let available_templates: RwSignal<Vec<NodeTemplate>> = RwSignal::new(vec![]);
+    Effect::new(move |_| {
+        if let Some(Ok(ts)) = templates_resource.get() {
+            available_templates.set(ts);
+        }
+    });
     let status = RwSignal::new("draft".to_string());
     let saving = RwSignal::new(false);
     let error_msg = RwSignal::new(Option::<String>::None);
@@ -274,6 +287,43 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         <option value="resource">"Resource"</option>
                         <option value="reference">"Reference"</option>
                     </select>
+                    // Template picker — only visible in create mode.
+                    {move || node.is_none().then(|| view! {
+                        <select
+                            class="text-sm bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300
+                                rounded-lg px-2 py-1.5 focus:outline-none max-w-[160px]"
+                            title="Use a template"
+                            prop:value=move || selected_template_value.get()
+                            on:change=move |ev| {
+                                let val = event_target_value(&ev);
+                                selected_template_value.set(val.clone());
+                                if val.is_empty() {
+                                    template_id_for_create.set(None);
+                                } else if let Ok(tid) = val.parse::<TemplateId>() {
+                                    let templates = available_templates.get_untracked();
+                                    if let Some(t) = templates.into_iter().find(|t| t.id == tid) {
+                                        let type_str = match t.node_type {
+                                            NodeType::Project   => "project",
+                                            NodeType::Area      => "area",
+                                            NodeType::Resource  => "resource",
+                                            NodeType::Reference => "reference",
+                                            NodeType::Article   => "article",
+                                        };
+                                        body.set(t.body.clone());
+                                        node_type.set(type_str.to_string());
+                                        template_id_for_create.set(Some(tid));
+                                    }
+                                }
+                            }
+                        >
+                            <option value="">"— Template —"</option>
+                            {move || available_templates.get().into_iter().map(|t| {
+                                let name = t.name.clone();
+                                let id = t.id.to_string();
+                                view! { <option value=id>{name}</option> }
+                            }).collect_view()}
+                        </select>
+                    })}
                     <select
                         class="text-sm bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300
                             rounded-lg px-2 py-1.5 focus:outline-none"
