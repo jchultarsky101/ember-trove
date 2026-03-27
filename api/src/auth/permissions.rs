@@ -22,8 +22,16 @@ fn role_satisfies(actual: &PermissionRole, required: &PermissionRole) -> bool {
     }
 }
 
+/// Returns `true` when the caller holds the `admin` role in their OIDC groups.
+///
+/// Admins bypass per-node permission checks and can read/write all nodes.
+fn is_admin(claims: &AuthClaims) -> bool {
+    claims.roles.contains(&"admin".to_string())
+}
+
 /// Assert that `claims.sub` holds at least `required_role` on `node_id`.
 ///
+/// Users in the `admin` OIDC group bypass the per-node check entirely.
 /// Returns `Err(ApiError::Forbidden)` when no permission row is found or the
 /// stored role is insufficient.
 pub async fn require_role(
@@ -32,6 +40,10 @@ pub async fn require_role(
     node_id: NodeId,
     required_role: PermissionRole,
 ) -> Result<(), ApiError> {
+    if is_admin(claims) {
+        return Ok(());
+    }
+
     let perm = permissions
         .find(node_id, &claims.sub)
         .await
@@ -93,5 +105,35 @@ mod tests {
         assert!(role_satisfies(&PermissionRole::Owner, &PermissionRole::Owner));
         assert!(!role_satisfies(&PermissionRole::Editor, &PermissionRole::Owner));
         assert!(!role_satisfies(&PermissionRole::Viewer, &PermissionRole::Owner));
+    }
+
+    #[test]
+    fn admin_role_bypasses_permission_check() {
+        let admin_claims = AuthClaims {
+            sub: "admin-sub".to_string(),
+            email: None,
+            name: None,
+            roles: vec!["admin".to_string()],
+            exp: i64::MAX,
+        };
+        assert!(is_admin(&admin_claims));
+
+        let non_admin = AuthClaims {
+            sub: "user-sub".to_string(),
+            email: None,
+            name: None,
+            roles: vec!["viewer".to_string()],
+            exp: i64::MAX,
+        };
+        assert!(!is_admin(&non_admin));
+
+        let no_roles = AuthClaims {
+            sub: "user-sub".to_string(),
+            email: None,
+            name: None,
+            roles: vec![],
+            exp: i64::MAX,
+        };
+        assert!(!is_admin(&no_roles));
     }
 }
