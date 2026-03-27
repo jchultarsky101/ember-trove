@@ -67,8 +67,11 @@ async fn list_nodes(
 ) -> Result<Json<NodeListResponse>, ApiError> {
     // Enforce private-by-default: only show nodes the caller owns or has a
     // permission row for.  The client-supplied owner_id filter is ignored.
+    // Admins bypass the permission filter and can see all nodes.
     params.owner_id = None;
-    params.subject_id = Some(claims.sub.clone());
+    if !claims.roles.contains(&"admin".to_string()) {
+        params.subject_id = Some(claims.sub.clone());
+    }
 
     let page = params.page.unwrap_or(1).max(1);
     let per_page = params.per_page.unwrap_or(50).min(200);
