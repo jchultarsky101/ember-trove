@@ -627,6 +627,13 @@ pub fn GraphView() -> impl IntoView {
                         let bg_w = (title.chars().count() as f64 * 5.4 + 10.0_f64).max(32.0_f64);
 
                         let is_pinned = node.pinned;
+                        // Collect tag colours (up to 5) for the dot overlay.
+                        let tag_colors: Vec<String> = node
+                            .tags
+                            .iter()
+                            .take(5)
+                            .map(|t| t.color.clone())
+                            .collect();
                         let shape_el: AnyView = match node_type {
                             NodeType::Article => view! {
                                 <circle
@@ -778,6 +785,43 @@ pub fn GraphView() -> impl IntoView {
                                     />
                                 })}
                                 {shape_el}
+                                // Tag colour dots — up to 5, centred just below the node shape.
+                                // Uses the tag's hex colour with a white outline for readability.
+                                {tag_colors.iter().enumerate().map(|(i, color)| {
+                                    let dot_style = format!(
+                                        "fill: {color}; stroke: #ffffff; stroke-width: 1px; pointer-events: none;"
+                                    );
+                                    let n_f = tag_colors.len() as f64;
+                                    let i_f = i as f64;
+                                    view! {
+                                        <circle
+                                            cx=move || {
+                                                let cx = positions
+                                                    .get()
+                                                    .get(&id)
+                                                    .map(|p| p.0)
+                                                    .unwrap_or(W / 2.0);
+                                                format!(
+                                                    "{:.1}",
+                                                    cx + (i_f - (n_f - 1.0) / 2.0) * 9.0
+                                                )
+                                            }
+                                            cy=move || {
+                                                format!(
+                                                    "{:.1}",
+                                                    positions
+                                                        .get()
+                                                        .get(&id)
+                                                        .map(|p| p.1)
+                                                        .unwrap_or(H / 2.0)
+                                                        + 27.0
+                                                )
+                                            }
+                                            r="3.5"
+                                            style=dot_style
+                                        />
+                                    }
+                                }).collect_view()}
                                 // Semi-transparent pill behind title text.
                                 <rect
                                     x=move || {
