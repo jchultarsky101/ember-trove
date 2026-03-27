@@ -42,6 +42,12 @@ const ARROW_OFFSET: f64 = NODE_R + 4.0;
 /// Y offset of the title text below the node centre.
 const TEXT_Y_OFFSET: f64 = 33.0;
 
+/// Minimap overlay dimensions (pixels) and scale factors relative to the canvas.
+const MINI_W: f64 = 160.0;
+const MINI_H: f64 = 112.0; // 160 × (700/1000)
+const MINI_SCALE_X: f64 = MINI_W / W;
+const MINI_SCALE_Y: f64 = MINI_H / H;
+
 // ── Hover card data ──────────────────────────────────────────────────────────
 
 /// Data for the node summary card shown on hover.
@@ -656,6 +662,125 @@ pub fn GraphView() -> impl IntoView {
                     <LegendEdge label="Wiki link"   color="#60a5fa" dash="4,2"     width="1.0" />
                 </div>
             </div>
+
+            // ── Graph minimap (bottom-right) ─────────────────────────────────
+            // Small fixed-size overview of the full W×H canvas. Nodes are
+            // coloured dots; edges are faint lines. An amber viewport rect
+            // shows the currently visible area. Clicking pans the main view
+            // to centre on the clicked graph coordinate.
+            {move || {
+                if loading.get() || nodes_sig.get().is_empty() {
+                    return None;
+                }
+                let nodes = nodes_sig.get();
+                let edges = edges_sig.get();
+                let pos = positions.get();
+
+                let edge_lines: Vec<AnyView> = edges
+                    .iter()
+                    .filter_map(|e| {
+                        let (x1, y1) = pos.get(&e.source_id.0).copied()?;
+                        let (x2, y2) = pos.get(&e.target_id.0).copied()?;
+                        let mx1 = x1 * MINI_SCALE_X;
+                        let my1 = y1 * MINI_SCALE_Y;
+                        let mx2 = x2 * MINI_SCALE_X;
+                        let my2 = y2 * MINI_SCALE_Y;
+                        Some(
+                            view! {
+                                <line
+                                    x1=format!("{mx1:.1}")
+                                    y1=format!("{my1:.1}")
+                                    x2=format!("{mx2:.1}")
+                                    y2=format!("{my2:.1}")
+                                    style="stroke: rgba(255,255,255,0.30); stroke-width: 0.5;"
+                                />
+                            }
+                            .into_any(),
+                        )
+                    })
+                    .collect();
+
+                let node_dots: Vec<AnyView> = nodes
+                    .iter()
+                    .map(|n| {
+                        let (nx, ny) =
+                            pos.get(&n.id.0).copied().unwrap_or((W / 2.0, H / 2.0));
+                        let mx = nx * MINI_SCALE_X;
+                        let my = ny * MINI_SCALE_Y;
+                        let color = node_fill(&n.node_type);
+                        view! {
+                            <circle
+                                cx=format!("{mx:.1}")
+                                cy=format!("{my:.1}")
+                                r="2.5"
+                                style=format!("fill: {color};")
+                            />
+                        }
+                        .into_any()
+                    })
+                    .collect();
+
+                Some(view! {
+                    <div
+                        class="absolute bottom-4 right-4 z-10 rounded-lg overflow-hidden \
+                               border border-stone-600/50 shadow-lg"
+                        style="background: rgba(12,12,12,0.80); cursor: crosshair;"
+                        on:click=move |ev: MouseEvent| {
+                            ev.stop_propagation();
+                            let mx = ev.offset_x() as f64;
+                            let my = ev.offset_y() as f64;
+                            let gx = mx / MINI_SCALE_X;
+                            let gy = my / MINI_SCALE_Y;
+                            let z = zoom.get_untracked();
+                            let vw = web_sys::window()
+                                .and_then(|w| w.inner_width().ok())
+                                .and_then(|v| v.as_f64())
+                                .unwrap_or(1200.0);
+                            let vh = web_sys::window()
+                                .and_then(|w| w.inner_height().ok())
+                                .and_then(|v| v.as_f64())
+                                .unwrap_or(800.0);
+                            pan_x.set(vw / 2.0 - gx * z);
+                            pan_y.set(vh / 2.0 - gy * z);
+                        }
+                    >
+                        <svg
+                            width=format!("{}", MINI_W as u32)
+                            height=format!("{}", MINI_H as u32)
+                            style="display: block; pointer-events: none;"
+                        >
+                            // Viewport indicator — reactive to pan & zoom changes.
+                            <rect
+                                x=move || {
+                                    format!("{:.1}", -pan_x.get() / zoom.get() * MINI_SCALE_X)
+                                }
+                                y=move || {
+                                    format!("{:.1}", -pan_y.get() / zoom.get() * MINI_SCALE_Y)
+                                }
+                                width=move || {
+                                    let vw = web_sys::window()
+                                        .and_then(|w| w.inner_width().ok())
+                                        .and_then(|v| v.as_f64())
+                                        .unwrap_or(1200.0);
+                                    format!("{:.1}", vw / zoom.get() * MINI_SCALE_X)
+                                }
+                                height=move || {
+                                    let vh = web_sys::window()
+                                        .and_then(|w| w.inner_height().ok())
+                                        .and_then(|v| v.as_f64())
+                                        .unwrap_or(800.0);
+                                    format!("{:.1}", vh / zoom.get() * MINI_SCALE_Y)
+                                }
+                                style="fill: rgba(245,158,11,0.12); \
+                                       stroke: #f59e0b; stroke-width: 1px;"
+                            />
+                            {edge_lines}
+                            {node_dots}
+                        </svg>
+                    </div>
+                })
+            }}
+
             {move || {
                 if loading.get() {
                     return view! {
