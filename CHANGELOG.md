@@ -4,6 +4,13 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.48.0] - 2026-03-27
+
+### Added
+- **Graph minimap** — small 160×112 px overview panel fixed at the bottom-right corner of the graph view. Shows all node positions as colour-coded dots (matching the node-type fill colours), faint edge lines, and an amber viewport indicator rect that reflects the current pan/zoom state. Clicking anywhere on the minimap pans the main graph to centre on that graph coordinate. The panel is hidden while the graph is loading or empty. Implemented using four new constants (`MINI_W`, `MINI_H`, `MINI_SCALE_X`, `MINI_SCALE_Y`) and a reactive `{move || {}}` block; the viewport rect updates via inner reactive closures so pan/zoom changes update only those SVG attributes without re-rendering the full minimap.
+
+---
+
 ## [1.47.0] - 2026-03-27
 
 ### Added
