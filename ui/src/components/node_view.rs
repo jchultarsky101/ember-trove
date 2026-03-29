@@ -109,11 +109,12 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                             let node_type = format!("{:?}", n.node_type).to_lowercase();
                             let status = format!("{:?}", n.status).to_lowercase();
                             let edit_id = n.id;
-                            // Real ownership check: compare the JWT sub with the node's owner_id.
+                            // Ownership check: node owner OR any admin user.
                             let is_owner = if let AuthStatus::Authenticated(ref user) =
                                 auth_state.get_untracked()
                             {
                                 user.sub == n.owner_id
+                                    || user.roles.contains(&"admin".to_string())
                             } else {
                                 false
                             };
