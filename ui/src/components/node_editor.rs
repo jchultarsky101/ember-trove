@@ -7,8 +7,10 @@ use common::{
 };
 use leptos::prelude::*;
 use pulldown_cmark::{Options, Parser, html};
+use wasm_bindgen::JsCast as _;
 
 use crate::app::{TemplatePrefill, View};
+use crate::components::toast::{ToastLevel, push_toast};
 use crate::templates::template_for_type;
 use crate::wikilink::preprocess_wikilinks;
 
@@ -122,9 +124,95 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     // Preview visibility — starts visible on wide viewports, hidden on narrow.
     let show_preview = RwSignal::new(is_wide_viewport());
 
+    // Image drag-and-drop / paste upload state.
+    let img_drag_over: RwSignal<bool> = RwSignal::new(false);
+    let img_uploading: RwSignal<bool> = RwSignal::new(false);
+    // Monotonic counter to generate unique placeholder strings for concurrent uploads.
+    let upload_counter: RwSignal<u32> = RwSignal::new(0);
+
     // Wiki-link autocomplete state.
     let wikilink_query = RwSignal::new(Option::<String>::None);
     let textarea_ref = NodeRef::<leptos::html::Textarea>::new();
+
+    // Helper: upload one image File and insert Markdown at the current cursor position.
+    // `node` is captured by value (Copy); all signals are Copy too.
+    let upload_image_file = move |file: web_sys::File| {
+        let Some(node_id) = node else {
+            push_toast(ToastLevel::Error, "Save the node first before uploading images.");
+            return;
+        };
+        // Claim a unique placeholder ID before entering the async block.
+        let uid = upload_counter.get_untracked() + 1;
+        upload_counter.set(uid);
+        let placeholder = format!("![uploading-{uid}\u{2026}]()");
+
+        // Insert placeholder at cursor (or end of text if cursor unavailable).
+        // NodeRef<Textarea>.get() deref-chains to web_sys::HtmlElement; use
+        // dyn_ref to reach HtmlTextAreaElement and call selection_start.
+        let cursor = textarea_ref
+            .get()
+            .and_then(|el| {
+                use std::ops::Deref as _;
+                use wasm_bindgen::JsCast as _;
+                el.deref()
+                    .dyn_ref::<web_sys::HtmlTextAreaElement>()
+                    .and_then(|ta| ta.selection_start().ok().flatten())
+            })
+            .unwrap_or(0) as usize;
+        let current = body.get_untracked();
+        let cursor = cursor.min(current.len());
+        let new_val = format!("{}{}{}", &current[..cursor], placeholder, &current[cursor..]);
+        body.set(new_val.clone());
+        if let Some(el) = textarea_ref.get() {
+            el.set_value(&new_val);
+            let pos = (cursor + placeholder.len()) as u32;
+            let _ = el.set_selection_start(Some(pos));
+            let _ = el.set_selection_end(Some(pos));
+        }
+
+        img_uploading.set(true);
+        let filename = file.name();
+        // Cast File → Blob for FormData.
+        let blob: &web_sys::Blob = file.unchecked_ref();
+        let Ok(form_data) = web_sys::FormData::new() else {
+            push_toast(ToastLevel::Error, "Failed to create form data.");
+            img_uploading.set(false);
+            return;
+        };
+        if form_data
+            .append_with_blob_and_filename("file", blob, &filename)
+            .is_err()
+        {
+            push_toast(ToastLevel::Error, "Failed to attach file.");
+            img_uploading.set(false);
+            return;
+        }
+
+        let placeholder_clone = placeholder.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            match crate::api::upload_attachment(node_id, form_data).await {
+                Ok(att) => {
+                    let url = crate::api::attachment_download_url(att.id);
+                    let final_md = format!("![{filename}]({url})");
+                    let updated = body.get_untracked().replacen(&placeholder_clone, &final_md, 1);
+                    body.set(updated.clone());
+                    if let Some(el) = textarea_ref.get() {
+                        el.set_value(&updated);
+                    }
+                }
+                Err(e) => {
+                    // Remove the placeholder on failure.
+                    let updated = body.get_untracked().replacen(&placeholder_clone, "", 1);
+                    body.set(updated.clone());
+                    if let Some(el) = textarea_ref.get() {
+                        el.set_value(&updated);
+                    }
+                    push_toast(ToastLevel::Error, format!("Image upload failed: {e}"));
+                }
+            }
+            img_uploading.set(false);
+        });
+    };
 
     // Fetch all node titles for wiki-link autocomplete and preview.
     let titles_resource =
@@ -141,6 +229,47 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
             }
         });
     }
+
+    // Image drag events on the textarea.
+    let on_img_dragover = move |ev: web_sys::DragEvent| {
+        ev.prevent_default();
+        img_drag_over.set(true);
+    };
+    let on_img_dragleave = move |_: web_sys::DragEvent| {
+        img_drag_over.set(false);
+    };
+    let on_img_drop = move |ev: web_sys::DragEvent| {
+        ev.prevent_default();
+        img_drag_over.set(false);
+        let Some(dt) = ev.data_transfer() else { return };
+        let Some(fl) = dt.files() else { return };
+        for i in 0..fl.length() {
+            let Some(file) = fl.get(i) else { continue };
+            if !file.type_().starts_with("image/") {
+                continue;
+            }
+            upload_image_file(file);
+        }
+    };
+    // Paste from clipboard (e.g. screenshot paste via Ctrl+V).
+    let on_img_paste = move |ev: web_sys::ClipboardEvent| {
+        let Some(cd) = ev.clipboard_data() else { return };
+        let items = cd.items();
+        let mut found_image = false;
+        for i in 0..items.length() {
+            let Some(item) = items.get(i) else { continue };
+            if item.kind() != "file" || !item.type_().starts_with("image/") {
+                continue;
+            }
+            let Ok(Some(file)) = item.get_as_file() else { continue };
+            if !found_image {
+                // Only prevent default once we know we have an image.
+                ev.prevent_default();
+                found_image = true;
+            }
+            upload_image_file(file);
+        }
+    };
 
     let on_save = move |_| {
         saving.set(true);
@@ -384,12 +513,24 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                 <div class="flex-1 flex flex-col relative">
                     <textarea
                         node_ref=textarea_ref
-                        class="flex-1 p-4 font-mono text-sm resize-none bg-transparent
-                            text-stone-900 dark:text-stone-100 focus:outline-none"
-                        placeholder="Write in Markdown… use [[Node Title]] to link nodes"
+                        class=move || {
+                            let base = "flex-1 p-4 font-mono text-sm resize-none bg-transparent \
+                                text-stone-900 dark:text-stone-100 focus:outline-none \
+                                transition-[box-shadow] duration-150";
+                            if img_drag_over.get() {
+                                format!("{base} ring-2 ring-amber-400 ring-inset")
+                            } else {
+                                base.to_string()
+                            }
+                        }
+                        placeholder="Write in Markdown… use [[Node Title]] to link nodes, or drag & drop images"
                         prop:value=move || body.get()
                         on:input=on_body_input
                         spellcheck="true"
+                        on:dragover=on_img_dragover
+                        on:dragleave=on_img_dragleave
+                        on:drop=on_img_drop
+                        on:paste=on_img_paste
                         // Close dropdown on Escape
                         on:keydown=move |ev: leptos::ev::KeyboardEvent| {
                             if ev.key() == "Escape" {
@@ -397,6 +538,15 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                             }
                         }
                     />
+                    // Image uploading indicator
+                    {move || img_uploading.get().then(|| view! {
+                        <div class="absolute top-2 right-2 z-40 flex items-center gap-1.5
+                            bg-stone-800/80 text-stone-100 text-xs rounded-lg px-2.5 py-1
+                            backdrop-blur-sm pointer-events-none">
+                            <span class="material-symbols-outlined text-sm animate-spin">"progress_activity"</span>
+                            "Uploading image\u{2026}"
+                        </div>
+                    })}
                     // Wiki-link autocomplete dropdown
                     {move || {
                         let query = wikilink_query.get()?;
