@@ -37,6 +37,10 @@ pub fn my_day_router() -> Router<AppState> {
     Router::new().route("/", get(my_day))
 }
 
+pub fn calendar_router() -> Router<AppState> {
+    Router::new().route("/", get(calendar_handler))
+}
+
 pub fn dashboard_router() -> Router<AppState> {
     Router::new().route("/", get(project_dashboard))
 }
@@ -97,6 +101,34 @@ async fn my_day(
 ) -> Result<Json<Vec<MyDayTask>>, ApiError> {
     let date = q.date.unwrap_or_else(|| chrono::Utc::now().date_naive());
     let tasks = state.tasks.list_my_day(&claims.sub, date).await?;
+    Ok(Json(tasks))
+}
+
+#[derive(Deserialize)]
+struct CalendarParams {
+    year: i32,
+    month: u32,
+}
+
+/// GET /calendar?year=YYYY&month=M — tasks with due_date in the given month.
+async fn calendar_handler(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Query(params): Query<CalendarParams>,
+) -> Result<Json<Vec<MyDayTask>>, ApiError> {
+    use chrono::NaiveDate;
+    let from = NaiveDate::from_ymd_opt(params.year, params.month, 1)
+        .ok_or_else(|| ApiError::Validation("invalid year/month".into()))?;
+    let to = if params.month == 12 {
+        NaiveDate::from_ymd_opt(params.year + 1, 1, 1)
+    } else {
+        NaiveDate::from_ymd_opt(params.year, params.month + 1, 1)
+    }
+    .ok_or_else(|| ApiError::Validation("invalid year/month".into()))?
+    .pred_opt()
+    .ok_or_else(|| ApiError::Validation("date underflow".into()))?;
+
+    let tasks = state.tasks.list_by_due_range(&claims.sub, from, to).await?;
     Ok(Json(tasks))
 }
 

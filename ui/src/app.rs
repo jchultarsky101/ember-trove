@@ -59,6 +59,7 @@ pub enum View {
     Admin,
     ProjectDashboard,
     MyDay,
+    Calendar,
     Notes,
     Backup,
     Templates,

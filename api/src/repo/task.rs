@@ -40,6 +40,14 @@ pub trait TaskRepo: Send + Sync {
         date: NaiveDate,
     ) -> Result<Vec<MyDayTask>, EmberTroveError>;
 
+    /// Tasks with a due_date in [from, to] inclusive, ordered by due_date then priority.
+    async fn list_by_due_range(
+        &self,
+        owner_id: &str,
+        from: NaiveDate,
+        to: NaiveDate,
+    ) -> Result<Vec<MyDayTask>, EmberTroveError>;
+
     /// Aggregated task counts per project node for the dashboard.
     async fn counts_for_nodes(
         &self,
@@ -143,6 +151,38 @@ const SELECT_COLS: &str = r#"
     priority::text  AS priority,
     focus_date, due_date, created_at, updated_at
 "#;
+
+#[derive(sqlx::FromRow)]
+struct MyDayRow {
+    id: Uuid,
+    node_id: Uuid,
+    owner_id: String,
+    title: String,
+    status: String,
+    priority: String,
+    focus_date: Option<NaiveDate>,
+    due_date: Option<NaiveDate>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    node_title: String,
+}
+
+fn my_day_row_to_task(r: MyDayRow) -> Result<MyDayTask, EmberTroveError> {
+    let task = TaskRow {
+        id: r.id,
+        node_id: r.node_id,
+        owner_id: r.owner_id,
+        title: r.title,
+        status: r.status,
+        priority: r.priority,
+        focus_date: r.focus_date,
+        due_date: r.due_date,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+    }
+    .into_task()?;
+    Ok(MyDayTask { task, node_title: r.node_title })
+}
 
 #[async_trait]
 impl TaskRepo for PgTaskRepo {
@@ -278,21 +318,6 @@ impl TaskRepo for PgTaskRepo {
         owner_id: &str,
         date: NaiveDate,
     ) -> Result<Vec<MyDayTask>, EmberTroveError> {
-        #[derive(sqlx::FromRow)]
-        struct MyDayRow {
-            id: Uuid,
-            node_id: Uuid,
-            owner_id: String,
-            title: String,
-            status: String,
-            priority: String,
-            focus_date: Option<NaiveDate>,
-            due_date: Option<NaiveDate>,
-            created_at: DateTime<Utc>,
-            updated_at: DateTime<Utc>,
-            node_title: String,
-        }
-
         let rows = sqlx::query_as::<_, MyDayRow>(
             r#"
             SELECT
@@ -325,24 +350,45 @@ impl TaskRepo for PgTaskRepo {
         .await
         .map_err(|e| EmberTroveError::Internal(format!("list my day failed: {e}")))?;
 
-        rows.into_iter()
-            .map(|r| {
-                let task = TaskRow {
-                    id: r.id,
-                    node_id: r.node_id,
-                    owner_id: r.owner_id,
-                    title: r.title,
-                    status: r.status,
-                    priority: r.priority,
-                    focus_date: r.focus_date,
-                    due_date: r.due_date,
-                    created_at: r.created_at,
-                    updated_at: r.updated_at,
-                }
-                .into_task()?;
-                Ok(MyDayTask { task, node_title: r.node_title })
-            })
-            .collect()
+        rows.into_iter().map(my_day_row_to_task).collect()
+    }
+
+    async fn list_by_due_range(
+        &self,
+        owner_id: &str,
+        from: NaiveDate,
+        to: NaiveDate,
+    ) -> Result<Vec<MyDayTask>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, MyDayRow>(
+            r#"
+            SELECT
+                t.id, t.node_id, t.owner_id, t.title,
+                t.status::text    AS status,
+                t.priority::text  AS priority,
+                t.focus_date, t.due_date, t.created_at, t.updated_at,
+                n.title           AS node_title
+            FROM node_tasks t
+            JOIN nodes n ON n.id = t.node_id
+            WHERE t.owner_id = $1
+              AND t.due_date >= $2
+              AND t.due_date <= $3
+            ORDER BY t.due_date,
+                CASE t.priority::text
+                    WHEN 'high'   THEN 0
+                    WHEN 'medium' THEN 1
+                    WHEN 'low'    THEN 2
+                END,
+                t.created_at
+            "#,
+        )
+        .bind(owner_id)
+        .bind(from)
+        .bind(to)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list by due range failed: {e}")))?;
+
+        rows.into_iter().map(my_day_row_to_task).collect()
     }
 
     async fn counts_for_nodes(

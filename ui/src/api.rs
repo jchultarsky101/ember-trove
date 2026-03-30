@@ -793,6 +793,15 @@ pub async fn fetch_my_day() -> Result<Vec<MyDayTask>, UiError> {
     parse_json(resp).await
 }
 
+pub async fn fetch_calendar_tasks(year: i32, month: u32) -> Result<Vec<MyDayTask>, UiError> {
+    let url = api_url(&format!("/calendar?year={year}&month={month}"));
+    let resp = Request::get(&url)
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
 // ── Notes ──────────────────────────────────────────────────────────────────────
 
 pub async fn fetch_notes(node_id: NodeId) -> Result<Vec<Note>, UiError> {
