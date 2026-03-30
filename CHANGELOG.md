@@ -4,6 +4,28 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.51.0] - 2026-03-29
+
+### Added
+- **Calendar view** — new sidebar entry (between My Day and Dashboard) showing a month grid of tasks that have a due date. Tasks without a due date are not shown. Navigate forward/backward by month with chevron buttons or jump to the current month with "Today". Each day cell shows colour-coded chips (priority tint + text) for its tasks; done/cancelled tasks are struck through. Clicking a chip opens the node detail view. Today's cell is highlighted with an amber ring. The grid is Mon–Sun with leading blank cells for offset days.
+- **`GET /api/calendar?year={y}&month={m}`** endpoint — returns `Vec<MyDayTask>` for tasks whose `due_date` falls within the given calendar month. Accessible to any authenticated user; results scoped to the caller's own tasks.
+
+---
+
+## [1.50.1] - 2026-03-29
+
+### Fixed
+- **Task edit form consistency** — the inline edit form in `TaskPanel` previously only allowed changing the title. It now also exposes a priority `<select>` (Low / Medium / High) and a `<input type="date">` for the due date, matching the fields available when creating a task. All three fields are saved in a single `UpdateTaskRequest`.
+
+---
+
+## [1.50.0] - 2026-03-29
+
+### Fixed
+- **My Day carry-over** — tasks previously disappeared from "My Day" when the date rolled over to a new day. The query now returns tasks whose `focus_date` is on or before today, unless the task is already `done` or `cancelled`. Incomplete tasks from prior days are carried forward automatically until marked done or removed from My Day. A small history-icon badge shows the original focus date for carried-over tasks.
+
+---
+
 ## [1.49.1] - 2026-03-29
 
 ### Fixed
