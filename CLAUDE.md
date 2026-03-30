@@ -82,7 +82,7 @@ Follows standard Git Flow. `v1.0.0` is the first production tag on `main`.
 - Hotfixes: `hotfix/<name>` branched from `main`; after fix, merge into `main`
   (`--no-ff`), tag patch bump, merge back into `develop`, delete branch.
 - **Never commit directly to `main` or `develop`** — all changes via branches.
-- **Current state**: v1.0.0 released. `develop` is the active integration branch.
+- **Current state**: v1.49.1 released. `develop` == `main` at `6b28bff`. CD pipeline active.
 
 ## Environment Quirks
 
@@ -200,6 +200,16 @@ Follows standard Git Flow. `v1.0.0` is the first production tag on `main`.
   `array_length($n::uuid[], 1) IS NULL` as a bypass guard (empty array → skip filter) combined
   with `HAVING (NOT $and_mode) OR COUNT(DISTINCT tag_id) = array_length($n::uuid[], 1)` to
   switch AND/OR logic — all in a single static parameterised query.
+
+## Admin Permission Model (v1.48.1+)
+
+- **`require_role()`** in `api/src/auth/permissions.rs` returns `Ok(())` immediately when
+  `claims.roles.contains("admin")`. Roles come from `cognito:groups` → JWT → `AuthClaims.roles`.
+- **`list_nodes`** skips `params.subject_id` entirely for admins — no `IN (permissions)` SQL filter.
+- **`is_owner` in NodeView** (`ui/src/components/node_view.rs`): `user.sub == n.owner_id || user.roles.contains("admin")`.
+  Controls visibility of: Add Note button, edit-note pencil, PermissionPanel controls, SharePanel, pin button, VersionPanel restore.
+- **`UserInfo.roles: Vec<String>`** is populated from `AuthClaims.roles` in `From<AuthClaims>`. Present in the WASM frontend via `AuthStatus::Authenticated(UserInfo)`.
+- **Admin Cognito sub**: `f1eb2590-0091-70e4-d9b3-24e4a23d24d1` (`julian@chultarsky.com`).
 
 ## Cognito Hosted UI
 

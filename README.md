@@ -17,7 +17,7 @@ Ember Trove is a web-based personal knowledge management (PKM) application where
 ### Key Features
 
 - **Graph-centric** — nodes and typed directional edges form a navigable knowledge graph with a visual graph view. Node shapes encode type; colours encode status. Click tag dots to filter the graph by tag.
-- **Markdown-native** — split-pane editor with collapsible live preview (auto-hidden on mobile), rendered via `pulldown-cmark` + `ammonia`. Wiki-link `[[title]]` syntax auto-creates edges and provides autocomplete.
+- **Markdown-native** — split-pane editor with collapsible live preview (auto-hidden on mobile), rendered via `pulldown-cmark` + `ammonia`. Wiki-link `[[title]]` syntax auto-creates edges and provides autocomplete. **Drag-and-drop or paste images** directly into the editor to upload and embed them inline.
 - **Full-text + fuzzy search** — PostgreSQL `tsvector` full-text search and `pg_trgm` trigram similarity, covering nodes, notes, and tasks. Length-normalised ranking with visual relevance indicator. Save and restore search presets.
 - **Multi-tag filtering** — AND/OR tag filters across node list, search results, and graph view. Tags can be attached directly from the node list without opening the node.
 - **S3 attachments** — bulk drag-and-drop upload; inline preview for images and PDFs. Stored in MinIO (local) or Lightsail Object Storage / AWS S3.
@@ -29,7 +29,7 @@ Ember Trove is a web-based personal knowledge management (PKM) application where
 - **Node templates** — create reusable Markdown templates for each node type; "Use" pre-fills the editor body.
 - **Quick capture** — floating amber FAB (bottom-right) and `n` keyboard shortcut both open a lightweight modal for rapid node creation. Type, title, and optional body; Ctrl+Enter to save.
 - **Keyboard shortcuts** — `n` new node · `g` graph · `/` search · `p` pin · `?` shortcut help · `Esc` back. All suppressed inside form fields.
-- **Multi-user permissions** — nodes are **private by default**. Owners can invite others by email with Viewer / Editor / Owner roles. Bulk permission management available in the admin panel.
+- **Multi-user permissions** — nodes are **private by default**. Owners can invite others by email with Viewer / Editor / Owner roles. Bulk permission management available in the admin panel. Admin users have full access to all nodes regardless of ownership.
 - **User management** — admin UI backed by Amazon Cognito (production) or Keycloak (local). User invite emails via AWS SES.
 - **Public share links** — generate opaque share tokens for read-only access to a node without login.
 - **Export** — download any node as Markdown (with YAML front-matter) or JSON.
@@ -65,7 +65,7 @@ ember-trove/
 ├── common/               # shared DTOs, error types, ID newtypes
 ├── api/                  # Axum REST backend  — port 3003
 ├── ui/                   # Leptos/Trunk WASM  — port 8003
-├── migrations/           # sqlx migrations (PostgreSQL schema, 017 files)
+├── migrations/           # sqlx migrations (PostgreSQL schema, 017 migrations)
 ├── docs/                 # Deployment and operations guides
 └── deploy/
     ├── Dockerfile.api

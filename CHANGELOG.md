@@ -4,6 +4,36 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.49.1] - 2026-03-29
+
+### Fixed
+- **Admin `is_owner` in NodeView** — `is_owner` is now `true` when the authenticated user carries the `"admin"` role, regardless of who created the node. Previously admin users saw no "Add note", "Edit permissions", or "Pin" controls on nodes they did not own. Computed as `user.sub == n.owner_id || user.roles.contains("admin")` using the `roles: Vec<String>` field already present in `UserInfo`.
+
+---
+
+## [1.49.0] - 2026-03-29
+
+### Added
+- **Drag-and-drop image upload in Markdown editor** — drag one or more image files onto the editor textarea to upload them inline. The file is sent to the existing `POST /nodes/{id}/attachments` endpoint and the resulting URL is inserted as `![filename](url)` at the cursor position. A `![uploading-N…]()` placeholder is inserted immediately while the upload is in-flight and replaced (or removed on failure) once the request completes. An amber inset ring appears on the textarea during drag-over. Only `image/*` MIME types are accepted; non-image files are silently skipped.
+- **Clipboard paste image upload** — `Ctrl+V` / `Cmd+V` with an image on the clipboard (e.g. a screenshot) triggers the same upload pipeline. `ev.prevent_default()` is called only when at least one image item is found in the clipboard data, so text paste is unaffected.
+- A "Uploading image…" spinner badge appears in the top-right corner of the editor pane while any upload is in progress (`img_uploading: RwSignal<bool>`).
+
+---
+
+## [1.48.2] - 2026-03-29
+
+### Fixed
+- **Admin sees all nodes in list view** — `list_nodes` was always setting `params.subject_id = Some(claims.sub)`, which restricts results to nodes the caller owns or holds an explicit permission row for. Admin users now skip this filter (`subject_id` left as `None`), causing the SQL `IN (SELECT node_id FROM permissions …)` clause to be omitted entirely and all nodes to be returned.
+
+---
+
+## [1.48.1] - 2026-03-29
+
+### Fixed
+- **Admin bypasses per-node permission check** — `require_role()` in `api/src/auth/permissions.rs` now returns `Ok(())` immediately when the caller's JWT contains `"admin"` in its `roles` claim (populated from Cognito `cognito:groups`). Previously an admin user received 403 when opening any node they had not explicitly been granted a permission row for.
+
+---
+
 ## [1.48.0] - 2026-03-27
 
 ### Added
