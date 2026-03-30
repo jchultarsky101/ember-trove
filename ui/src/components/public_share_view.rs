@@ -41,7 +41,11 @@ pub fn PublicShareView(token: Uuid) -> impl IntoView {
                                 | Options::ENABLE_TASKLISTS;
                             let mut out = String::new();
                             cmark_html::push_html(&mut out, Parser::new_ext(src, opts));
-                            let body_html = ammonia::clean(&out);
+                            let body_html = ammonia::Builder::new()
+                                .add_tags(&["input"])
+                                .add_tag_attributes("input", &["type", "checked", "disabled"])
+                                .clean(&out)
+                                .to_string();
                             let node_type = format!("{:?}", n.node_type).to_lowercase();
                             view! {
                                 <article>
