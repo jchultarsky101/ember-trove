@@ -228,9 +228,14 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
     let is_done = status_done(&task.status);
     let status_val = status_value(&task.status).to_string();
     let priority = task.priority.clone();
-    let p_icon = priority_icon(&priority);
-    let p_color = priority_color(&priority);
-    let p_label = priority_label(&priority);
+    let priority_str = match priority {
+        TaskPriority::High   => "high",
+        TaskPriority::Medium => "medium",
+        TaskPriority::Low    => "low",
+    };
+    let p_icon = priority_icon(&task.priority);
+    let p_color = priority_color(&task.priority);
+    let p_label = priority_label(&task.priority);
     let due = task.due_date;
     let focus = task.focus_date;
 
@@ -240,10 +245,37 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
 
     let status_sig = RwSignal::new(status_val.clone());
 
-    // Inline title editing — RwSignal is Copy so closures stay FnMut.
-    let editing_title = RwSignal::new(false);
-    let edit_title    = RwSignal::new(task.title.clone());
-    let orig_title    = RwSignal::new(task.title.clone());
+    // Inline editing — title, priority, due date.
+    let editing_title  = RwSignal::new(false);
+    let edit_title     = RwSignal::new(task.title.clone());
+    let orig_title     = RwSignal::new(task.title.clone());
+    let edit_priority  = RwSignal::new(priority_str.to_string());
+    let edit_due       = RwSignal::new(
+        due.map(|d| d.format("%Y-%m-%d").to_string())
+            .unwrap_or_default(),
+    );
+
+    // Save all editable fields at once.
+    let do_save_edit = move || {
+        let new_title = edit_title.get_untracked().trim().to_string();
+        if new_title.is_empty() { return; }
+        editing_title.set(false);
+        let new_priority = Some(parse_priority(&edit_priority.get_untracked()));
+        let new_due: Option<Option<NaiveDate>> = Some(
+            edit_due.get_untracked().trim().parse::<NaiveDate>().ok()
+        );
+        let req = UpdateTaskRequest {
+            title: Some(new_title),
+            status: None,
+            priority: new_priority,
+            focus_date: None,
+            due_date: new_due,
+        };
+        wasm_bindgen_futures::spawn_local(async move {
+            let _ = crate::api::update_task(task_id, &req).await;
+            task_refresh.update(|n| *n += 1);
+        });
+    };
 
     // Toggle done ↔ open on checkbox click
     let on_toggle = move |_| {
@@ -311,42 +343,69 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
 
             // Title + meta
             <div class="flex-1 min-w-0">
-                // Title — display or inline edit (only Copy types captured)
+                // Title — display or inline edit form (title + priority + due date)
                 {move || if editing_title.get() {
                     view! {
-                        <input
-                            type="text"
-                            class="w-full bg-stone-100 dark:bg-stone-800 text-sm
-                                text-stone-900 dark:text-stone-100 rounded px-1.5 py-0.5
-                                focus:outline-none focus:ring-1 focus:ring-amber-500"
-                            prop:value=move || edit_title.get()
-                            on:input=move |ev| edit_title.set(event_target_value(&ev))
-                            on:keydown=move |ev: leptos::ev::KeyboardEvent| {
-                                match ev.key().as_str() {
-                                    "Enter" => {
-                                        let new_title = edit_title.get_untracked().trim().to_string();
-                                        if new_title.is_empty() { return; }
-                                        editing_title.set(false);
-                                        let req = UpdateTaskRequest {
-                                            title: Some(new_title),
-                                            status: None,
-                                            priority: None,
-                                            focus_date: None,
-                                            due_date: None,
-                                        };
-                                        wasm_bindgen_futures::spawn_local(async move {
-                                            let _ = crate::api::update_task(task_id, &req).await;
-                                            task_refresh.update(|n| *n += 1);
-                                        });
+                        <div class="space-y-1.5 pb-1">
+                            <input
+                                type="text"
+                                class="w-full bg-stone-100 dark:bg-stone-800 text-sm
+                                    text-stone-900 dark:text-stone-100 rounded px-1.5 py-0.5
+                                    focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                prop:value=move || edit_title.get()
+                                on:input=move |ev| edit_title.set(event_target_value(&ev))
+                                on:keydown=move |ev: leptos::ev::KeyboardEvent| {
+                                    match ev.key().as_str() {
+                                        "Enter" => do_save_edit(),
+                                        "Escape" => {
+                                            editing_title.set(false);
+                                            edit_title.set(orig_title.get_untracked());
+                                        }
+                                        _ => {}
                                     }
-                                    "Escape" => {
+                                }
+                            />
+                            <div class="flex items-center gap-2">
+                                <select
+                                    class="text-xs bg-stone-100 dark:bg-stone-700
+                                        text-stone-700 dark:text-stone-300
+                                        rounded px-2 py-0.5 focus:outline-none"
+                                    prop:value=move || edit_priority.get()
+                                    on:change=move |ev| edit_priority.set(event_target_value(&ev))
+                                >
+                                    <option value="high">"High"</option>
+                                    <option value="medium">"Medium"</option>
+                                    <option value="low">"Low"</option>
+                                </select>
+                                <input
+                                    type="date"
+                                    class="text-xs bg-stone-100 dark:bg-stone-700
+                                        text-stone-700 dark:text-stone-300
+                                        rounded px-2 py-0.5 focus:outline-none"
+                                    title="Due date (optional)"
+                                    prop:value=move || edit_due.get()
+                                    on:input=move |ev| edit_due.set(event_target_value(&ev))
+                                />
+                                <span class="flex-1"/>
+                                <button
+                                    class="text-xs bg-amber-500 hover:bg-amber-600 text-white
+                                        rounded px-2 py-0.5 transition-colors"
+                                    on:click=move |_| do_save_edit()
+                                >
+                                    "Save"
+                                </button>
+                                <button
+                                    class="text-xs text-stone-400 hover:text-stone-600
+                                        dark:hover:text-stone-300 transition-colors"
+                                    on:click=move |_| {
                                         editing_title.set(false);
                                         edit_title.set(orig_title.get_untracked());
                                     }
-                                    _ => {}
-                                }
-                            }
-                        />
+                                >
+                                    "Cancel"
+                                </button>
+                            </div>
+                        </div>
                     }.into_any()
                 } else {
                     let td = title_display.clone();
@@ -395,10 +454,10 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
 
             // Actions (visible on hover)
             <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                // Edit title
+                // Edit task
                 <button
                     class="p-1 rounded text-stone-400 hover:text-amber-500 transition-colors"
-                    title="Edit title"
+                    title="Edit task"
                     on:click=move |_| editing_title.set(true)
                 >
                     <span class="material-symbols-outlined" style="font-size:16px;">{"edit"}</span>
