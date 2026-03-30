@@ -184,6 +184,8 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
 
     let overdue = task.due_date.map(|d| !status_done(&task.status) && d < today).unwrap_or(false);
     let due = task.due_date;
+    // Carried-over: focus_date was set on a previous day (not today).
+    let carried_from = task.focus_date.filter(|&d| d < today);
 
     view! {
         <div class="group flex items-center gap-3 py-2.5 px-3 rounded-lg
@@ -212,6 +214,18 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
             >
                 {title}
             </span>
+
+            // Carried-over badge — shown when focus_date is a past date
+            {carried_from.map(|d| view! {
+                <span
+                    class="flex items-center gap-0.5 text-stone-400 dark:text-stone-500"
+                    style="font-size: 11px;"
+                    title=format!("Carried over from {}", d.format("%b %-d"))
+                >
+                    <span class="material-symbols-outlined" style="font-size: 12px;">{"history"}</span>
+                    {d.format("%b %-d").to_string()}
+                </span>
+            })}
 
             // Due date
             {due.map(|d| {
