@@ -104,6 +104,11 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                 collapsed=collapsed
             />
             <SidebarLink
+                icon="calendar_month" label="Calendar"
+                on_click=move || { current_view.set(View::Calendar); on_nav.run(()); }
+                collapsed=collapsed
+            />
+            <SidebarLink
                 icon="dashboard" label="Dashboard"
                 on_click=move || { current_view.set(View::ProjectDashboard); on_nav.run(()); }
                 collapsed=collapsed
