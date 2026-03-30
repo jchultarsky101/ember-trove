@@ -303,7 +303,13 @@ impl TaskRepo for PgTaskRepo {
                 n.title           AS node_title
             FROM node_tasks t
             JOIN nodes n ON n.id = t.node_id
-            WHERE t.owner_id = $1 AND t.focus_date = $2
+            WHERE t.owner_id = $1
+              AND t.focus_date IS NOT NULL
+              AND t.focus_date <= $2
+              AND (
+                  t.focus_date = $2
+                  OR t.status::text NOT IN ('done', 'cancelled')
+              )
             ORDER BY
                 CASE t.priority::text
                     WHEN 'high'   THEN 0
