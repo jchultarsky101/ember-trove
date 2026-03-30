@@ -24,6 +24,8 @@ fn render_markdown(source: &str, title_map: &HashMap<String, NodeId>) -> String 
         .add_tag_attributes("a", &["class", "data-node-id"])
         .add_tags(&["span"])
         .add_tag_attributes("span", &["class"])
+        .add_tags(&["input"])
+        .add_tag_attributes("input", &["type", "checked", "disabled"])
         .clean(&html_out)
         .to_string()
 }
