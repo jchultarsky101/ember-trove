@@ -83,6 +83,9 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
         async move { crate::api::fetch_tasks(node_id).await }
     });
 
+    // Filter: hide done/cancelled tasks by default; toggled by the user.
+    let show_completed = RwSignal::new(false);
+
     // New task form state
     let new_title = RwSignal::new(String::new());
     let new_priority = RwSignal::new("medium".to_string());
@@ -200,21 +203,60 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
                 </div>
             })}
 
-            // Task list
+            // Task list (open tasks always shown; completed revealed on demand)
             {move || {
-                let tasks = tasks_resource.get()
+                let all_tasks = tasks_resource.get()
                     .and_then(|r| r.ok())
                     .unwrap_or_default();
-                if tasks.is_empty() {
+
+                if all_tasks.is_empty() {
                     return view! {
                         <p class="text-sm text-stone-400 dark:text-stone-500 italic">
                             "No tasks yet."
                         </p>
                     }.into_any();
                 }
-                tasks.into_iter().map(|task| {
-                    view! { <TaskRow task=task task_refresh=task_refresh /> }
-                }).collect_view().into_any()
+
+                let (open_tasks, done_tasks): (Vec<_>, Vec<_>) =
+                    all_tasks.into_iter().partition(|t| !status_done(&t.status));
+
+                let done_count = done_tasks.len();
+                let showing = show_completed.get();
+
+                view! {
+                    // Open tasks
+                    {open_tasks.into_iter().map(|task| view! {
+                        <TaskRow task=task task_refresh=task_refresh />
+                    }).collect_view()}
+
+                    // Completed tasks (revealed when toggled)
+                    {showing.then(|| done_tasks.into_iter().map(|task| view! {
+                        <TaskRow task=task task_refresh=task_refresh />
+                    }).collect_view())}
+
+                    // Disclosure row — shown only when completed tasks exist
+                    {(done_count > 0).then(|| {
+                        let label = if showing {
+                            "Hide completed".to_string()
+                        } else {
+                            format!("{done_count} completed · show")
+                        };
+                        let icon = if showing { "expand_less" } else { "expand_more" };
+                        view! {
+                            <button
+                                class="mt-2 flex items-center gap-1 text-xs
+                                       text-stone-400 dark:text-stone-500
+                                       hover:text-stone-600 dark:hover:text-stone-300
+                                       transition-colors cursor-pointer"
+                                on:click=move |_| show_completed.update(|v| *v = !*v)
+                            >
+                                <span class="material-symbols-outlined"
+                                      style="font-size: 14px;">{icon}</span>
+                                {label}
+                            </button>
+                        }
+                    })}
+                }.into_any()
             }}
         </div>
     }
