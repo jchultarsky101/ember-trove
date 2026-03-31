@@ -122,6 +122,13 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                 false
                             };
 
+                            // Record this node visit in the localStorage recent list.
+                            crate::recent::push_recent(
+                                n.id.0,
+                                n.title.clone(),
+                                &node_type,
+                            );
+
                             // Local pin state — initialised from the loaded node.
                             let pinned = RwSignal::new(n.pinned);
 
