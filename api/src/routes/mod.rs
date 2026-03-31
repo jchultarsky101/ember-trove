@@ -15,6 +15,7 @@ pub mod share;
 pub mod tags;
 pub mod tasks;
 pub mod templates;
+pub mod node_links;
 
 use axum::{extract::State, middleware, routing::get, Json, Router};
 use axum::http::{header, Method, StatusCode};
@@ -106,6 +107,7 @@ pub fn build_router(state: AppState) -> anyhow::Result<Router> {
         .nest("/nodes/{node_id}/share", share::node_share_router())
         .nest("/templates", templates::router())
         .nest("/search-presets", search_presets::router())
+        .nest("/nodes/{node_id}/links", node_links::router())
         .nest("/admin", admin::router())
         .nest("/admin/backups", backup::router())
         .nest("/metrics", metrics::router())

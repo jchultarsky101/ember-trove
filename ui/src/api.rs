@@ -5,8 +5,9 @@ use common::{
     auth::UserInfo,
     edge::{CreateEdgeRequest, Edge, EdgeWithTitles},
     favorite::{CreateFavoriteRequest, Favorite, ReorderFavoritesRequest},
-    id::{AttachmentId, EdgeId, FavoriteId, NodeId, NoteId, TagId, TaskId},
+    id::{AttachmentId, EdgeId, FavoriteId, NodeId, NodeLinkId, NoteId, TagId, TaskId},
     node::{CreateNodeRequest, Node, NodeListResponse, NodeTitleEntry, SetPinnedRequest, UpdateNodeRequest},
+    node_link::{CreateNodeLinkRequest, NodeLink, UpdateNodeLinkRequest},
     id::SearchPresetId,
     search::{CreateSearchPresetRequest, SearchPreset, SearchResponse},
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
@@ -1027,6 +1028,57 @@ pub async fn delete_search_preset(id: SearchPresetId) -> Result<(), UiError> {
             .text()
             .await
             .unwrap_or_else(|_| "unknown error".to_string());
+        Err(UiError::api(status, text))
+    }
+}
+
+// ── Node Links ─────────────────────────────────────────────────────────────────
+
+pub async fn fetch_node_links(node_id: NodeId) -> Result<Vec<NodeLink>, UiError> {
+    let resp = Request::get(&api_url(&format!("/nodes/{}/links", node_id)))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn create_node_link(
+    node_id: NodeId,
+    req: &CreateNodeLinkRequest,
+) -> Result<NodeLink, UiError> {
+    let resp = Request::post(&api_url(&format!("/nodes/{}/links", node_id)))
+        .json(req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn update_node_link(
+    node_id: NodeId,
+    link_id: NodeLinkId,
+    req: &UpdateNodeLinkRequest,
+) -> Result<NodeLink, UiError> {
+    let resp = Request::put(&api_url(&format!("/nodes/{}/links/{}", node_id, link_id)))
+        .json(req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn delete_node_link(node_id: NodeId, link_id: NodeLinkId) -> Result<(), UiError> {
+    let resp = Request::delete(&api_url(&format!("/nodes/{}/links/{}", node_id, link_id)))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    if resp.ok() {
+        Ok(())
+    } else {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
         Err(UiError::api(status, text))
     }
 }
