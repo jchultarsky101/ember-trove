@@ -209,6 +209,14 @@ pub async fn delete_node(id: NodeId) -> Result<(), UiError> {
     }
 }
 
+pub async fn duplicate_node(id: NodeId) -> Result<Node, UiError> {
+    let resp = Request::post(&api_url(&format!("/nodes/{id}/duplicate")))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
 pub async fn set_node_pinned(id: NodeId, pinned: bool) -> Result<Node, UiError> {
     let req = SetPinnedRequest { pinned };
     let resp = Request::put(&api_url(&format!("/nodes/{id}/pin")))

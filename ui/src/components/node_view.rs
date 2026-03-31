@@ -73,6 +73,24 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
             .unwrap_or_default()
     });
 
+    let duplicating = RwSignal::new(false);
+    let do_duplicate = move || {
+        duplicating.set(true);
+        wasm_bindgen_futures::spawn_local(async move {
+            match crate::api::duplicate_node(id).await {
+                Ok(dup) => {
+                    push_toast(ToastLevel::Success, "Node duplicated.");
+                    refresh.update(|n| *n += 1);
+                    current_view.set(View::NodeDetail(dup.id));
+                }
+                Err(e) => {
+                    push_toast(ToastLevel::Error, format!("Duplicate failed: {e}"));
+                }
+            }
+            duplicating.set(false);
+        });
+    };
+
     let do_delete = move || {
         deleting.set(true);
         show_delete_confirm.set(false);
@@ -238,6 +256,19 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                                 title="Edit"
                                             >
                                                 <span class="material-symbols-outlined">"edit"</span>
+                                            </button>
+                                            <button
+                                                class="p-1.5 rounded-lg text-stone-400 hover:text-amber-600
+                                                    dark:hover:text-amber-400 hover:bg-amber-50
+                                                    dark:hover:bg-amber-900/30 transition-colors
+                                                    disabled:opacity-30"
+                                                on:click=move |_| do_duplicate()
+                                                disabled=move || duplicating.get()
+                                                title=move || if duplicating.get() { "Duplicating…" } else { "Duplicate" }
+                                            >
+                                                <span class="material-symbols-outlined">
+                                                    {move || if duplicating.get() { "hourglass_empty" } else { "content_copy" }}
+                                                </span>
                                             </button>
                                             <button
                                                 class="p-1.5 rounded-lg text-stone-400 hover:text-red-600
