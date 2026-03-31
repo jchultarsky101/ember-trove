@@ -18,6 +18,7 @@ use crate::components::tag_bar::TagBar;
 use crate::auth::{AuthStatus, use_auth_state};
 use crate::components::note_panel::NotePanel;
 use crate::components::task_panel::TaskPanel;
+use crate::components::links_panel::LinksPanel;
 use crate::components::toast::{ToastLevel, push_toast};
 use crate::wikilink::preprocess_wikilinks;
 
@@ -258,6 +259,8 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         />
                                         // Task panel — shown for all node types
                                         <TaskPanel node_id=id />
+                                        // External links panel
+                                        <LinksPanel node_id=id is_editor=is_owner />
                                         // Note panel — append-only; owner can add, everyone can read
                                         <NotePanel node_id=id is_owner=is_owner />
                                         <EdgePanel node_id=id />

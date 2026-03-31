@@ -35,7 +35,8 @@ use common::{
     node::{CreateNodeRequest, Node, NodeListParams, NodeTitleEntry, SetPinnedRequest, UpdateNodeRequest},
     note::{CreateNoteRequest, FeedNote, Note},
     permission::{GrantPermissionRequest, Permission, PermissionRole},
-    id::SearchPresetId,
+    id::{NodeLinkId, SearchPresetId},
+    node_link::{CreateNodeLinkRequest, NodeLink, UpdateNodeLinkRequest},
     search::{CreateSearchPresetRequest, SearchPreset, SearchQuery, SearchResponse},
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
     task::{CreateTaskRequest, MyDayTask, Task, TaskCounts, UpdateTaskRequest},
@@ -54,7 +55,7 @@ use crate::{
         favorite::FavoriteRepo, graph::GraphRepo, node::NodeRepo, node_version::NodeVersionRepo,
         note::NoteRepo, permission::PermissionRepo, search::SearchRepo,
         search_presets::SearchPresetRepo, share_token::ShareTokenRepo, tag::TagRepo,
-        task::TaskRepo, template::TemplateRepo,
+        node_link::NodeLinkRepo, task::TaskRepo, template::TemplateRepo,
     },
     routes::build_router,
     state::AppState,
@@ -220,6 +221,15 @@ impl TemplateRepo for StubTemplateRepo {
     async fn delete(&self, _: TemplateId) -> Result<(), EmberTroveError> { unimplemented!() }
 }
 
+struct StubNodeLinkRepo;
+#[async_trait]
+impl NodeLinkRepo for StubNodeLinkRepo {
+    async fn list(&self, _: NodeId) -> Result<Vec<NodeLink>, EmberTroveError> { unimplemented!() }
+    async fn create(&self, _: NodeId, _: CreateNodeLinkRequest) -> Result<NodeLink, EmberTroveError> { unimplemented!() }
+    async fn update(&self, _: NodeLinkId, _: UpdateNodeLinkRequest) -> Result<NodeLink, EmberTroveError> { unimplemented!() }
+    async fn delete(&self, _: NodeLinkId) -> Result<(), EmberTroveError> { unimplemented!() }
+}
+
 struct StubSearchPresetRepo;
 #[async_trait]
 impl SearchPresetRepo for StubSearchPresetRepo {
@@ -256,6 +266,7 @@ fn test_state() -> AppState {
         node_versions: Arc::new(StubNodeVersionRepo),
         templates:       Arc::new(StubTemplateRepo),
         search_presets:  Arc::new(StubSearchPresetRepo),
+        node_links:      Arc::new(StubNodeLinkRepo),
         object_store: Arc::new(NullObjectStore),
         oidc:          None,
         cognito_admin: None,

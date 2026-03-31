@@ -18,5 +18,6 @@ pub mod node_version;
 pub mod template;
 pub mod share_token;
 pub mod task;
+pub mod node_link;
 
 pub use error::EmberTroveError;
