@@ -39,9 +39,10 @@ aws-sdk-s3 = "1"
 aws-sdk-cognitoidentityprovider = "1"
 aws-sdk-sesv2 = "1"
 
-# Backup archive (tar + gzip)
+# Backup archive (tar + gzip) and ZIP export
 tar    = "0.4"
 flate2 = "1"
+zip    = "3"
 
 sqlx = { version = "0.8", features = [
     "runtime-tokio-native-tls",
