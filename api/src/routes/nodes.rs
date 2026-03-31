@@ -56,6 +56,7 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/versions", get(list_versions))
         .route("/{id}/versions/{version_id}/restore", post(restore_version))
         .route("/{id}/pin", put(pin_node))
+        .route("/{id}/duplicate", post(duplicate_node))
 }
 
 // ── Node list ────────────────────────────────────────────────────────────────
@@ -703,6 +704,60 @@ async fn sync_wikilinks(
 /// Strip characters that could inject HTTP headers or break Content-Disposition.
 /// Keeps ASCII letters, digits, dots, dashes, underscores, and spaces.
 /// Truncates to 200 chars and falls back to "upload" if the result is empty.
+/// Duplicate a node — creates a copy with the same body, type, and tags.
+/// The new node's title is suffixed with " (copy)" and its status is reset
+/// to `Draft`.  The caller becomes the owner of the duplicate.
+async fn duplicate_node(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Path(id): Path<Uuid>,
+) -> Result<(StatusCode, Json<Node>), ApiError> {
+    require_viewer(state.permissions.as_ref(), &claims, NodeId(id)).await?;
+    let src = state.nodes.get(NodeId(id)).await?;
+
+    let req = CreateNodeRequest {
+        title: format!("{} (copy)", src.title),
+        body: src.body.clone(),
+        node_type: src.node_type.clone(),
+        status: Some(common::node::NodeStatus::Draft),
+        metadata: src.metadata.clone(),
+        template_id: None,
+    };
+    let dup = state.nodes.create(&claims.sub, req).await?;
+
+    // Auto-grant Owner permission for the duplicating user.
+    let owner_req = GrantPermissionRequest {
+        subject_id: claims.sub.clone(),
+        role: PermissionRole::Owner,
+    };
+    state
+        .permissions
+        .grant(dup.id, &claims.sub, owner_req)
+        .await
+        .map_err(|e| ApiError::Internal(format!("auto-grant owner permission failed: {e}")))?;
+
+    // Copy tags from the source node.
+    let tags = state.tags.list_for_node(NodeId(id)).await.unwrap_or_default();
+    for tag in tags {
+        let _ = state.tags.attach(dup.id, tag.id).await;
+    }
+
+    if let Some(ref body) = dup.body {
+        sync_wikilinks(&state, dup.id, body).await?;
+    }
+
+    log_activity(
+        &state,
+        dup.id,
+        &claims,
+        ActivityAction::Created,
+        json!({ "title": dup.title, "duplicated_from": id }),
+    )
+    .await;
+
+    Ok((StatusCode::CREATED, Json(dup)))
+}
+
 fn sanitize_filename(raw: &str) -> String {
     let clean: String = raw
         .chars()
