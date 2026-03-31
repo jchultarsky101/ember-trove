@@ -9,6 +9,7 @@ use crate::{
         search_bar::SearchBar,
     },
 };
+use common::id::NodeId;
 
 #[component]
 pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl IntoView {
@@ -52,6 +53,9 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             // Favorites — pinned nodes and external URLs
             <FavoritesSection collapsed=collapsed on_nav=on_nav />
+            <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
+            // Recent nodes — re-reads localStorage on every view change
+            <RecentSection collapsed=collapsed on_nav=on_nav />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             // "All Nodes" + per-type sub-links
             <SidebarLink
@@ -190,6 +194,77 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                 }
             }}
         </div>
+    }
+}
+
+// ── Recent nodes ─────────────────────────────────────────────────────────────
+
+/// Sidebar section that lists the last 10 visited nodes, read from
+/// `localStorage`.  Re-reads on every view-signal change so new visits appear
+/// immediately when the user navigates back to the sidebar.
+#[component]
+fn RecentSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl IntoView {
+    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+
+    move || {
+        // Track current_view so this closure re-runs after each navigation.
+        let _view = current_view.get();
+        let entries = crate::recent::read_recent();
+
+        if entries.is_empty() {
+            return None;
+        }
+
+        let is_collapsed = collapsed.get();
+
+        Some(view! {
+            <div>
+                // Section heading (hidden when collapsed — only icons show)
+                {(!is_collapsed).then(|| view! {
+                    <p class="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest
+                               text-stone-400 dark:text-stone-500 select-none">
+                        "Recent"
+                    </p>
+                })}
+                {entries.into_iter().map(|entry| {
+                    let id = entry.id;
+                    let title = entry.title.clone();
+                    let icon = entry.icon.clone();
+                    let label = entry.title.clone();
+                    view! {
+                        <button
+                            class=move || {
+                                let base = "flex items-center w-full rounded-lg text-sm \
+                                    text-stone-600 dark:text-stone-400 \
+                                    hover:bg-stone-100 dark:hover:bg-stone-800 \
+                                    hover:text-stone-800 dark:hover:text-stone-200 \
+                                    transition-colors cursor-pointer py-1.5";
+                                if collapsed.get() {
+                                    format!("{base} justify-center px-0")
+                                } else {
+                                    format!("{base} px-3 gap-2")
+                                }
+                            }
+                            title=title.clone()
+                            on:click=move |_| {
+                                current_view.set(View::NodeDetail(NodeId(id)));
+                                on_nav.run(());
+                            }
+                        >
+                            <span class="material-symbols-outlined shrink-0
+                                         text-stone-400 dark:text-stone-500"
+                                  style="font-size: 16px;">
+                                {icon.clone()}
+                            </span>
+                            <span class="truncate text-xs"
+                                  class:hidden=move || collapsed.get()>
+                                {label.clone()}
+                            </span>
+                        </button>
+                    }
+                }).collect_view()}
+            </div>
+        }.into_any())
     }
 }
 
