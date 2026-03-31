@@ -1,5 +1,6 @@
 pub mod admin;
 pub mod backup;
+pub mod export;
 pub mod favorites;
 pub mod metrics;
 pub mod notes;
@@ -108,6 +109,7 @@ pub fn build_router(state: AppState) -> anyhow::Result<Router> {
         .nest("/templates", templates::router())
         .nest("/search-presets", search_presets::router())
         .nest("/nodes/{node_id}/links", node_links::router())
+        .nest("/export", export::router())
         .nest("/admin", admin::router())
         .nest("/admin/backups", backup::router())
         .nest("/metrics", metrics::router())

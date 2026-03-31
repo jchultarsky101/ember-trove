@@ -151,6 +151,18 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                     None
                 }
             }}
+            <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
+            // Export all nodes as a ZIP of Markdown files
+            <SidebarLink
+                icon="download"
+                label="Export ZIP"
+                on_click=move || {
+                    if let Some(window) = web_sys::window() {
+                        let _ = window.open_with_url("/api/export");
+                    }
+                }
+                collapsed=collapsed
+            />
         </nav>
         // User / logout section
         <div class="px-2 py-3 border-t border-stone-200 dark:border-stone-800">
