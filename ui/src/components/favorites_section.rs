@@ -12,8 +12,9 @@ use crate::{
     },
 };
 
-/// Sidebar section that shows the user's pinned favorites (nodes and external URLs).
-/// Position: below search, above "All Nodes".
+/// Sidebar section that shows the user's pinned favorites split into two
+/// sub-groups: external Web Links (sky accent) on top, internal Nodes (amber
+/// accent) below.  Position: below search, above "All Nodes".
 #[component]
 pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl IntoView {
     let favorites: RwSignal<Vec<Favorite>> = RwSignal::new(vec![]);
@@ -42,12 +43,16 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
         });
     });
 
+    // Move an item up within its type-group.
+    // Finds the previous item of the same type in the full list and swaps them
+    // so the global position ordering is kept consistent with the server.
     let move_up = Callback::new(move |id: FavoriteId| {
         favorites.update(|list| {
-            if let Some(idx) = list.iter().position(|f| f.id == id)
-                && idx > 0
-            {
-                list.swap(idx, idx - 1);
+            if let Some(idx) = list.iter().position(|f| f.id == id) {
+                let is_url = list[idx].url.is_some();
+                if let Some(prev) = (0..idx).rev().find(|&i| list[i].url.is_some() == is_url) {
+                    list.swap(idx, prev);
+                }
             }
         });
         let ids: Vec<uuid::Uuid> = favorites.get_untracked().iter().map(|f| f.id.0).collect();
@@ -59,12 +64,15 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
         });
     });
 
+    // Move an item down within its type-group.
     let move_down = Callback::new(move |id: FavoriteId| {
         favorites.update(|list| {
-            if let Some(idx) = list.iter().position(|f| f.id == id)
-                && idx + 1 < list.len()
-            {
-                list.swap(idx, idx + 1);
+            if let Some(idx) = list.iter().position(|f| f.id == id) {
+                let is_url = list[idx].url.is_some();
+                let len = list.len();
+                if let Some(next) = (idx + 1..len).find(|&i| list[i].url.is_some() == is_url) {
+                    list.swap(idx, next);
+                }
             }
         });
         let ids: Vec<uuid::Uuid> = favorites.get_untracked().iter().map(|f| f.id.0).collect();
@@ -77,7 +85,7 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
     });
 
     view! {
-        // Collapsed: single star icon that opens the add modal
+        // ── Collapsed: single star icon that opens the add modal ──────────────
         {move || {
             if collapsed.get() {
                 return view! {
@@ -93,7 +101,7 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
                 }.into_any();
             }
 
-            // Expanded: full favorites list
+            // ── Expanded: split into Web Links + Nodes sub-groups ─────────────
             view! {
                 <div>
                     // Section header
@@ -112,10 +120,9 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
                         </button>
                     </div>
 
-                    // Favorite items
                     {move || {
                         let list = favorites.get();
-                        let len = list.len();
+
                         if list.is_empty() {
                             return view! {
                                 <p class="px-3 py-1 text-xs text-stone-400 dark:text-stone-500 italic">
@@ -123,30 +130,97 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
                                 </p>
                             }.into_any();
                         }
-                        list.into_iter().enumerate().map(|(idx, fav)| {
-                            let fav_id = fav.id;
-                            let label = fav.label.clone();
-                            let url = fav.url.clone();
-                            let node_id = fav.node_id;
-                            let is_first = idx == 0;
-                            let is_last = idx + 1 == len;
 
-                            view! {
-                                <FavoriteRow
-                                    label=label
-                                    url=url
-                                    node_id=node_id
-                                    fav_id=fav_id
-                                    is_first=is_first
-                                    is_last=is_last
-                                    on_delete=on_delete
-                                    on_move_up=move_up
-                                    on_move_down=move_down
-                                    current_view=current_view
-                                    on_nav=on_nav
-                                />
-                            }
-                        }).collect_view().into_any()
+                        // Partition preserving original relative order.
+                        let (web_favs, node_favs): (Vec<_>, Vec<_>) =
+                            list.iter().cloned().partition(|f| f.url.is_some());
+
+                        let has_web   = !web_favs.is_empty();
+                        let has_nodes = !node_favs.is_empty();
+                        let web_len   = web_favs.len();
+                        let node_len  = node_favs.len();
+
+                        view! {
+                            // ── Web Links sub-group ───────────────────────────
+                            {has_web.then(|| {
+                                let rows = web_favs.into_iter().enumerate().map(|(i, fav)| {
+                                    let fav_id = fav.id;
+                                    let label  = fav.label.clone();
+                                    let url    = fav.url.clone();
+                                    view! {
+                                        <FavoriteRow
+                                            label=label
+                                            url=url
+                                            node_id=fav.node_id
+                                            fav_id=fav_id
+                                            is_first=i == 0
+                                            is_last=i + 1 == web_len
+                                            on_delete=on_delete
+                                            on_move_up=move_up
+                                            on_move_down=move_down
+                                            current_view=current_view
+                                            on_nav=on_nav
+                                        />
+                                    }
+                                }).collect_view();
+
+                                view! {
+                                    <div class="flex items-center gap-1.5 px-3 pt-0.5 pb-0.5">
+                                        <span class="material-symbols-outlined
+                                                     text-sky-400 dark:text-sky-500"
+                                              style="font-size: 12px;">"public"</span>
+                                        <span class="text-[10px] font-semibold uppercase tracking-widest
+                                                     text-sky-500/60 dark:text-sky-400/50 select-none">
+                                            "Web Links"
+                                        </span>
+                                    </div>
+                                    {rows}
+                                }
+                            })}
+
+                            // Divider — only when both groups are non-empty
+                            {(has_web && has_nodes).then(|| view! {
+                                <div class="mx-3 my-1.5 border-t
+                                            border-stone-200 dark:border-stone-700/60" />
+                            })}
+
+                            // ── Nodes sub-group ───────────────────────────────
+                            {has_nodes.then(|| {
+                                let rows = node_favs.into_iter().enumerate().map(|(i, fav)| {
+                                    let fav_id = fav.id;
+                                    let label  = fav.label.clone();
+                                    let url    = fav.url.clone();
+                                    view! {
+                                        <FavoriteRow
+                                            label=label
+                                            url=url
+                                            node_id=fav.node_id
+                                            fav_id=fav_id
+                                            is_first=i == 0
+                                            is_last=i + 1 == node_len
+                                            on_delete=on_delete
+                                            on_move_up=move_up
+                                            on_move_down=move_down
+                                            current_view=current_view
+                                            on_nav=on_nav
+                                        />
+                                    }
+                                }).collect_view();
+
+                                view! {
+                                    <div class="flex items-center gap-1.5 px-3 pt-0.5 pb-0.5">
+                                        <span class="material-symbols-outlined
+                                                     text-amber-400 dark:text-amber-500"
+                                              style="font-size: 12px;">"star"</span>
+                                        <span class="text-[10px] font-semibold uppercase tracking-widest
+                                                     text-amber-500/60 dark:text-amber-400/50 select-none">
+                                            "Nodes"
+                                        </span>
+                                    </div>
+                                    {rows}
+                                }
+                            })}
+                        }.into_any()
                     }}
                 </div>
             }.into_any()
@@ -177,7 +251,8 @@ fn FavoriteRow(
     on_nav: Callback<()>,
 ) -> impl IntoView {
     let label2 = label.clone();
-    let url2 = url.clone();
+    let url2   = url.clone();
+    let is_url = url.is_some();
 
     let handle_click = move || {
         if let Some(nid) = node_id {
@@ -190,43 +265,56 @@ fn FavoriteRow(
         }
     };
 
+    // Icon and accent colour differ by type.
+    let (icon, icon_class) = if is_url {
+        (
+            "open_in_new",
+            "material-symbols-outlined text-sky-400 dark:text-sky-500 shrink-0",
+        )
+    } else {
+        (
+            "star",
+            "material-symbols-outlined text-amber-400 dark:text-amber-500 shrink-0",
+        )
+    };
+
     view! {
         <div class="group flex items-center gap-1 px-2 py-0.5 rounded-lg
                     hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors">
-            // Star / link icon
-            <span class="material-symbols-outlined text-amber-400 dark:text-amber-500 shrink-0"
-                  style="font-size: 14px">
-                {if node_id.is_some() { "star" } else { "link" }}
-            </span>
+            <span class=icon_class style="font-size: 14px">{icon}</span>
 
-            // Label — clickable
             <button
-                class="flex-1 text-left text-sm text-stone-700 dark:text-stone-300 truncate cursor-pointer py-1"
+                class="flex-1 text-left text-sm text-stone-700 dark:text-stone-300
+                       truncate cursor-pointer py-1"
                 title=label.clone()
                 on:click=move |_| handle_click()
             >
                 {label2}
             </button>
 
-            // Controls (visible on hover)
+            // Hover controls
             <div class="hidden group-hover:flex items-center gap-0.5 shrink-0">
                 <button
-                    class="p-0.5 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 cursor-pointer
-                           disabled:opacity-30 disabled:cursor-default"
+                    class="p-0.5 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                           cursor-pointer disabled:opacity-30 disabled:cursor-default"
                     title="Move up"
                     disabled=is_first
                     on:click=move |_| on_move_up.run(fav_id)
                 >
-                    <span class="material-symbols-outlined" style="font-size: 14px">"keyboard_arrow_up"</span>
+                    <span class="material-symbols-outlined" style="font-size: 14px">
+                        "keyboard_arrow_up"
+                    </span>
                 </button>
                 <button
-                    class="p-0.5 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 cursor-pointer
-                           disabled:opacity-30 disabled:cursor-default"
+                    class="p-0.5 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                           cursor-pointer disabled:opacity-30 disabled:cursor-default"
                     title="Move down"
                     disabled=is_last
                     on:click=move |_| on_move_down.run(fav_id)
                 >
-                    <span class="material-symbols-outlined" style="font-size: 14px">"keyboard_arrow_down"</span>
+                    <span class="material-symbols-outlined" style="font-size: 14px">
+                        "keyboard_arrow_down"
+                    </span>
                 </button>
                 <button
                     class="p-0.5 text-stone-400 hover:text-red-500 cursor-pointer"
