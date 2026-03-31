@@ -54,3 +54,4 @@ uuid_newtype!(ActivityId);
 uuid_newtype!(NodeVersionId);
 uuid_newtype!(TemplateId);
 uuid_newtype!(SearchPresetId);
+uuid_newtype!(NodeLinkId);
