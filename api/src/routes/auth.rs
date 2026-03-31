@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use axum::{
     Extension, Json, Router,
     extract::{Query, State},
@@ -20,9 +22,8 @@ use crate::{auth::middleware::SESSION_COOKIE, error::ApiError, state::AppState};
 /// Scoped to `/api/auth/refresh` so the browser never sends it on other requests.
 const REFRESH_COOKIE: &str = "ember_trove_refresh";
 
-/// Short-lived cookie that holds the PKCE `code_verifier`.
-/// Consumed once in the callback; path restricted to the callback endpoint.
-const PKCE_COOKIE: &str = "ember_trove_pkce";
+/// Maximum age for a pending PKCE entry — entries older than this are purged.
+const PKCE_TTL: Duration = Duration::from_secs(600); // 10 minutes
 
 /// Public auth routes (no JWT required).
 pub fn public_router() -> Router<AppState> {
@@ -57,47 +58,61 @@ async fn login(
     let code_verifier = URL_SAFE_NO_PAD.encode(raw);
     let code_challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(code_verifier.as_bytes()));
 
+    // Generate a random OAuth state token (16 bytes).
+    // The verifier is stored server-side keyed by this token, which travels
+    // through the redirect URL — avoiding iOS Safari ITP cookie restrictions.
+    let mut state_raw = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut state_raw);
+    let oauth_state = URL_SAFE_NO_PAD.encode(state_raw);
+
+    // Purge expired entries and store the new one atomically.
+    {
+        let mut store = state.pkce_store.lock()
+            .map_err(|_| ApiError::Internal("pkce store lock poisoned".to_string()))?;
+        let now = Instant::now();
+        store.retain(|_, (_, created_at)| now.duration_since(*created_at) < PKCE_TTL);
+        store.insert(oauth_state.clone(), (code_verifier, now));
+    }
+
     let redirect_uri = format!("{}/api/auth/callback", state.auth.api_external_url);
     let url = format!(
         "{}?client_id={}&redirect_uri={}&response_type=code&scope=openid+email+profile\
-         &code_challenge={}&code_challenge_method=S256",
+         &code_challenge={}&code_challenge_method=S256&state={}",
         oidc.authorization_endpoint,
         state.auth.client_id,
         urlencoding::encode(&redirect_uri),
         code_challenge,
+        oauth_state,
     );
 
-    let secure = state.auth.cookie_secure;
-    let pkce_cookie = Cookie::build((PKCE_COOKIE, code_verifier))
-        .path("/api/auth/callback")
-        .http_only(true)
-        .same_site(SameSite::Lax)
-        .secure(secure)
-        .build();
-
-    Ok((jar.add(pkce_cookie), Json(RedirectResponse { redirect_url: url })))
+    Ok((jar, Json(RedirectResponse { redirect_url: url })))
 }
 
 #[derive(Deserialize)]
 struct CallbackQuery {
     code: String,
+    /// OAuth state parameter — used to retrieve the PKCE verifier.
+    state: Option<String>,
 }
 
 async fn callback(
-    State(state): State<AppState>,
+    State(app_state): State<AppState>,
     jar: PrivateCookieJar,
     Query(params): Query<CallbackQuery>,
 ) -> Result<(PrivateCookieJar, Html<String>), ApiError> {
-    let oidc = state.oidc.as_ref()
+    let oidc = app_state.oidc.as_ref()
         .ok_or_else(|| ApiError::Internal("OIDC not configured — auth is disabled".to_string()))?;
 
-    // Consume the PKCE verifier cookie (single-use).
-    let code_verifier = jar
-        .get(PKCE_COOKIE)
-        .map(|c| c.value().to_string());
-    let jar = jar.remove(Cookie::build((PKCE_COOKIE, "")).path("/api/auth/callback").build());
+    // Retrieve and consume the PKCE verifier from the server-side store.
+    let code_verifier = if let Some(ref oauth_state) = params.state {
+        let mut store = app_state.pkce_store.lock()
+            .map_err(|_| ApiError::Internal("pkce store lock poisoned".to_string()))?;
+        store.remove(oauth_state).map(|(verifier, _)| verifier)
+    } else {
+        None
+    };
 
-    let redirect_uri = format!("{}/api/auth/callback", state.auth.api_external_url);
+    let redirect_uri = format!("{}/api/auth/callback", app_state.auth.api_external_url);
     let token_resp = oidc
         .exchange_code(&params.code, &redirect_uri, code_verifier.as_deref())
         .await?;
@@ -107,7 +122,7 @@ async fn callback(
     // for providers that don't issue a separate ID token.
     let session_token = token_resp.id_token.unwrap_or(token_resp.access_token);
 
-    let secure = state.auth.cookie_secure;
+    let secure = app_state.auth.cookie_secure;
 
     let access_cookie = Cookie::build((SESSION_COOKIE, session_token))
         .path("/")
@@ -128,7 +143,7 @@ async fn callback(
         updated_jar = updated_jar.add(refresh_cookie);
     }
 
-    let frontend_url = &state.auth.frontend_url;
+    let frontend_url = &app_state.auth.frontend_url;
 
     let html = format!(
         r#"<!DOCTYPE html>
