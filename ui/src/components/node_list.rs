@@ -1,12 +1,16 @@
+use std::collections::HashSet;
+
 use common::{
-    id::TagId,
+    id::{NodeId, TagId},
     node::Node,
     tag::Tag,
 };
 use leptos::prelude::*;
+use uuid::Uuid;
 
 use crate::app::View;
 use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
+use crate::components::toast::{ToastLevel, push_toast};
 
 // ── Sorting ────────────────────────────────────────────────────────────────────
 
@@ -104,6 +108,11 @@ pub fn NodeList() -> impl IntoView {
     let status_filter: RwSignal<Option<String>> = RwSignal::new(None);
     let sort_key = RwSignal::new(SortKey::ModifiedDesc);
     let show_sort_menu = RwSignal::new(false);
+
+    // Bulk selection state — shared between NodeList (action bar) and NodeCards (checkboxes).
+    let selected_ids: RwSignal<HashSet<Uuid>> = RwSignal::new(HashSet::new());
+    let show_apply_menu  = RwSignal::new(false);
+    let show_remove_menu = RwSignal::new(false);
 
     let nodes = LocalResource::new(move || {
         let _ = refresh.get();
@@ -246,6 +255,178 @@ pub fn NodeList() -> impl IntoView {
                 }).collect::<Vec<_>>()}
             </div>
 
+            // Bulk action bar — shown when ≥1 nodes are selected
+            {move || {
+                let sel = selected_ids.get();
+                if sel.is_empty() { return None; }
+                let count = sel.len();
+                let all_tags_snap = all_tags.get().and_then(|r| r.ok()).unwrap_or_default();
+                let all_tags_apply  = StoredValue::new(all_tags_snap.clone());
+                let all_tags_remove = StoredValue::new(all_tags_snap);
+                Some(view! {
+                    <div class="flex items-center gap-2 px-6 py-2 bg-amber-50 dark:bg-amber-900/20
+                                border-b border-amber-200 dark:border-amber-800">
+                        <span class="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                            {format!("{count} selected")}
+                        </span>
+                        // Apply tag dropdown
+                        <div class="relative">
+                            <button
+                                class="flex items-center gap-1 px-2 py-1 text-xs rounded-lg
+                                    bg-amber-100 dark:bg-amber-900/40
+                                    text-amber-700 dark:text-amber-400
+                                    hover:bg-amber-200 dark:hover:bg-amber-900/60
+                                    border border-amber-300 dark:border-amber-700
+                                    transition-colors"
+                                on:click=move |_| {
+                                    show_apply_menu.update(|v| *v = !*v);
+                                    show_remove_menu.set(false);
+                                }
+                            >
+                                <span class="material-symbols-outlined" style="font-size:13px;">"add"</span>
+                                "Apply tag"
+                            </button>
+                            {move || show_apply_menu.get().then(|| {
+                                let tags = all_tags_apply.get_value();
+                                let sel_snap = selected_ids.get();
+                                view! {
+                                    <div class="fixed inset-0 z-10" on:click=move |_| show_apply_menu.set(false) />
+                                    <div class="absolute left-0 top-full mt-1 z-20 w-48
+                                        bg-white dark:bg-stone-900 rounded-xl shadow-xl
+                                        border border-stone-200 dark:border-stone-700 overflow-hidden">
+                                        {if tags.is_empty() {
+                                            view! {
+                                                <div class="px-3 py-2 text-xs text-stone-400">"No tags defined"</div>
+                                            }.into_any()
+                                        } else {
+                                            view! {
+                                                <div>
+                                                {tags.into_iter().map(|tag| {
+                                                    let tag_id = tag.id;
+                                                    let color  = tag.color.clone();
+                                                    let name   = tag.name.clone();
+                                                    let ids: Vec<NodeId> = sel_snap.iter().map(|&u| NodeId(u)).collect();
+                                                    view! {
+                                                        <button
+                                                            class="w-full text-left px-3 py-1.5 text-xs flex items-center gap-2
+                                                                hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors"
+                                                            on:click=move |_| {
+                                                                show_apply_menu.set(false);
+                                                                let ids = ids.clone();
+                                                                wasm_bindgen_futures::spawn_local(async move {
+                                                                    let mut ok = 0usize;
+                                                                    for nid in &ids {
+                                                                        if crate::api::attach_tag(*nid, tag_id).await.is_ok() {
+                                                                            ok += 1;
+                                                                        }
+                                                                    }
+                                                                    push_toast(ToastLevel::Success,
+                                                                        format!("Applied tag to {ok} node(s)."));
+                                                                    selected_ids.set(HashSet::new());
+                                                                    refresh.update(|n| *n += 1);
+                                                                });
+                                                            }
+                                                        >
+                                                            <span class="w-2 h-2 rounded-full shrink-0"
+                                                                  style=format!("background-color:{color}") />
+                                                            <span class="text-stone-700 dark:text-stone-300">{name}</span>
+                                                        </button>
+                                                    }
+                                                }).collect::<Vec<_>>()}
+                                                </div>
+                                            }.into_any()
+                                        }}
+                                    </div>
+                                }
+                            })}
+                        </div>
+                        // Remove tag dropdown
+                        <div class="relative">
+                            <button
+                                class="flex items-center gap-1 px-2 py-1 text-xs rounded-lg
+                                    bg-stone-100 dark:bg-stone-800
+                                    text-stone-600 dark:text-stone-400
+                                    hover:bg-stone-200 dark:hover:bg-stone-700
+                                    border border-stone-300 dark:border-stone-600
+                                    transition-colors"
+                                on:click=move |_| {
+                                    show_remove_menu.update(|v| *v = !*v);
+                                    show_apply_menu.set(false);
+                                }
+                            >
+                                <span class="material-symbols-outlined" style="font-size:13px;">"remove"</span>
+                                "Remove tag"
+                            </button>
+                            {move || show_remove_menu.get().then(|| {
+                                let tags = all_tags_remove.get_value();
+                                let sel_snap = selected_ids.get();
+                                view! {
+                                    <div class="fixed inset-0 z-10" on:click=move |_| show_remove_menu.set(false) />
+                                    <div class="absolute left-0 top-full mt-1 z-20 w-48
+                                        bg-white dark:bg-stone-900 rounded-xl shadow-xl
+                                        border border-stone-200 dark:border-stone-700 overflow-hidden">
+                                        {if tags.is_empty() {
+                                            view! {
+                                                <div class="px-3 py-2 text-xs text-stone-400">"No tags defined"</div>
+                                            }.into_any()
+                                        } else {
+                                            view! {
+                                                <div>
+                                                {tags.into_iter().map(|tag| {
+                                                    let tag_id = tag.id;
+                                                    let color  = tag.color.clone();
+                                                    let name   = tag.name.clone();
+                                                    let ids: Vec<NodeId> = sel_snap.iter().map(|&u| NodeId(u)).collect();
+                                                    view! {
+                                                        <button
+                                                            class="w-full text-left px-3 py-1.5 text-xs flex items-center gap-2
+                                                                hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors"
+                                                            on:click=move |_| {
+                                                                show_remove_menu.set(false);
+                                                                let ids = ids.clone();
+                                                                wasm_bindgen_futures::spawn_local(async move {
+                                                                    let mut ok = 0usize;
+                                                                    for nid in &ids {
+                                                                        if crate::api::detach_tag(*nid, tag_id).await.is_ok() {
+                                                                            ok += 1;
+                                                                        }
+                                                                    }
+                                                                    push_toast(ToastLevel::Success,
+                                                                        format!("Removed tag from {ok} node(s)."));
+                                                                    selected_ids.set(HashSet::new());
+                                                                    refresh.update(|n| *n += 1);
+                                                                });
+                                                            }
+                                                        >
+                                                            <span class="w-2 h-2 rounded-full shrink-0"
+                                                                  style=format!("background-color:{color}") />
+                                                            <span class="text-stone-700 dark:text-stone-300">{name}</span>
+                                                        </button>
+                                                    }
+                                                }).collect::<Vec<_>>()}
+                                                </div>
+                                            }.into_any()
+                                        }}
+                                    </div>
+                                }
+                            })}
+                        </div>
+                        <span class="flex-1"/>
+                        // Clear selection
+                        <button
+                            class="flex items-center gap-1 px-2 py-1 text-xs rounded-lg
+                                text-stone-500 dark:text-stone-400
+                                hover:text-stone-700 dark:hover:text-stone-200
+                                hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+                            on:click=move |_| selected_ids.set(HashSet::new())
+                        >
+                            <span class="material-symbols-outlined" style="font-size:13px;">"close"</span>
+                            "Clear"
+                        </button>
+                    </div>
+                }.into_any())
+            }}
+
             <div class="flex-1 overflow-auto">
                 <Suspense fallback=move || view! {
                     <ul class="divide-y divide-stone-200 dark:divide-stone-800">
@@ -323,6 +504,7 @@ pub fn NodeList() -> impl IntoView {
                                             nodes=sorted
                                             current_view=current_view
                                             available_tags=available_tags
+                                            selected_ids=selected_ids
                                         />
                                     }.into_any()
                                 }
@@ -345,6 +527,7 @@ fn NodeCards(
     nodes: Vec<Node>,
     current_view: RwSignal<View>,
     available_tags: Vec<Tag>,
+    selected_ids: RwSignal<HashSet<Uuid>>,
 ) -> impl IntoView {
     let tag_filter =
         use_context::<RwSignal<Option<Tag>>>().unwrap_or_else(|| RwSignal::new(None));
@@ -375,13 +558,39 @@ fn NodeCards(
                 let s_label = status_label(&st);
                 let s_color = status_color(&st);
 
+                let node_uuid = id.0;
                 view! {
                     <li
-                        class="px-6 py-3.5 hover:bg-stone-50 dark:hover:bg-stone-900/60
+                        class="px-4 py-3.5 hover:bg-stone-50 dark:hover:bg-stone-900/60
                                cursor-pointer transition-colors"
-                        on:click=move |_| current_view.set(View::NodeDetail(id))
+                        on:click=move |_| {
+                            // Only navigate if nothing is selected (bulk mode off)
+                            // — prevents accidental navigation while selecting.
+                            if selected_ids.get_untracked().is_empty() {
+                                current_view.set(View::NodeDetail(id));
+                            }
+                        }
                     >
-                        <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-start gap-3">
+                            // Checkbox — always visible; click toggles selection
+                            <input
+                                type="checkbox"
+                                class="mt-1 w-4 h-4 accent-amber-500 cursor-pointer shrink-0"
+                                prop:checked=move || selected_ids.get().contains(&node_uuid)
+                                on:click=move |ev| {
+                                    use leptos::ev::MouseEvent;
+                                    let ev: MouseEvent = ev;
+                                    ev.stop_propagation();
+                                    selected_ids.update(|s| {
+                                        if s.contains(&node_uuid) {
+                                            s.remove(&node_uuid);
+                                        } else {
+                                            s.insert(node_uuid);
+                                        }
+                                    });
+                                }
+                            />
+                        <div class="flex items-start justify-between gap-4 flex-1 min-w-0">
                             <div class="min-w-0 flex-1">
 
                                 // ── Row 1: type icon · title · status icon ──────────
@@ -585,6 +794,7 @@ fn NodeCards(
                                     }
                                 })}
                             </div>
+                        </div>
                         </div>
                     </li>
                 }
