@@ -722,7 +722,7 @@ pub fn GraphView() -> impl IntoView {
 
                 Some(view! {
                     <div
-                        class="absolute bottom-4 right-4 z-10 rounded-lg overflow-hidden \
+                        class="absolute top-16 right-3 z-10 rounded-lg overflow-hidden \
                                border border-stone-600/50 shadow-lg"
                         style="background: rgba(12,12,12,0.80); cursor: crosshair;"
                         on:click=move |ev: MouseEvent| {
