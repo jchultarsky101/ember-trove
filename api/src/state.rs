@@ -1,4 +1,8 @@
-use std::{sync::Arc, time::Instant};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 use axum_extra::extract::cookie::Key;
 use sqlx::PgPool;
@@ -17,6 +21,14 @@ use crate::{
         tag::TagRepo, task::TaskRepo, template::TemplateRepo,
     },
 };
+
+/// In-memory PKCE store: maps OAuth `state` → `(code_verifier, created_at)`.
+///
+/// Replaces the previous cookie-based approach which failed on iOS Safari due
+/// to ITP dropping cookies set during a `fetch()` call after a cross-domain
+/// redirect (the Cognito hosted-UI round-trip).  The `state` parameter travels
+/// in the redirect URL itself, so it is immune to cookie restrictions.
+pub type PkceStore = Arc<Mutex<HashMap<String, (String, Instant)>>>;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -49,6 +61,8 @@ pub struct AppState {
     pub config: Config,
     /// Process start time — used to compute uptime in the metrics endpoint.
     pub started_at: Instant,
+    /// Short-lived PKCE verifier store — keyed by OAuth state parameter.
+    pub pkce_store: PkceStore,
 }
 
 /// `PrivateCookieJar` needs `FromRef<AppState>` for `Key` to derive

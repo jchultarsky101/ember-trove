@@ -158,6 +158,7 @@ async fn main() -> anyhow::Result<()> {
         auth,
         config: config.clone(),
         pool,
+        pkce_store: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
     };
 
     let app = axum::Router::new().nest("/api", routes::build_router(state)?);

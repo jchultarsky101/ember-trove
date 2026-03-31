@@ -285,6 +285,7 @@ fn test_state() -> AppState {
             ..Config::default()
         },
         started_at: Instant::now(),
+        pkce_store: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
     }
 }
 
