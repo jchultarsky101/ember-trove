@@ -44,6 +44,27 @@ pub async fn fetch_api_version() -> String {
         .unwrap_or_default()
 }
 
+/// Change the current user's password.
+pub async fn change_password(current: &str, proposed: &str) -> Result<(), UiError> {
+    let resp = Request::post(&api_url("/auth/change-password"))
+        .json(&serde_json::json!({
+            "current_password": current,
+            "new_password": proposed,
+        }))
+        .map_err(|e| UiError::Network(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+
+    if resp.ok() {
+        Ok(())
+    } else {
+        let status = resp.status();
+        let msg = resp.text().await.unwrap_or_else(|_| "password change failed".to_string());
+        Err(UiError::api(status, msg))
+    }
+}
+
 pub async fn parse_json<T: serde::de::DeserializeOwned>(
     response: gloo_net::http::Response,
 ) -> Result<T, UiError> {

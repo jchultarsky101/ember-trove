@@ -11,7 +11,7 @@ use axum_extra::extract::{
     cookie::{Cookie, SameSite},
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use common::auth::{AuthClaims, UserInfo};
+use common::auth::{AuthClaims, ChangePasswordRequest, UserInfo};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -21,6 +21,10 @@ use crate::{auth::middleware::SESSION_COOKIE, error::ApiError, state::AppState};
 /// Cookie that holds the encrypted refresh token.
 /// Scoped to `/api/auth/refresh` so the browser never sends it on other requests.
 const REFRESH_COOKIE: &str = "ember_trove_refresh";
+
+/// Cookie that holds the Cognito access token — required by the ChangePassword API.
+/// Scoped to `/api/auth/change-password` so it is never sent on other requests.
+const ACCESS_COOKIE: &str = "ember_trove_access";
 
 /// Maximum age for a pending PKCE entry — entries older than this are purged.
 const PKCE_TTL: Duration = Duration::from_secs(600); // 10 minutes
@@ -38,6 +42,7 @@ pub fn public_router() -> Router<AppState> {
 pub fn protected_router() -> Router<AppState> {
     Router::new()
         .route("/auth/me", get(me))
+        .route("/auth/change-password", post(change_password))
 }
 
 #[derive(Serialize)]
@@ -120,18 +125,28 @@ async fn callback(
     // Prefer the ID token for the session cookie — it carries email, name, and
     // cognito:groups which the auth middleware needs.  Fall back to access_token
     // for providers that don't issue a separate ID token.
-    let session_token = token_resp.id_token.unwrap_or(token_resp.access_token);
+    let cognito_access_token = token_resp.access_token;
+    let session_token = token_resp.id_token.unwrap_or_else(|| cognito_access_token.clone());
 
     let secure = app_state.auth.cookie_secure;
 
-    let access_cookie = Cookie::build((SESSION_COOKIE, session_token))
+    let session_cookie = Cookie::build((SESSION_COOKIE, session_token))
         .path("/")
         .http_only(true)
         .same_site(SameSite::Lax)
         .secure(secure)
         .build();
 
-    let mut updated_jar = jar.add(access_cookie);
+    // Store the Cognito access token in a tightly-scoped cookie so the
+    // change-password endpoint can call the Cognito ChangePassword API.
+    let cognito_access_cookie = Cookie::build((ACCESS_COOKIE, cognito_access_token))
+        .path("/api/auth/change-password")
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .secure(secure)
+        .build();
+
+    let mut updated_jar = jar.add(session_cookie).add(cognito_access_cookie);
 
     if let Some(refresh_token) = token_resp.refresh_token {
         let refresh_cookie = Cookie::build((REFRESH_COOKIE, refresh_token))
@@ -212,7 +227,8 @@ async fn logout(
 
     let updated_jar = jar
         .remove(Cookie::build((SESSION_COOKIE, "")).path("/").build())
-        .remove(Cookie::build((REFRESH_COOKIE, "")).path("/api/auth/refresh").build());
+        .remove(Cookie::build((REFRESH_COOKIE, "")).path("/api/auth/refresh").build())
+        .remove(Cookie::build((ACCESS_COOKIE, "")).path("/api/auth/change-password").build());
 
     // Redirect through Cognito's end-session endpoint so the SSO session cookie
     // at the Cognito domain is cleared.  Without this the browser is silently
@@ -229,4 +245,26 @@ async fn logout(
     };
 
     (updated_jar, Json(RedirectResponse { redirect_url }))
+}
+
+async fn change_password(
+    State(state): State<AppState>,
+    jar: PrivateCookieJar,
+    Json(body): Json<ChangePasswordRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    // Retrieve the Cognito access token stored during login.
+    let access_token = jar
+        .get(ACCESS_COOKIE)
+        .map(|c| c.value().to_string())
+        .ok_or_else(|| ApiError::Unauthorized(
+            "access token cookie missing — please log out and back in".to_string()
+        ))?;
+
+    // Call Cognito ChangePassword — requires the access token (not ID token).
+    let oidc = state.oidc.as_ref()
+        .ok_or_else(|| ApiError::Internal("OIDC not configured".to_string()))?;
+
+    oidc.change_password(&access_token, &body.current_password, &body.new_password).await?;
+
+    Ok(Json(serde_json::json!({"ok": true})))
 }

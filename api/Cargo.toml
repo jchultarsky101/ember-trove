@@ -1,6 +1,6 @@
 [package]
 name       = "api"
-version = "1.66.0"
+version = "1.67.0"
 edition    = "2021"
 repository = "https://github.com/jchultarsky101/ember-trove"
 
