@@ -17,6 +17,13 @@ pub struct AuthClaims {
     pub exp: i64,
 }
 
+/// Request body for `POST /auth/change-password`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
 /// Public user information returned by `GET /auth/me`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct UserInfo {

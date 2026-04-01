@@ -268,6 +268,59 @@ impl OidcClient {
         Ok(token_data.claims)
     }
 
+    /// Change a user's password using their Cognito access token.
+    ///
+    /// Calls the Cognito Identity Provider service directly via HTTP — no AWS
+    /// SDK dependency required.  The service URL is derived from the token
+    /// endpoint (same AWS hostname, different path).
+    pub async fn change_password(
+        &self,
+        access_token: &str,
+        previous_password: &str,
+        proposed_password: &str,
+    ) -> Result<(), ApiError> {
+        // Derive the Cognito service root from the token_endpoint URL.
+        // token_endpoint: https://cognito-idp.<region>.amazonaws.com/<pool>/oauth2/token
+        // service root:   https://cognito-idp.<region>.amazonaws.com/
+        let service_root = self.token_endpoint
+            .splitn(4, '/')
+            .take(3)
+            .collect::<Vec<_>>()
+            .join("/");
+
+        let resp = self.http
+            .post(&service_root)
+            .header("Content-Type", "application/x-amz-json-1.1")
+            .header("X-Amz-Target", "AWSCognitoIdentityProviderService.ChangePassword")
+            .json(&serde_json::json!({
+                "AccessToken": access_token,
+                "PreviousPassword": previous_password,
+                "ProposedPassword": proposed_password,
+            }))
+            .send()
+            .await
+            .map_err(|e| ApiError::Internal(format!("ChangePassword request failed: {e}")))?;
+
+        if resp.status().is_success() {
+            return Ok(());
+        }
+
+        let status = resp.status();
+        let body: serde_json::Value = resp.json().await.unwrap_or_default();
+        let msg = body.get("message")
+            .or_else(|| body.get("Message"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("password change failed")
+            .to_string();
+
+        let code = body.get("__type").and_then(|v| v.as_str()).unwrap_or("");
+        if code == "NotAuthorizedException" {
+            Err(ApiError::Unauthorized(msg))
+        } else {
+            Err(ApiError::Internal(format!("ChangePassword ({status}): {msg}")))
+        }
+    }
+
     /// Fetch (and cache) the JWKS from the OIDC provider.
     async fn get_jwks(&self) -> Result<JwkSet, ApiError> {
         {

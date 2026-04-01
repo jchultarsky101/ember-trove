@@ -4,6 +4,7 @@ use crate::{
     app::View,
     auth::{AuthState, AuthStatus},
     components::{
+        change_password_modal::ChangePasswordModal,
         favorites_section::FavoritesSection,
         layout::SidebarCollapsed,
         search_bar::SearchBar,
@@ -14,6 +15,8 @@ use common::id::NodeId;
 #[component]
 pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+
+    let show_change_pw = RwSignal::new(false);
 
     let on_logout = move |_| {
         wasm_bindgen_futures::spawn_local(async move {
@@ -131,7 +134,7 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                         <div>
                             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
                             <SidebarLink
-                                icon="admin_panel_settings" label="Admin"
+                                icon="group" label="Users"
                                 on_click=move || { current_view.set(View::Admin); on_nav.run(()); }
                                 collapsed=collapsed
                             />
@@ -173,31 +176,56 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                         .or_else(|| user.email.clone())
                         .unwrap_or_else(|| user.sub.clone());
                     if is_collapsed {
-                        // Collapsed: icon-only logout with tooltip showing username
+                        // Collapsed: stack of icon-only buttons with tooltips
                         Some(view! {
-                            <button
-                                on:click=on_logout
-                                class="flex items-center justify-center w-full p-2 rounded-lg
-                                    text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800
-                                    dark:text-stone-400 cursor-pointer"
-                                title=format!("{name} — Logout")
-                            >
-                                <span class="material-symbols-outlined">"logout"</span>
-                            </button>
+                            <div class="flex flex-col gap-1">
+                                <button
+                                    class="flex items-center justify-center w-full p-2 rounded-lg
+                                        text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800
+                                        dark:text-stone-400 cursor-pointer"
+                                    title=format!("{name} — Change password")
+                                    on:click=move |_| show_change_pw.set(true)
+                                >
+                                    <span class="material-symbols-outlined">"lock_reset"</span>
+                                </button>
+                                <button
+                                    on:click=on_logout
+                                    class="flex items-center justify-center w-full p-2 rounded-lg
+                                        text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-800
+                                        dark:text-stone-400 cursor-pointer"
+                                    title=format!("{name} — Logout")
+                                >
+                                    <span class="material-symbols-outlined">"logout"</span>
+                                </button>
+                            </div>
                         }.into_any())
                     } else {
-                        // Expanded: username + logout link
+                        // Expanded: username + change-password + logout
                         Some(view! {
-                            <div class="flex items-center justify-between px-1">
-                                <span class="text-xs text-stone-500 dark:text-stone-400 truncate">
+                            <div class="space-y-1 px-1">
+                                <span class="block text-xs text-stone-500 dark:text-stone-400 truncate">
                                     {name}
                                 </span>
-                                <button
-                                    class="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 cursor-pointer"
-                                    on:click=on_logout
-                                >
-                                    "Logout"
-                                </button>
+                                <div class="flex items-center justify-between">
+                                    <button
+                                        class="text-xs text-stone-400 hover:text-amber-500
+                                               dark:hover:text-amber-400 cursor-pointer
+                                               flex items-center gap-1 transition-colors"
+                                        on:click=move |_| show_change_pw.set(true)
+                                    >
+                                        <span class="material-symbols-outlined" style="font-size: 13px;">
+                                            "lock_reset"
+                                        </span>
+                                        "Change password"
+                                    </button>
+                                    <button
+                                        class="text-xs text-stone-400 hover:text-stone-600
+                                               dark:hover:text-stone-300 cursor-pointer"
+                                        on:click=on_logout
+                                    >
+                                        "Logout"
+                                    </button>
+                                </div>
                             </div>
                         }.into_any())
                     }
@@ -206,6 +234,11 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                 }
             }}
         </div>
+
+        // Change-password modal (portal rendered above everything)
+        {move || show_change_pw.get().then(|| view! {
+            <ChangePasswordModal on_close=Callback::new(move |_| show_change_pw.set(false)) />
+        })}
     }
 }
 
