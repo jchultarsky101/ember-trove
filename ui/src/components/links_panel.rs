@@ -90,9 +90,9 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
     };
 
     view! {
-        <div class="border-t border-stone-200 dark:border-stone-800 mt-6">
+        <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-6">
             // ── Section header ────────────────────────────────────────────────
-            <div class="px-6 pt-3 pb-1">
+            <div class="flex items-center justify-between">
                 <button
                     class="flex items-center gap-1 text-left cursor-pointer"
                     on:click=move |_| open.update(|o| *o = !*o)
@@ -102,6 +102,12 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
                         style="font-size: 16px;"
                     >
                         {move || if open.get() { "expand_more" } else { "chevron_right" }}
+                    </span>
+                    <span
+                        class="material-symbols-outlined text-stone-400 dark:text-stone-500"
+                        style="font-size: 15px;"
+                    >
+                        "open_in_new"
                     </span>
                     <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                         "External Links"
@@ -119,11 +125,27 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
                         }))
                     }}
                 </button>
+                {move || (open.get() && is_editor).then(|| view! {
+                    <button
+                        class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                            dark:hover:text-stone-300 hover:bg-stone-100
+                            dark:hover:bg-stone-800 transition-colors"
+                        on:click=move |_| {
+                            show_add.update(|v| *v = !*v);
+                            editing_id.set(None);
+                        }
+                        title=move || if show_add.get() { "Cancel" } else { "Add link" }
+                    >
+                        <span class="material-symbols-outlined" style="font-size: 16px;">
+                            {move || if show_add.get() { "close" } else { "add_link" }}
+                        </span>
+                    </button>
+                })}
             </div>
 
             // ── Collapsible body ──────────────────────────────────────────────
             {move || open.get().then(|| view! {
-                <div class="px-6 pb-4">
+                <div class="mt-4">
                     <Suspense fallback=move || view! {
                         <p class="text-xs text-stone-400 py-2">"Loading…"</p>
                     }>
@@ -265,77 +287,58 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
                                             }).collect::<Vec<_>>()}
                                         </ul>
 
-                                        // ── Add-link form (editor only) ───────────────────────
+                                        // ── Add-link form (editor only, toggled from header) ──
                                         {is_editor.then(|| view! {
-                                            {move || if show_add.get() {
-                                                view! {
-                                                    <div class="flex flex-col gap-1.5 mt-1">
-                                                        <input
-                                                            type="text"
-                                                            class="text-sm border border-stone-300 dark:border-stone-600
-                                                                   rounded px-2 py-1 w-full
-                                                                   bg-white dark:bg-stone-800
-                                                                   text-stone-900 dark:text-stone-100
-                                                                   focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                                            placeholder="Link name"
-                                                            prop:value=move || new_name.get()
-                                                            on:input=move |ev| new_name.set(event_target_value(&ev))
-                                                        />
-                                                        <input
-                                                            type="url"
-                                                            class="text-sm border border-stone-300 dark:border-stone-600
-                                                                   rounded px-2 py-1 w-full
-                                                                   bg-white dark:bg-stone-800
-                                                                   text-stone-900 dark:text-stone-100
-                                                                   focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                                            placeholder="https://example.com"
-                                                            prop:value=move || new_url.get()
-                                                            on:input=move |ev| new_url.set(event_target_value(&ev))
-                                                        />
-                                                        {move || add_error.get().map(|e| view! {
-                                                            <p class="text-xs text-red-500">{e}</p>
-                                                        })}
-                                                        <div class="flex gap-2">
-                                                            <button
-                                                                class="px-2.5 py-1 text-xs rounded
-                                                                       bg-amber-500 hover:bg-amber-600
-                                                                       text-white font-medium cursor-pointer"
-                                                                on:click=move |_| do_add()
-                                                            >"Add"</button>
-                                                            <button
-                                                                class="px-2.5 py-1 text-xs rounded
-                                                                       bg-stone-200 dark:bg-stone-700
-                                                                       text-stone-700 dark:text-stone-200
-                                                                       hover:bg-stone-300 dark:hover:bg-stone-600
-                                                                       cursor-pointer"
-                                                                on:click=move |_| {
-                                                                    show_add.set(false);
-                                                                    new_name.set(String::new());
-                                                                    new_url.set(String::new());
-                                                                    add_error.set(None);
-                                                                }
-                                                            >"Cancel"</button>
-                                                        </div>
+                                            {move || show_add.get().then(|| view! {
+                                                <div class="flex flex-col gap-1.5 mt-1">
+                                                    <input
+                                                        type="text"
+                                                        class="text-sm border border-stone-300 dark:border-stone-600
+                                                               rounded px-2 py-1 w-full
+                                                               bg-white dark:bg-stone-800
+                                                               text-stone-900 dark:text-stone-100
+                                                               focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                                        placeholder="Link name"
+                                                        prop:value=move || new_name.get()
+                                                        on:input=move |ev| new_name.set(event_target_value(&ev))
+                                                    />
+                                                    <input
+                                                        type="url"
+                                                        class="text-sm border border-stone-300 dark:border-stone-600
+                                                               rounded px-2 py-1 w-full
+                                                               bg-white dark:bg-stone-800
+                                                               text-stone-900 dark:text-stone-100
+                                                               focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                                        placeholder="https://example.com"
+                                                        prop:value=move || new_url.get()
+                                                        on:input=move |ev| new_url.set(event_target_value(&ev))
+                                                    />
+                                                    {move || add_error.get().map(|e| view! {
+                                                        <p class="text-xs text-red-500">{e}</p>
+                                                    })}
+                                                    <div class="flex gap-2">
+                                                        <button
+                                                            class="px-2.5 py-1 text-xs rounded
+                                                                   bg-amber-500 hover:bg-amber-600
+                                                                   text-white font-medium cursor-pointer"
+                                                            on:click=move |_| do_add()
+                                                        >"Add"</button>
+                                                        <button
+                                                            class="px-2.5 py-1 text-xs rounded
+                                                                   bg-stone-200 dark:bg-stone-700
+                                                                   text-stone-700 dark:text-stone-200
+                                                                   hover:bg-stone-300 dark:hover:bg-stone-600
+                                                                   cursor-pointer"
+                                                            on:click=move |_| {
+                                                                show_add.set(false);
+                                                                new_name.set(String::new());
+                                                                new_url.set(String::new());
+                                                                add_error.set(None);
+                                                            }
+                                                        >"Cancel"</button>
                                                     </div>
-                                                }.into_any()
-                                            } else {
-                                                view! {
-                                                    <button
-                                                        class="flex items-center gap-1.5 text-xs
-                                                               text-stone-500 dark:text-stone-400
-                                                               hover:text-amber-600 dark:hover:text-amber-400
-                                                               cursor-pointer transition-colors"
-                                                        on:click=move |_| {
-                                                            show_add.set(true);
-                                                            editing_id.set(None);
-                                                        }
-                                                    >
-                                                        <span class="material-symbols-outlined"
-                                                              style="font-size:15px;">"add_link"</span>
-                                                        "Add link"
-                                                    </button>
-                                                }.into_any()
-                                            }}
+                                                </div>
+                                            })}
                                         })}
                                     }.into_any()
                                 }

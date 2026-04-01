@@ -274,10 +274,10 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         />
                                         // Task panel — shown for all node types
                                         <TaskPanel node_id=id />
-                                        // External links panel
-                                        <LinksPanel node_id=id is_editor=is_owner />
                                         // Note panel — append-only; owner can add, everyone can read
                                         <NotePanel node_id=id is_owner=is_owner />
+                                        // External links panel — grouped with other collapsible sections
+                                        <LinksPanel node_id=id is_editor=is_owner />
                                         <EdgePanel node_id=id />
                                         <BacklinksPanel node_id=id />
                                         <AttachmentPanel node_id=id />
@@ -406,9 +406,27 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                     >
                         {move || if open.get() { "expand_more" } else { "chevron_right" }}
                     </span>
+                    <span
+                        class="material-symbols-outlined text-stone-400 dark:text-stone-500"
+                        style="font-size: 15px;"
+                    >
+                        "hub"
+                    </span>
                     <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                         "Connections"
                     </h2>
+                    {move || {
+                        edges.with(|r| r.as_ref().and_then(|res| match res {
+                            Ok(v) if !v.is_empty() => Some(view! {
+                                <span class="ml-1 text-xs bg-stone-200 dark:bg-stone-700
+                                            text-stone-600 dark:text-stone-300
+                                            rounded-full px-1.5 py-0.5">
+                                    {v.len()}
+                                </span>
+                            }),
+                            _ => None,
+                        }))
+                    }}
                 </button>
                 {move || open.get().then(|| view! {
                     <button
@@ -627,9 +645,27 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
                 >
                     {move || if open.get() { "expand_more" } else { "chevron_right" }}
                 </span>
+                <span
+                    class="material-symbols-outlined text-stone-400 dark:text-stone-500"
+                    style="font-size: 15px;"
+                >
+                    "link"
+                </span>
                 <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                     "Linked Here"
                 </h2>
+                {move || {
+                    backlinks.with(|r| r.as_ref().and_then(|res| match res {
+                        Ok(v) if !v.is_empty() => Some(view! {
+                            <span class="ml-1 text-xs bg-stone-200 dark:bg-stone-700
+                                        text-stone-600 dark:text-stone-300
+                                        rounded-full px-1.5 py-0.5">
+                                {v.len()}
+                            </span>
+                        }),
+                        _ => None,
+                    }))
+                }}
             </button>
             {move || open.get().then(|| view! {
                 <div class="mt-4">
