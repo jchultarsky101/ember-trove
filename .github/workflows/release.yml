@@ -105,13 +105,17 @@ jobs:
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
+        env:
+          # Explicitly map secrets into env vars so appleboy/ssh-action can
+          # forward them to the remote shell via the `envs` parameter.
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ubuntu
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           # Pull + restart is fast; 10 min is generous.
           command_timeout: 10m
-          envs: GITHUB_REF_NAME,GITHUB_ACTOR,GITHUB_TOKEN
+          envs: GITHUB_REF_NAME,GITHUB_ACTOR,GHCR_TOKEN
           script: |
             set -euo pipefail
 
@@ -120,7 +124,7 @@ jobs:
             UI_IMAGE="ghcr.io/${{ github.repository_owner }}/ember-trove-ui"
 
             echo "=== Logging in to GHCR ==="
-            echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+            echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
             echo "=== Fetching latest compose config ==="
             cd ~/ember-trove
