@@ -70,6 +70,27 @@ fn parse_priority(s: &str) -> TaskPriority {
     }
 }
 
+fn priority_weight(p: &TaskPriority) -> u8 {
+    match p {
+        TaskPriority::High   => 0,
+        TaskPriority::Medium => 1,
+        TaskPriority::Low    => 2,
+    }
+}
+
+fn sort_tasks(tasks: &mut [Task]) {
+    tasks.sort_by(|a, b| {
+        priority_weight(&a.priority)
+            .cmp(&priority_weight(&b.priority))
+            .then_with(|| match (a.due_date, b.due_date) {
+                (Some(da), Some(db)) => da.cmp(&db),
+                (Some(_), None)      => std::cmp::Ordering::Less,
+                (None, Some(_))      => std::cmp::Ordering::Greater,
+                (None, None)         => std::cmp::Ordering::Equal,
+            })
+    });
+}
+
 // ── TaskPanel ─────────────────────────────────────────────────────────────────
 
 #[component]
@@ -217,10 +238,12 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
                     }.into_any();
                 }
 
-                let (open_tasks, done_tasks): (Vec<_>, Vec<_>) =
+                let (mut open_tasks, done_tasks): (Vec<_>, Vec<_>) =
                     all_tasks.into_iter().partition(|t| !status_done(&t.status));
+                sort_tasks(&mut open_tasks);
 
                 let done_count = done_tasks.len();
+                let done_ids: Vec<_> = done_tasks.iter().map(|t| t.id).collect();
                 let showing = show_completed.get();
 
                 view! {
@@ -242,18 +265,38 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
                             format!("{done_count} completed · show")
                         };
                         let icon = if showing { "expand_less" } else { "expand_more" };
+                        let ids_for_clear = done_ids.clone();
                         view! {
-                            <button
-                                class="mt-2 flex items-center gap-1 text-xs
-                                       text-stone-400 dark:text-stone-500
-                                       hover:text-stone-600 dark:hover:text-stone-300
-                                       transition-colors cursor-pointer"
-                                on:click=move |_| show_completed.update(|v| *v = !*v)
-                            >
-                                <span class="material-symbols-outlined"
-                                      style="font-size: 14px;">{icon}</span>
-                                {label}
-                            </button>
+                            <div class="mt-2 flex items-center gap-3">
+                                <button
+                                    class="flex items-center gap-1 text-xs
+                                           text-stone-400 dark:text-stone-500
+                                           hover:text-stone-600 dark:hover:text-stone-300
+                                           transition-colors cursor-pointer"
+                                    on:click=move |_| show_completed.update(|v| *v = !*v)
+                                >
+                                    <span class="material-symbols-outlined"
+                                          style="font-size: 14px;">{icon}</span>
+                                    {label}
+                                </button>
+                                <button
+                                    class="text-xs text-stone-300 dark:text-stone-600
+                                           hover:text-red-500 dark:hover:text-red-400
+                                           transition-colors cursor-pointer"
+                                    title="Delete all completed tasks"
+                                    on:click=move |_| {
+                                        let ids = ids_for_clear.clone();
+                                        wasm_bindgen_futures::spawn_local(async move {
+                                            for id in ids {
+                                                let _ = crate::api::delete_task(id).await;
+                                            }
+                                            task_refresh.update(|n| *n += 1);
+                                        });
+                                    }
+                                >
+                                    "Clear all"
+                                </button>
+                            </div>
                         }
                     })}
                 }.into_any()
@@ -500,7 +543,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
             <div class="flex items-center gap-1 flex-shrink-0">
                 // Edit task
                 <button
-                    class="p-1 rounded text-stone-400 hover:text-amber-500 transition-colors"
+                    class="p-1 rounded text-stone-300 dark:text-stone-600 hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
                     title="Edit task"
                     on:click=move |_| editing_title.set(true)
                 >
@@ -509,7 +552,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
                 // My Day toggle
                 <button
                     class="p-1 rounded transition-colors"
-                    style=move || if in_my_day.get() { "color: #d97706;" } else { "color: #a8a29e;" }
+                    style=move || if in_my_day.get() { "color: #d97706;" } else { "color: #d6d3d1;" }
                     title=move || if in_my_day.get() { "Remove from My Day" } else { "Add to My Day" }
                     on:click=on_toggle_focus
                 >
@@ -517,7 +560,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
                 </button>
                 // Delete
                 <button
-                    class="p-1 rounded text-stone-400 hover:text-red-500 transition-colors"
+                    class="p-1 rounded text-stone-300 dark:text-stone-600 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                     title="Delete task"
                     on:click=on_delete
                 >
