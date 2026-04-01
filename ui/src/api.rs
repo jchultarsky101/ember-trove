@@ -26,6 +26,24 @@ pub fn api_url(path: &str) -> String {
     format!("{API_BASE}{path}")
 }
 
+// ── Health ────────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct HealthResponse {
+    version: String,
+}
+
+/// Fetch the API version string from `/api/health`.
+pub async fn fetch_api_version() -> String {
+    let Ok(resp) = Request::get(&api_url("/health")).send().await else {
+        return String::new();
+    };
+    resp.json::<HealthResponse>()
+        .await
+        .map(|h| h.version)
+        .unwrap_or_default()
+}
+
 pub async fn parse_json<T: serde::de::DeserializeOwned>(
     response: gloo_net::http::Response,
 ) -> Result<T, UiError> {
