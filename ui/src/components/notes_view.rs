@@ -2,6 +2,23 @@ use leptos::prelude::*;
 
 use crate::app::View;
 
+/// Mirror of note_panel::PALETTE — full class strings so Tailwind's scanner picks them up.
+const PALETTE: &[(&str, &str)] = &[
+    ("default", "bg-stone-50 dark:bg-stone-900/50 border-stone-200 dark:border-stone-700"),
+    ("amber",   "bg-amber-100 dark:bg-amber-950/60 border-amber-300 dark:border-amber-800"),
+    ("rose",    "bg-rose-100 dark:bg-rose-950/60 border-rose-300 dark:border-rose-800"),
+    ("lime",    "bg-lime-100 dark:bg-lime-950/60 border-lime-300 dark:border-lime-800"),
+    ("sky",     "bg-sky-100 dark:bg-sky-950/60 border-sky-300 dark:border-sky-800"),
+    ("violet",  "bg-violet-100 dark:bg-violet-950/60 border-violet-300 dark:border-violet-800"),
+];
+
+fn palette_card_class(color: &str) -> &'static str {
+    PALETTE.iter()
+        .find(|(k, _)| *k == color)
+        .map(|(_, cls)| *cls)
+        .unwrap_or(PALETTE[0].1)
+}
+
 #[component]
 pub fn NotesView() -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
@@ -53,13 +70,13 @@ pub fn NotesView() -> impl IntoView {
                                     let node_id = feed_note.note.node_id;
                                     let node_title = feed_note.node_title.clone();
                                     let body_text = feed_note.note.body.clone();
+                                    let card_class = palette_card_class(&feed_note.note.color).to_string();
                                     let ts = feed_note.note.created_at
                                         .format("%b %-d, %Y %H:%M")
                                         .to_string();
 
                                     view! {
-                                        <div class="rounded-lg border border-stone-200 dark:border-stone-700
-                                            bg-stone-50 dark:bg-stone-900/50 px-4 py-3">
+                                        <div class=format!("rounded-lg border px-4 py-3 {card_class}")>
                                             // Node link header
                                             <button
                                                 class="flex items-center gap-1.5 mb-2 text-xs font-semibold
