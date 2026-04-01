@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -18,6 +18,13 @@ pub struct SearchQuery {
     pub tag_op: Option<String>,
     pub page: Option<u32>,
     pub per_page: Option<u32>,
+    /// Sort order: `"relevance"` (default for text search), `"updated_desc"`,
+    /// `"updated_asc"`, `"title_asc"`, `"title_desc"`.
+    pub sort: Option<String>,
+    /// Restrict results to nodes updated on or after this date (`YYYY-MM-DD`).
+    pub updated_after: Option<NaiveDate>,
+    /// Restrict results to nodes updated on or before this date (`YYYY-MM-DD`).
+    pub updated_before: Option<NaiveDate>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -34,6 +41,9 @@ pub struct SearchResult {
     /// Where the match was found: `"node"` (title/body), `"note"`, or `"task"`.
     /// `None` for browse (empty-query) results.
     pub match_source: Option<String>,
+    /// `ts_headline`-marked title when the query matched the node title.
+    /// Contains `<mark>…</mark>` spans; `None` in browse mode or fuzzy mode.
+    pub highlighted_title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

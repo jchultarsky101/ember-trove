@@ -32,6 +32,10 @@ pub fn SearchView() -> impl IntoView {
 
     let fuzzy = RwSignal::new(false);
     let published_only = RwSignal::new(false);
+    let node_type_filter: RwSignal<Option<String>> = RwSignal::new(None);
+    let sort = RwSignal::new("relevance".to_string());
+    let updated_after = RwSignal::new(String::new());
+    let updated_before = RwSignal::new(String::new());
     let page = RwSignal::new(1u32);
     let error_msg = RwSignal::new(Option::<String>::None);
     let results: RwSignal<Option<SearchResponse>> = RwSignal::new(None);
@@ -58,11 +62,11 @@ pub fn SearchView() -> impl IntoView {
         loading.set(true);
         error_msg.set(None);
         let is_fuzzy = fuzzy.get_untracked();
-        let status = if published_only.get_untracked() {
-            Some("published")
-        } else {
-            None
-        };
+        let status = if published_only.get_untracked() { Some("published") } else { None };
+        let nt = node_type_filter.get_untracked();
+        let sort_val = sort.get_untracked();
+        let after_val = updated_after.get_untracked();
+        let before_val = updated_before.get_untracked();
         let tag_ids: Vec<uuid::Uuid> = tag_filters
             .get_untracked()
             .iter()
@@ -78,7 +82,24 @@ pub fn SearchView() -> impl IntoView {
             if search_version.get_untracked() != version {
                 return;
             }
-            match crate::api::search_nodes(&q, is_fuzzy, status, &tag_ids, tag_op, current_page, 20).await {
+            let sort_str = if sort_val == "relevance" { None } else { Some(sort_val.as_str()) };
+            let after_str = if after_val.is_empty() { None } else { Some(after_val.as_str()) };
+            let before_str = if before_val.is_empty() { None } else { Some(before_val.as_str()) };
+            match crate::api::search_nodes(
+                &q,
+                is_fuzzy,
+                status,
+                nt.as_deref(),
+                &tag_ids,
+                tag_op,
+                sort_str,
+                after_str,
+                before_str,
+                current_page,
+                20,
+            )
+            .await
+            {
                 Ok(resp) => {
                     if search_version.get_untracked() == version {
                         results.set(Some(resp));
@@ -98,11 +119,15 @@ pub fn SearchView() -> impl IntoView {
 
     // Auto-search when query, options, or tag filters change.
     Effect::new(move |_| {
-        let _q = search_query.get();
-        let _f = fuzzy.get();
-        let _p = published_only.get();
-        let _t = tag_filters.get();
-        let _o = tag_op_and.get();
+        let _q  = search_query.get();
+        let _f  = fuzzy.get();
+        let _p  = published_only.get();
+        let _nt = node_type_filter.get();
+        let _s  = sort.get();
+        let _af = updated_after.get();
+        let _bf = updated_before.get();
+        let _t  = tag_filters.get();
+        let _o  = tag_op_and.get();
         page.set(1);
         do_search();
     });
@@ -388,6 +413,41 @@ pub fn SearchView() -> impl IntoView {
                     {move || loading.get().then_some(view! {
                         <span class="text-xs text-stone-400 dark:text-stone-500 animate-pulse">"Searching\u{2026}"</span>
                     })}
+                    // Date range
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs text-stone-400 dark:text-stone-500 shrink-0">"From"</span>
+                        <input
+                            type="date"
+                            class="text-xs rounded border border-stone-300 dark:border-stone-600
+                                bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300
+                                px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            prop:value=move || updated_after.get()
+                            on:change=move |ev| updated_after.set(event_target_value(&ev))
+                        />
+                        <span class="text-xs text-stone-400 dark:text-stone-500 shrink-0">"To"</span>
+                        <input
+                            type="date"
+                            class="text-xs rounded border border-stone-300 dark:border-stone-600
+                                bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300
+                                px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            prop:value=move || updated_before.get()
+                            on:change=move |ev| updated_before.set(event_target_value(&ev))
+                        />
+                    </div>
+                    // Sort
+                    <select
+                        class="text-xs rounded border border-stone-300 dark:border-stone-600
+                            bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300
+                            px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                        prop:value=move || sort.get()
+                        on:change=move |ev| sort.set(event_target_value(&ev))
+                    >
+                        <option value="relevance">"Relevance"</option>
+                        <option value="updated_desc">"Updated \u{2193}"</option>
+                        <option value="updated_asc">"Updated \u{2191}"</option>
+                        <option value="title_asc">"Title A\u{2013}Z"</option>
+                        <option value="title_desc">"Title Z\u{2013}A"</option>
+                    </select>
                     <label class="flex items-center gap-1.5 text-sm text-stone-600 dark:text-stone-400 cursor-pointer select-none">
                         <input
                             type="checkbox"
@@ -408,6 +468,40 @@ pub fn SearchView() -> impl IntoView {
                         />
                         "Published"
                     </label>
+                </div>
+
+                // Node type chips — second row
+                <div class="w-full flex items-center gap-1 pt-2 border-t border-stone-100 dark:border-stone-800">
+                    {[
+                        (None,                        "All"),
+                        (Some("article"),             "Article"),
+                        (Some("project"),             "Project"),
+                        (Some("area"),                "Area"),
+                        (Some("resource"),            "Resource"),
+                        (Some("reference"),           "Reference"),
+                    ].into_iter().map(|(value, label)| {
+                        let value_owned: Option<String> = value.map(String::from);
+                        let value_for_click = value_owned.clone();
+                        view! {
+                            <button
+                                class=move || {
+                                    let active = node_type_filter.get() == value_owned;
+                                    if active {
+                                        "px-2.5 py-0.5 text-xs rounded-full font-medium \
+                                         bg-amber-500 text-white transition-colors"
+                                    } else {
+                                        "px-2.5 py-0.5 text-xs rounded-full font-medium \
+                                         text-stone-500 dark:text-stone-400 \
+                                         hover:text-stone-700 dark:hover:text-stone-200 \
+                                         hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+                                    }
+                                }
+                                on:click=move |_| node_type_filter.set(value_for_click.clone())
+                            >
+                                {label}
+                            </button>
+                        }
+                    }).collect::<Vec<_>>()}
                 </div>
             </div>
 
@@ -463,6 +557,8 @@ pub fn SearchView() -> impl IntoView {
                                             let s_color = status_color(&st);
                                             let match_src = result.match_source.clone();
                                             let snippet = result.snippet.clone();
+                                            let plain_title = result.title.clone();
+                                            let hl_title = result.highlighted_title.clone();
 
                                             view! {
                                                 <button
@@ -484,7 +580,12 @@ pub fn SearchView() -> impl IntoView {
                                                             {t_icon}
                                                         </span>
                                                         <h3 class="text-sm font-medium text-stone-900 dark:text-stone-100 truncate flex-1">
-                                                            {result.title}
+                                                            {match hl_title {
+                                                                Some(ht) => view! {
+                                                                    <span inner_html=ht />
+                                                                }.into_any(),
+                                                                None => view! { {plain_title} }.into_any(),
+                                                            }}
                                                         </h3>
                                                         <span
                                                             class="material-symbols-outlined flex-shrink-0"
