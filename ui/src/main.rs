@@ -6,6 +6,7 @@ mod app;
 mod auth;
 mod components;
 mod error;
+mod markdown;
 mod recent;
 mod templates;
 mod wikilink;
