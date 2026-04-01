@@ -1,7 +1,9 @@
 use common::{id::{NodeId, TemplateId}, tag::Tag};
 use leptos::{ev, prelude::*};
+use leptos::task::spawn_local;
 
 use crate::{
+    api::fetch_api_version,
     auth::provide_auth_state,
     components::{
         dark_mode_toggle::Theme, layout::Layout,
@@ -28,6 +30,12 @@ pub fn storage_set(key: &str, value: &str) {
         let _ = s.set_item(key, value);
     }
 }
+
+// ── App version ────────────────────────────────────────────────────────────
+// Fetched once from /api/health at startup and provided to all descendants.
+
+#[derive(Clone, Copy)]
+pub struct AppVersion(pub RwSignal<String>);
 
 // ── Global task refresh signal ─────────────────────────────────────────────
 // Shared between TaskPanel and MyDayView so toggling a task in either view
@@ -155,6 +163,14 @@ pub fn App() -> impl IntoView {
     // Template prefill — set by TemplatesView "Use", consumed by NodeEditor on create.
     let template_prefill: RwSignal<Option<TemplatePrefill>> = RwSignal::new(None);
     provide_context(template_prefill);
+
+    // API version — fetched once at startup, displayed in the sidebar header.
+    let app_version = AppVersion(RwSignal::new(String::new()));
+    provide_context(app_version);
+    spawn_local(async move {
+        let v = fetch_api_version().await;
+        app_version.0.set(v);
+    });
 
     // Current node pin state — written by NodeView when a node loads so the
     // global `p` shortcut can toggle it without an extra API round-trip.
