@@ -1,7 +1,7 @@
 use leptos::prelude::*;
 
 use crate::{
-    app::{ShowCapture, View},
+    app::{AppVersion, ShowCapture, View},
     auth::{AuthState, AuthStatus},
     components::{
         admin_view::AdminView, backup_view::BackupView,
@@ -172,6 +172,7 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
 /// The collapse toggle is now a floating button on the aside border (see Layout).
 #[component]
 fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
+    let app_version = use_context::<AppVersion>().expect("AppVersion must be provided");
     view! {
         <div class="flex items-center border-b border-stone-200 dark:border-stone-800 px-3 py-4 gap-2">
             // Banner icon — inline SVG ember flame
@@ -197,14 +198,24 @@ fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
                 </svg>
             </div>
 
-            // Title + dark-mode toggle (hidden when collapsed)
+            // Title + version badge + dark-mode toggle (hidden when collapsed)
             <div
                 class="flex-1 flex items-center justify-between min-w-0 overflow-hidden"
                 class:hidden=move || collapsed.get()
             >
-                <span class="font-semibold text-stone-900 dark:text-stone-100 truncate">
-                    "Ember Trove"
-                </span>
+                <div class="flex items-baseline gap-1.5 min-w-0 truncate">
+                    <span class="font-semibold text-stone-900 dark:text-stone-100 truncate">
+                        "Ember Trove"
+                    </span>
+                    {move || {
+                        let v = app_version.0.get();
+                        (!v.is_empty()).then(|| view! {
+                            <span class="text-[10px] font-mono text-stone-400 dark:text-stone-500 select-none shrink-0">
+                                {format!("v{v}")}
+                            </span>
+                        })
+                    }}
+                </div>
                 <DarkModeToggle />
             </div>
         </div>
