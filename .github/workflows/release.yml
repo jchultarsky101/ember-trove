@@ -42,17 +42,6 @@ jobs:
           echo "$NOTES" > /tmp/release-notes.txt
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Bump api/Cargo.toml version
-        run: |
-          VERSION="${{ steps.notes.outputs.version }}"
-          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" api/Cargo.toml
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add api/Cargo.toml
-          # Only commit if there is actually a change (idempotent)
-          git diff --cached --quiet || git commit -m "chore: bump api version to ${VERSION} [skip ci]"
-          git push origin HEAD:main
-
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -88,6 +77,12 @@ jobs:
             git fetch origin main
             git checkout main
             git pull origin main
+
+            echo "=== Patching api/Cargo.toml version ==="
+            TAG=$(git describe --tags --abbrev=0)
+            VERSION="${TAG#v}"
+            sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" api/Cargo.toml
+            echo "api version set to ${VERSION}"
 
             echo "=== Rebuilding api and ui images ==="
             docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod build api ui
