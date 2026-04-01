@@ -7,19 +7,16 @@ on:
 
 permissions:
   contents: write
-
-# Only one deploy can run at a time on the Lightsail VM.
-# Tags are keyed individually so simultaneous pushes don't cancel each other;
-# the deploy job serialises on the same group without cancellation.
-concurrency:
-  group: production-deploy-${{ github.ref_name }}
-  cancel-in-progress: false
+  packages: write   # push images to GHCR
 
 env:
-  # Opt into Node.js 24 now; GitHub will force it on all runners from June 2026.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  REGISTRY: ghcr.io
+  API_IMAGE: ghcr.io/${{ github.repository_owner }}/ember-trove-api
+  UI_IMAGE:  ghcr.io/${{ github.repository_owner }}/ember-trove-ui
 
 jobs:
+  # ── 1. Create the GitHub Release ───────────────────────────────────────────
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
@@ -33,12 +30,10 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"
           VERSION="${TAG#v}"
-          # Extract the block between this version's heading and the next one
           NOTES=$(awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
           if [ -z "$NOTES" ]; then
             NOTES="See [CHANGELOG.md](CHANGELOG.md) for details."
           fi
-          # Write to a temp file to avoid quoting issues
           echo "$NOTES" > /tmp/release-notes.txt
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
@@ -50,14 +45,62 @@ jobs:
             --title "v${{ steps.notes.outputs.version }}" \
             --notes-file /tmp/release-notes.txt
 
+  # ── 2. Build Docker images on GitHub runners and push to GHCR ──────────────
+  build:
+    name: Build & push images
+    runs-on: ubuntu-latest
+    needs: release
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch api/Cargo.toml version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" api/Cargo.toml
+          echo "api/Cargo.toml → ${VERSION}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.api
+          push: true
+          tags: ${{ env.API_IMAGE }}:${{ github.ref_name }}
+          cache-from: type=gha,scope=api
+          cache-to:   type=gha,mode=max,scope=api
+
+      - name: Build & push UI image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.ui
+          push: true
+          tags: ${{ env.UI_IMAGE }}:${{ github.ref_name }}
+          cache-from: type=gha,scope=ui
+          cache-to:   type=gha,mode=max,scope=ui
+
+  # ── 3. Pull pre-built images on EC2 and restart services ───────────────────
   deploy:
     name: Deploy to production (Lightsail)
     runs-on: ubuntu-latest
-    needs: release
-    # `vars` context is valid in job-level `if`; `secrets` context is not.
-    # Set the DEPLOY_ENABLED repository variable to "true" to activate auto-deploy.
-    # Also add LIGHTSAIL_SSH_KEY and LIGHTSAIL_HOST to repository secrets.
+    needs: build
     if: vars.DEPLOY_ENABLED == 'true'
+
+    # Serialise deploys on the EC2 instance — only one at a time regardless of tag.
+    concurrency:
+      group: production-ec2-deploy
+      cancel-in-progress: false
 
     steps:
       - name: Deploy via SSH
@@ -66,29 +109,33 @@ jobs:
           host: ${{ secrets.LIGHTSAIL_HOST }}
           username: ubuntu
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
-          # Rust rebuild on cold Lightsail VM can exceed 60 min; 120 min is safe.
-          command_timeout: 120m
+          # Pull + restart is fast; 10 min is generous.
+          command_timeout: 10m
+          envs: GITHUB_REF_NAME,GITHUB_ACTOR,GITHUB_TOKEN
           script: |
             set -euo pipefail
 
-            cd ~/ember-trove
+            TAG="${GITHUB_REF_NAME}"
+            API_IMAGE="ghcr.io/${{ github.repository_owner }}/ember-trove-api"
+            UI_IMAGE="ghcr.io/${{ github.repository_owner }}/ember-trove-ui"
 
-            echo "=== Fetching latest main ==="
+            echo "=== Logging in to GHCR ==="
+            echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+
+            echo "=== Fetching latest compose config ==="
+            cd ~/ember-trove
             git fetch origin main
             git checkout main
             git pull origin main
 
-            echo "=== Patching api/Cargo.toml version ==="
-            TAG=$(git describe --tags --abbrev=0)
-            VERSION="${TAG#v}"
-            sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" api/Cargo.toml
-            echo "api version set to ${VERSION}"
-
-            echo "=== Rebuilding api and ui images ==="
-            docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod build api ui
+            echo "=== Pulling pre-built images for ${TAG} ==="
+            docker pull "${API_IMAGE}:${TAG}"
+            docker pull "${UI_IMAGE}:${TAG}"
 
             echo "=== Restarting services ==="
-            docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d --force-recreate api ui proxy
+            IMAGE_TAG="${TAG}" \
+              docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod \
+              up -d --force-recreate api ui proxy
 
             echo "=== Verifying health (up to 60s) ==="
             for i in $(seq 1 12); do
@@ -110,3 +157,6 @@ jobs:
                 exit 1
               fi
             done
+
+            echo "=== Cleaning up old images ==="
+            docker image prune -f --filter "until=24h" || true
