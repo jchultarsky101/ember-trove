@@ -151,6 +151,18 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                     <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                         "Attachments"
                     </h2>
+                    {move || {
+                        attachments.with(|r| r.as_ref().and_then(|res| match res {
+                            Ok(v) if !v.is_empty() => Some(view! {
+                                <span class="ml-1 text-xs bg-stone-200 dark:bg-stone-700
+                                            text-stone-600 dark:text-stone-300
+                                            rounded-full px-1.5 py-0.5">
+                                    {v.len()}
+                                </span>
+                            }),
+                            _ => None,
+                        }))
+                    }}
                 </button>
             </div>
 
