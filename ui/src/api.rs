@@ -682,15 +682,24 @@ pub async fn save_position(node_id: uuid::Uuid, x: f64, y: f64) -> Result<(), Ui
 
 /// Search nodes.
 ///
-/// - `status`: optional filter (`Some("published")` etc.)
+/// - `status`: optional status filter (`Some("published")` etc.)
+/// - `node_type`: optional node-type filter (`Some("article")` etc.)
 /// - `tag_ids`: zero or more tag UUIDs to filter by
 /// - `tag_op`: `"or"` (default) or `"and"` — how to combine multiple tags
+/// - `sort`: optional sort order (`"relevance"`, `"updated_desc"`, `"updated_asc"`,
+///   `"title_asc"`, `"title_desc"`)
+/// - `updated_after` / `updated_before`: optional date bounds in `YYYY-MM-DD` format
+#[allow(clippy::too_many_arguments)]
 pub async fn search_nodes(
     q: &str,
     fuzzy: bool,
     status: Option<&str>,
+    node_type: Option<&str>,
     tag_ids: &[uuid::Uuid],
     tag_op: &str,
+    sort: Option<&str>,
+    updated_after: Option<&str>,
+    updated_before: Option<&str>,
     page: u32,
     per_page: u32,
 ) -> Result<SearchResponse, UiError> {
@@ -702,6 +711,9 @@ pub async fn search_nodes(
     if let Some(s) = status {
         url.push_str(&format!("&status={}", js_sys::encode_uri_component(s)));
     }
+    if let Some(nt) = node_type {
+        url.push_str(&format!("&node_type={nt}"));
+    }
     if !tag_ids.is_empty() {
         let ids_str = tag_ids
             .iter()
@@ -709,6 +721,15 @@ pub async fn search_nodes(
             .collect::<Vec<_>>()
             .join(",");
         url.push_str(&format!("&tag_ids={ids_str}&tag_op={tag_op}"));
+    }
+    if let Some(s) = sort {
+        url.push_str(&format!("&sort={s}"));
+    }
+    if let Some(d) = updated_after {
+        url.push_str(&format!("&updated_after={d}"));
+    }
+    if let Some(d) = updated_before {
+        url.push_str(&format!("&updated_before={d}"));
     }
     let resp = Request::get(&url)
         .send()
