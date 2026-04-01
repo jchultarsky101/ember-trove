@@ -274,10 +274,10 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         />
                                         // Task panel — shown for all node types
                                         <TaskPanel node_id=id />
-                                        // External links panel
-                                        <LinksPanel node_id=id is_editor=is_owner />
                                         // Note panel — append-only; owner can add, everyone can read
                                         <NotePanel node_id=id is_owner=is_owner />
+                                        // External links panel — grouped with other collapsible sections
+                                        <LinksPanel node_id=id is_editor=is_owner />
                                         <EdgePanel node_id=id />
                                         <BacklinksPanel node_id=id />
                                         <AttachmentPanel node_id=id />
@@ -405,6 +405,12 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                         style="font-size: 16px;"
                     >
                         {move || if open.get() { "expand_more" } else { "chevron_right" }}
+                    </span>
+                    <span
+                        class="material-symbols-outlined text-stone-400 dark:text-stone-500"
+                        style="font-size: 15px;"
+                    >
+                        "hub"
                     </span>
                     <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                         "Connections"
@@ -638,6 +644,12 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
                     style="font-size: 16px;"
                 >
                     {move || if open.get() { "expand_more" } else { "chevron_right" }}
+                </span>
+                <span
+                    class="material-symbols-outlined text-stone-400 dark:text-stone-500"
+                    style="font-size: 15px;"
+                >
+                    "link"
                 </span>
                 <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                     "Linked Here"
