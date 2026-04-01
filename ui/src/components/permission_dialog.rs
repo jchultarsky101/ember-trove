@@ -87,6 +87,12 @@ pub fn PermissionPanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                     >
                         {move || if open.get() { "expand_more" } else { "chevron_right" }}
                     </span>
+                    <span
+                        class="material-symbols-outlined text-stone-400 dark:text-stone-500"
+                        style="font-size: 15px;"
+                    >
+                        "group"
+                    </span>
                     <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                         "Sharing"
                     </h2>
