@@ -3,7 +3,8 @@ use common::{
     note::{CreateNoteRequest, UpdateNoteRequest},
 };
 use leptos::prelude::*;
-use pulldown_cmark::{Options, Parser, html as cmark_html};
+
+use crate::markdown::render_markdown_plain;
 
 /// Number of notes to show before collapsing the rest behind "Show N more".
 const INITIAL_VISIBLE: usize = 5;
@@ -31,21 +32,6 @@ fn palette_card_class(color: &str) -> &'static str {
         .find(|(k, _, _)| *k == color)
         .map(|(_, _, cls)| *cls)
         .unwrap_or(PALETTE[0].2)
-}
-
-/// Render Markdown to sanitised HTML for note bodies.
-/// Notes don't use WikiLinks so no preprocessing is needed.
-fn render_note_markdown(source: &str) -> String {
-    let opts = Options::ENABLE_STRIKETHROUGH
-        | Options::ENABLE_TABLES
-        | Options::ENABLE_TASKLISTS;
-    let mut html_out = String::new();
-    cmark_html::push_html(&mut html_out, Parser::new_ext(source, opts));
-    ammonia::Builder::new()
-        .add_tags(&["input"])
-        .add_tag_attributes("input", &["type", "checked", "disabled"])
-        .clean(&html_out)
-        .to_string()
 }
 
 // ── ColorPicker ───────────────────────────────────────────────────────────────
@@ -252,7 +238,7 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                                                 let save_error = RwSignal::new(Option::<String>::None);
 
                                                 // Pre-render Markdown (computed once per note in this iteration)
-                                                let body_html  = render_note_markdown(&note.body);
+                                                let body_html  = render_markdown_plain(&note.body);
                                                 let ts_display = ts.clone();
                                                 let card_class = palette_card_class(&note_color).to_string();
 

@@ -6,29 +6,12 @@ use common::{
     template::NodeTemplate,
 };
 use leptos::prelude::*;
-use pulldown_cmark::{Options, Parser, html};
 use wasm_bindgen::JsCast as _;
 
 use crate::app::{TemplatePrefill, View};
 use crate::components::toast::{ToastLevel, push_toast};
+use crate::markdown::render_markdown;
 use crate::templates::template_for_type;
-use crate::wikilink::preprocess_wikilinks;
-
-fn render_markdown(source: &str, title_map: &HashMap<String, NodeId>) -> String {
-    let preprocessed = preprocess_wikilinks(source, title_map);
-    let opts = Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES | Options::ENABLE_TASKLISTS;
-    let parser = Parser::new_ext(&preprocessed, opts);
-    let mut html_out = String::new();
-    html::push_html(&mut html_out, parser);
-    ammonia::Builder::new()
-        .add_tag_attributes("a", &["class", "data-node-id"])
-        .add_tags(&["span"])
-        .add_tag_attributes("span", &["class"])
-        .add_tags(&["input"])
-        .add_tag_attributes("input", &["type", "checked", "disabled"])
-        .clean(&html_out)
-        .to_string()
-}
 
 fn build_title_map(entries: &[NodeTitleEntry]) -> HashMap<String, NodeId> {
     entries.iter().map(|e| (e.title.clone(), e.id)).collect()
