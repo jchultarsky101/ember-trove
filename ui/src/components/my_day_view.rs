@@ -239,10 +239,9 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                 }
             })}
 
-            // Remove from My Day (hover)
+            // Remove from My Day — always visible amber (task is in My Day by definition)
             <button
-                class="opacity-0 group-hover:opacity-100 text-stone-300 hover:text-amber-500
-                    transition-all flex-shrink-0"
+                class="text-amber-500 hover:text-amber-700 transition-colors flex-shrink-0"
                 title="Remove from My Day"
                 on:click=on_remove
             >

@@ -283,7 +283,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
 
     let today = chrono::Utc::now().date_naive();
     let overdue = due.map(|d| !is_done && d < today).unwrap_or(false);
-    let in_my_day = focus == Some(today);
+    let in_my_day = RwSignal::new(focus == Some(today));
 
     let status_sig = RwSignal::new(status_val.clone());
 
@@ -340,7 +340,9 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
 
     // Toggle My Day
     let on_toggle_focus = move |_| {
-        let new_focus = if in_my_day { None } else { Some(today) };
+        let currently = in_my_day.get_untracked();
+        let new_focus = if currently { None } else { Some(today) };
+        in_my_day.set(!currently); // optimistic UI update
         let req = UpdateTaskRequest {
             title: None,
             status: None,
@@ -506,9 +508,9 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
                 </button>
                 // My Day toggle
                 <button
-                    class="p-1 rounded text-stone-400 transition-colors"
-                    style=if in_my_day { "color: #d97706;" } else { "" }
-                    title=if in_my_day { "Remove from My Day" } else { "Add to My Day" }
+                    class="p-1 rounded transition-colors"
+                    style=move || if in_my_day.get() { "color: #d97706;" } else { "color: #a8a29e;" }
+                    title=move || if in_my_day.get() { "Remove from My Day" } else { "Add to My Day" }
                     on:click=on_toggle_focus
                 >
                     <span class="material-symbols-outlined" style="font-size:16px;">{"wb_sunny"}</span>
