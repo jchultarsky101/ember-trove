@@ -208,6 +208,21 @@ pub fn App() -> impl IntoView {
                 ev.prevent_default();
                 current_view.set(View::Search);
             }
+            "d" => {
+                // Duplicate the currently open node, then navigate to the copy.
+                if let View::NodeDetail(node_id) = current_view.get_untracked() {
+                    wasm_bindgen_futures::spawn_local(async move {
+                        match crate::api::duplicate_node(node_id).await {
+                            Ok(dup) => {
+                                push_toast(ToastLevel::Success, "Node duplicated.");
+                                current_view.set(View::NodeDetail(dup.id));
+                                refresh.update(|n| *n += 1);
+                            }
+                            Err(e) => push_toast(ToastLevel::Error, format!("Duplicate failed: {e}")),
+                        }
+                    });
+                }
+            }
             "p" => {
                 // Toggle pin on the currently open node.
                 if let View::NodeDetail(node_id) = current_view.get_untracked() {
