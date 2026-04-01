@@ -3,9 +3,8 @@
 use leptos::prelude::*;
 use uuid::Uuid;
 
-use pulldown_cmark::{Options, Parser, html as cmark_html};
-
 use crate::api;
+use crate::markdown::render_markdown_plain;
 
 #[component]
 pub fn PublicShareView(token: Uuid) -> impl IntoView {
@@ -35,17 +34,7 @@ pub fn PublicShareView(token: Uuid) -> impl IntoView {
                 }>
                     {move || node.get().map(|result| match result {
                         Ok(n) => {
-                            let src = n.body.as_deref().unwrap_or("");
-                            let opts = Options::ENABLE_STRIKETHROUGH
-                                | Options::ENABLE_TABLES
-                                | Options::ENABLE_TASKLISTS;
-                            let mut out = String::new();
-                            cmark_html::push_html(&mut out, Parser::new_ext(src, opts));
-                            let body_html = ammonia::Builder::new()
-                                .add_tags(&["input"])
-                                .add_tag_attributes("input", &["type", "checked", "disabled"])
-                                .clean(&out)
-                                .to_string();
+                            let body_html = render_markdown_plain(n.body.as_deref().unwrap_or(""));
                             let node_type = format!("{:?}", n.node_type).to_lowercase();
                             view! {
                                 <article>

@@ -4,7 +4,6 @@ use common::edge::{CreateEdgeRequest, EdgeType, EdgeWithTitles};
 use common::id::NodeId;
 use common::node::NodeTitleEntry;
 use leptos::{html::Input, prelude::*};
-use pulldown_cmark::{Options, Parser, html};
 
 use crate::app::View;
 use crate::components::attachment_panel::AttachmentPanel;
@@ -20,29 +19,7 @@ use crate::components::note_panel::NotePanel;
 use crate::components::task_panel::TaskPanel;
 use crate::components::links_panel::LinksPanel;
 use crate::components::toast::{ToastLevel, push_toast};
-use crate::wikilink::preprocess_wikilinks;
-
-/// Render markdown with wiki-link resolution.
-///
-/// `[[title]]` and `[[title|display]]` are first replaced with HTML anchors
-/// (resolved) or `<span>` tags (unresolved) by `preprocess_wikilinks`, then
-/// the result is passed through pulldown-cmark. Ammonia is configured to
-/// preserve the `class` and `data-node-id` attributes added by the preprocessor.
-fn render_markdown(source: &str, title_map: &HashMap<String, NodeId>) -> String {
-    let preprocessed = preprocess_wikilinks(source, title_map);
-    let opts = Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES | Options::ENABLE_TASKLISTS;
-    let parser = Parser::new_ext(&preprocessed, opts);
-    let mut html_out = String::new();
-    html::push_html(&mut html_out, parser);
-    ammonia::Builder::new()
-        .add_tag_attributes("a", &["class", "data-node-id"])
-        .add_tags(&["span"])
-        .add_tag_attributes("span", &["class"])
-        .add_tags(&["input"])
-        .add_tag_attributes("input", &["type", "checked", "disabled"])
-        .clean(&html_out)
-        .to_string()
-}
+use crate::markdown::render_markdown;
 
 fn build_title_map(entries: &[NodeTitleEntry]) -> HashMap<String, NodeId> {
     entries.iter().map(|e| (e.title.clone(), e.id)).collect()
