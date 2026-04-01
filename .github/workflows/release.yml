@@ -9,10 +9,11 @@ permissions:
   contents: write
 
 # Only one deploy can run at a time on the Lightsail VM.
-# A newer release tag cancels any in-progress deploy from an older tag.
+# Tags are keyed individually so simultaneous pushes don't cancel each other;
+# the deploy job serialises on the same group without cancellation.
 concurrency:
-  group: production-deploy
-  cancel-in-progress: true
+  group: production-deploy-${{ github.ref_name }}
+  cancel-in-progress: false
 
 env:
   # Opt into Node.js 24 now; GitHub will force it on all runners from June 2026.
