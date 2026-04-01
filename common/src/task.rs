@@ -77,12 +77,30 @@ pub struct CreateTaskRequest {
     pub due_date: Option<NaiveDate>,
 }
 
+/// Deserialises `Option<Option<T>>` correctly:
+/// - field absent        → `None`           (via `#[serde(default)]`)
+/// - field present/null  → `Some(None)`
+/// - field present/value → `Some(Some(v))`
+///
+/// Without this, serde maps JSON `null` to the *outer* `None`, making it
+/// impossible to distinguish "don't touch this field" from "clear this field".
+fn deser_double_opt<'de, T, D>(d: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: serde::Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Ok(Some(Option::<T>::deserialize(d)?))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdateTaskRequest {
     pub title: Option<String>,
     pub status: Option<TaskStatus>,
     pub priority: Option<TaskPriority>,
-    /// Set to `Some(date)` to add to My Day, `Some(null)` / `None` to remove.
+    /// `None` = leave unchanged · `Some(None)` = clear · `Some(Some(d))` = set to date
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deser_double_opt")]
     pub focus_date: Option<Option<NaiveDate>>,
+    /// `None` = leave unchanged · `Some(None)` = clear · `Some(Some(d))` = set to date
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deser_double_opt")]
     pub due_date: Option<Option<NaiveDate>>,
 }
