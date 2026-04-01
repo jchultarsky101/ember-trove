@@ -409,6 +409,18 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                     <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                         "Connections"
                     </h2>
+                    {move || {
+                        edges.with(|r| r.as_ref().and_then(|res| match res {
+                            Ok(v) if !v.is_empty() => Some(view! {
+                                <span class="ml-1 text-xs bg-stone-200 dark:bg-stone-700
+                                            text-stone-600 dark:text-stone-300
+                                            rounded-full px-1.5 py-0.5">
+                                    {v.len()}
+                                </span>
+                            }),
+                            _ => None,
+                        }))
+                    }}
                 </button>
                 {move || open.get().then(|| view! {
                     <button
@@ -630,6 +642,18 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
                 <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                     "Linked Here"
                 </h2>
+                {move || {
+                    backlinks.with(|r| r.as_ref().and_then(|res| match res {
+                        Ok(v) if !v.is_empty() => Some(view! {
+                            <span class="ml-1 text-xs bg-stone-200 dark:bg-stone-700
+                                        text-stone-600 dark:text-stone-300
+                                        rounded-full px-1.5 py-0.5">
+                                {v.len()}
+                            </span>
+                        }),
+                        _ => None,
+                    }))
+                }}
             </button>
             {move || open.get().then(|| view! {
                 <div class="mt-4">

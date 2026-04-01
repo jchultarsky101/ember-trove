@@ -90,40 +90,38 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
     };
 
     view! {
-        <div class="border-t border-stone-200 dark:border-stone-800 mt-6">
+        <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-6">
             // ── Section header ────────────────────────────────────────────────
-            <div class="px-6 pt-3 pb-1">
-                <button
-                    class="flex items-center gap-1 text-left cursor-pointer"
-                    on:click=move |_| open.update(|o| *o = !*o)
+            <button
+                class="flex items-center gap-1 text-left cursor-pointer"
+                on:click=move |_| open.update(|o| *o = !*o)
+            >
+                <span
+                    class="material-symbols-outlined text-stone-400 dark:text-stone-500"
+                    style="font-size: 16px;"
                 >
-                    <span
-                        class="material-symbols-outlined text-stone-400 dark:text-stone-500"
-                        style="font-size: 16px;"
-                    >
-                        {move || if open.get() { "expand_more" } else { "chevron_right" }}
-                    </span>
-                    <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
-                        "External Links"
-                    </h2>
-                    {move || {
-                        links_res.with(|r| r.as_ref().and_then(|res| match res {
-                            Ok(v) if !v.is_empty() => Some(view! {
-                                <span class="ml-1 text-xs bg-stone-200 dark:bg-stone-700
-                                            text-stone-600 dark:text-stone-300
-                                            rounded-full px-1.5 py-0.5">
-                                    {v.len()}
-                                </span>
-                            }),
-                            _ => None,
-                        }))
-                    }}
-                </button>
-            </div>
+                    {move || if open.get() { "expand_more" } else { "chevron_right" }}
+                </span>
+                <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
+                    "External Links"
+                </h2>
+                {move || {
+                    links_res.with(|r| r.as_ref().and_then(|res| match res {
+                        Ok(v) if !v.is_empty() => Some(view! {
+                            <span class="ml-1 text-xs bg-stone-200 dark:bg-stone-700
+                                        text-stone-600 dark:text-stone-300
+                                        rounded-full px-1.5 py-0.5">
+                                {v.len()}
+                            </span>
+                        }),
+                        _ => None,
+                    }))
+                }}
+            </button>
 
             // ── Collapsible body ──────────────────────────────────────────────
             {move || open.get().then(|| view! {
-                <div class="px-6 pb-4">
+                <div class="mt-4">
                     <Suspense fallback=move || view! {
                         <p class="text-xs text-stone-400 py-2">"Loading…"</p>
                     }>
