@@ -130,7 +130,7 @@ jobs:
             cd ~/ember-trove
             git fetch origin main
             git checkout main
-            git pull origin main
+            git reset --hard origin/main
 
             echo "=== Pulling pre-built images for ${TAG} ==="
             docker pull "${API_IMAGE}:${TAG}"
