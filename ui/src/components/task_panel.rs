@@ -494,8 +494,8 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
                 </div>
             </div>
 
-            // Actions (visible on hover)
-            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+            // Actions — always visible (group-hover:opacity is @media(hover:hover) only, invisible on touch)
+            <div class="flex items-center gap-1 flex-shrink-0">
                 // Edit task
                 <button
                     class="p-1 rounded text-stone-400 hover:text-amber-500 transition-colors"
