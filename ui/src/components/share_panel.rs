@@ -30,7 +30,10 @@ pub fn SharePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
 
     let tokens = LocalResource::new(move || {
         let _ = refresh.get();
-        async move { api::list_share_tokens(node_id).await }
+        async move {
+            if !open.get() { return Ok(vec![]); }
+            api::list_share_tokens(node_id).await
+        }
     });
 
     let on_create = move |_| {
