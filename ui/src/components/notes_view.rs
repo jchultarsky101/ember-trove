@@ -1,6 +1,7 @@
 use leptos::prelude::*;
 
 use crate::app::View;
+use crate::markdown::render_markdown_plain;
 
 /// Mirror of note_panel::PALETTE — full class strings so Tailwind's scanner picks them up.
 const PALETTE: &[(&str, &str)] = &[
@@ -69,7 +70,7 @@ pub fn NotesView() -> impl IntoView {
                                 {notes.into_iter().map(|feed_note| {
                                     let node_id = feed_note.note.node_id;
                                     let node_title = feed_note.node_title.clone();
-                                    let body_text = feed_note.note.body.clone();
+                                    let body_html = render_markdown_plain(&feed_note.note.body);
                                     let card_class = palette_card_class(&feed_note.note.color).to_string();
                                     let ts = feed_note.note.created_at
                                         .format("%b %-d, %Y %H:%M")
@@ -93,9 +94,12 @@ pub fn NotesView() -> impl IntoView {
                                                 </span>
                                             </button>
                                             // Body
-                                            <p class="text-sm text-stone-800 dark:text-stone-200 whitespace-pre-wrap">
-                                                {body_text}
-                                            </p>
+                                            <div
+                                                class="prose prose-sm max-w-none dark:prose-invert
+                                                    prose-p:my-0.5 prose-ul:my-0.5 prose-ol:my-0.5
+                                                    prose-li:my-0 prose-headings:mt-1 prose-headings:mb-0.5"
+                                                inner_html=body_html
+                                            />
                                             // Timestamp
                                             <p class="text-xs text-stone-400 dark:text-stone-600 mt-2">
                                                 {ts}
