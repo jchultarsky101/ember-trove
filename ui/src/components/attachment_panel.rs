@@ -28,9 +28,15 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
     // Upload progress: Some((completed, total)) while a batch is running.
     let upload_progress: RwSignal<Option<(usize, usize)>> = RwSignal::new(None);
 
+    // open must be declared before attachments so the resource closure can capture it.
+    let open = RwSignal::new(false);
+
     let attachments = LocalResource::new(move || {
         let _ = refresh.get();
-        async move { api::fetch_attachments(node_id).await }
+        async move {
+            if !open.get() { return Ok(vec![]); }
+            api::fetch_attachments(node_id).await
+        }
     });
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -132,8 +138,6 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
             refresh.update(|n| *n += 1);
         });
     };
-
-    let open = RwSignal::new(false);
 
     view! {
         <div class="mt-8 border-t border-stone-200 dark:border-stone-700 pt-6">

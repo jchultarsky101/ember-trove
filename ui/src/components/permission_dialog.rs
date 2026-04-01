@@ -25,14 +25,17 @@ pub fn PermissionPanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
     // requires it.
     let admin_users: RwSignal<Option<Vec<common::admin::AdminUser>>> = RwSignal::new(None);
 
+    // open must be declared before permissions so the resource closure can capture it.
+    let open = RwSignal::new(false);
+
     let permissions = LocalResource::new(move || {
         let _ = refresh.get();
         let node_id = node_id;
-        async move { api::list_permissions(node_id).await }
+        async move {
+            if !open.get() { return Ok(vec![]); }
+            api::list_permissions(node_id).await
+        }
     });
-
-    // Fetch admin users for display-name resolution the first time the panel expands.
-    let open = RwSignal::new(false);
     let on_toggle_open = move |_| {
         let opening = !open.get_untracked();
         open.update(|v| *v = !*v);

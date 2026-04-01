@@ -343,7 +343,10 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
         LocalResource::new(move || {
             let _ = refresh_edges.get();
             let node_id = node_id;
-            async move { crate::api::fetch_edges_for_node(node_id).await }
+            async move {
+                if !open.get() { return Ok(vec![]); }
+                crate::api::fetch_edges_for_node(node_id).await
+            }
         });
 
     let on_add_edge = move |_| {
@@ -630,7 +633,10 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
 
     let backlinks = LocalResource::new(move || {
         let node_id = node_id;
-        async move { crate::api::fetch_backlinks(node_id).await }
+        async move {
+            if !open.get() { return Ok(vec![]); }
+            crate::api::fetch_backlinks(node_id).await
+        }
     });
 
     view! {
