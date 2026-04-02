@@ -125,6 +125,12 @@ Follows standard Git Flow. `v1.0.0` is the first production tag on `main`.
 
 ## Leptos Patterns
 
+- **Static `style=` / `title=` attributes**: `style=expr` and `title=expr` without a closure are
+  evaluated once at component construction and never re-run. To track a signal, use `style=move || ...`
+  and `title=move || ...`. Non-closure attribute values are frozen for the component's lifetime.
+- **`MyDayTask` struct layout**: Task fields (`node_id`, `id`, etc.) live on the nested
+  `task: Task` field (via `#[serde(flatten)]`), not directly on `MyDayTask`. Access as
+  `my_day_task.task.node_id`.
 - **Reactive Effect + async race**: `Effect::new` fires on every signal change (each keystroke).
   Any `spawn_local` inside must use a monotonic version counter (`RwSignal<u32>`) to discard stale
   responses, plus `gloo_timers::future::TimeoutFuture::new(300).await` debounce before the API call.
@@ -200,6 +206,12 @@ Follows standard Git Flow. `v1.0.0` is the first production tag on `main`.
   `array_length($n::uuid[], 1) IS NULL` as a bypass guard (empty array → skip filter) combined
   with `HAVING (NOT $and_mode) OR COUNT(DISTINCT tag_id) = array_length($n::uuid[], 1)` to
   switch AND/OR logic — all in a single static parameterised query.
+- **`Option<Option<T>>` in PATCH DTOs**: Without a custom deserialiser, serde maps JSON `null`
+  to the *outer* `None`, so `req.field.is_some()` is always `false` for "clear" payloads — the
+  SQL `CASE WHEN $n` guard never fires. Fix: add
+  `#[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deser_double_opt")]`
+  where `deser_double_opt` is `Ok(Some(Option::<T>::deserialize(d)?))`.
+  Semantics: absent → `None` (leave unchanged), null → `Some(None)` (clear), value → `Some(Some(v))` (set).
 
 ## Admin Permission Model (v1.48.1+)
 
