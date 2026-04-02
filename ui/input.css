@@ -81,56 +81,66 @@
 .dark .prose td { color: #d6d3d1; } /* stone-300 */
 .dark .prose strong { color: #fafaf9; } /* stone-50 */
 
-/* ── GFM task-list checkboxes ─────────────────────────────────────────────── */
-/* pulldown-cmark emits bare <input type="checkbox" disabled> — no Tailwind    */
-/* classes are available, so we style them entirely here.                      */
-.prose input[type="checkbox"] {
+/* ── Checkboxes — global (appearance:none, dark-mode aware) ──────────────── */
+/* Browsers ignore background-color on native checkboxes unless appearance is  */
+/* reset first. This rule covers every <input type="checkbox"> in the app:     */
+/* node-list bulk-select, admin role toggles, search filters, and GFM tasks.   */
+input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
   display: inline-block;
-  width:  0.875rem;
-  height: 0.875rem;
+  width:  1rem;
+  height: 1rem;
   flex-shrink: 0;
   border: 1.5px solid #a8a29e; /* stone-400 */
   border-radius: 0.25rem;
   background-color: #ffffff;
-  vertical-align: -0.1em;
-  margin-right: 0.3em;
   position: relative;
-  cursor: default;
+  cursor: pointer;
+  vertical-align: -0.125em;
   transition: background-color 0.1s ease, border-color 0.1s ease;
 }
-.prose input[type="checkbox"]:checked {
-  background-color: #d97706; /* amber-600 */
-  border-color:     #d97706;
+input[type="checkbox"]:checked {
+  background-color: #f59e0b; /* amber-500 */
+  border-color:     #f59e0b;
 }
-/* Checkmark drawn via ::after */
-.prose input[type="checkbox"]:checked::after {
+/* Checkmark via ::after pseudo-element */
+input[type="checkbox"]:checked::after {
   content: "";
   position: absolute;
-  left: 1.5px;
+  left: 2px;
   top:  0px;
-  width:  0.4rem;
-  height: 0.25rem;
+  width:  0.45rem;
+  height: 0.28rem;
   border: 2px solid #ffffff;
   border-top:   none;
   border-right: none;
   transform: rotate(-45deg);
 }
+/* Dark mode */
+.dark input[type="checkbox"] {
+  border-color:     #57534e; /* stone-600 */
+  background-color: #292524; /* stone-800 */
+}
+.dark input[type="checkbox"]:checked {
+  background-color: #f59e0b; /* amber-500 */
+  border-color:     #f59e0b;
+}
+
+/* ── GFM task-list prose overrides ───────────────────────────────────────── */
+/* pulldown-cmark emits <input type="checkbox" disabled> — inherit global      */
+/* base above; override only the prose-specific properties.                    */
+.prose input[type="checkbox"] {
+  width:  0.875rem;
+  height: 0.875rem;
+  cursor: default;
+  vertical-align: -0.1em;
+  margin-right: 0.3em;
+}
 /* Hide the bullet disc on task-list <li> items */
 .prose ul li:has(> input[type="checkbox"]) {
   list-style-type: none;
   margin-left: -1.25em;
-}
-
-/* Dark mode */
-.dark .prose input[type="checkbox"] {
-  border-color:     #57534e; /* stone-600 */
-  background-color: #292524; /* stone-800 */
-}
-.dark .prose input[type="checkbox"]:checked {
-  background-color: #d97706; /* amber-600 */
-  border-color:     #d97706;
 }
 
 /* ── Wiki-links ───────────────────────────────────────────────────────────── */

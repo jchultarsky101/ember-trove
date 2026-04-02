@@ -184,7 +184,7 @@ pub fn AdminView() -> impl IntoView {
                                         <label class="flex items-center gap-1.5 cursor-pointer select-none">
                                             <input
                                                 type="checkbox"
-                                                class="rounded border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 accent-amber-500"
+                                                class="cursor-pointer"
                                                 prop:checked=checked
                                                 on:change=move |_| {
                                                     form_roles.update(|roles| {
@@ -210,7 +210,7 @@ pub fn AdminView() -> impl IntoView {
                             <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-stone-600 dark:text-stone-400">
                                 <input
                                     type="checkbox"
-                                    class="rounded border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 accent-amber-500"
+                                    class="cursor-pointer"
                                     prop:checked=move || form_send_email.get()
                                     on:change=move |ev| {
                                         use wasm_bindgen::JsCast;
@@ -444,7 +444,7 @@ fn UserRow(
                                     <label class="flex items-center gap-1.5 cursor-pointer select-none">
                                         <input
                                             type="checkbox"
-                                            class="rounded border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-700 accent-amber-500"
+                                            class="cursor-pointer"
                                             prop:checked=checked
                                             on:change=move |_| {
                                                 edited_roles.update(|roles| {

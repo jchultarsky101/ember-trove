@@ -451,8 +451,7 @@ pub fn SearchView() -> impl IntoView {
                     <label class="flex items-center gap-1.5 text-sm text-stone-600 dark:text-stone-400 cursor-pointer select-none">
                         <input
                             type="checkbox"
-                            class="rounded border-stone-300 dark:border-stone-600 text-amber-500
-                                focus:ring-amber-500 dark:bg-stone-700"
+                            class="cursor-pointer"
                             prop:checked=move || fuzzy.get()
                             on:change=move |_| fuzzy.update(|f| *f = !*f)
                         />
@@ -461,8 +460,7 @@ pub fn SearchView() -> impl IntoView {
                     <label class="flex items-center gap-1.5 text-sm text-stone-600 dark:text-stone-400 cursor-pointer select-none">
                         <input
                             type="checkbox"
-                            class="rounded border-stone-300 dark:border-stone-600 text-green-500
-                                focus:ring-green-500 dark:bg-stone-700"
+                            class="cursor-pointer"
                             prop:checked=move || published_only.get()
                             on:change=move |_| published_only.update(|v| *v = !*v)
                         />

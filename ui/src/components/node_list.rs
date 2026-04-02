@@ -575,9 +575,7 @@ fn NodeCards(
                             // Checkbox — always visible; click toggles selection
                             <input
                                 type="checkbox"
-                                class="mt-1 w-4 h-4 rounded border-stone-300 dark:border-stone-600
-                                       bg-white dark:bg-stone-700 accent-amber-500
-                                       cursor-pointer shrink-0"
+                                class="mt-1 w-4 h-4 shrink-0 cursor-pointer"
                                 prop:checked=move || selected_ids.get().contains(&node_uuid)
                                 on:click=move |ev| {
                                     use leptos::ev::MouseEvent;
