@@ -66,7 +66,7 @@ pub fn NotesView() -> impl IntoView {
                         }
 
                         view! {
-                            <div class="space-y-4 max-w-2xl mx-auto w-full">
+                            <div class="space-y-4 w-full">
                                 {notes.into_iter().map(|feed_note| {
                                     let node_id = feed_note.note.node_id;
                                     let node_title = feed_note.node_title.clone();
