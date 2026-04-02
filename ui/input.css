@@ -81,6 +81,58 @@
 .dark .prose td { color: #d6d3d1; } /* stone-300 */
 .dark .prose strong { color: #fafaf9; } /* stone-50 */
 
+/* ── GFM task-list checkboxes ─────────────────────────────────────────────── */
+/* pulldown-cmark emits bare <input type="checkbox" disabled> — no Tailwind    */
+/* classes are available, so we style them entirely here.                      */
+.prose input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-block;
+  width:  0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+  border: 1.5px solid #a8a29e; /* stone-400 */
+  border-radius: 0.25rem;
+  background-color: #ffffff;
+  vertical-align: -0.1em;
+  margin-right: 0.3em;
+  position: relative;
+  cursor: default;
+  transition: background-color 0.1s ease, border-color 0.1s ease;
+}
+.prose input[type="checkbox"]:checked {
+  background-color: #d97706; /* amber-600 */
+  border-color:     #d97706;
+}
+/* Checkmark drawn via ::after */
+.prose input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 1.5px;
+  top:  0px;
+  width:  0.4rem;
+  height: 0.25rem;
+  border: 2px solid #ffffff;
+  border-top:   none;
+  border-right: none;
+  transform: rotate(-45deg);
+}
+/* Hide the bullet disc on task-list <li> items */
+.prose ul li:has(> input[type="checkbox"]) {
+  list-style-type: none;
+  margin-left: -1.25em;
+}
+
+/* Dark mode */
+.dark .prose input[type="checkbox"] {
+  border-color:     #57534e; /* stone-600 */
+  background-color: #292524; /* stone-800 */
+}
+.dark .prose input[type="checkbox"]:checked {
+  background-color: #d97706; /* amber-600 */
+  border-color:     #d97706;
+}
+
 /* ── Wiki-links ───────────────────────────────────────────────────────────── */
 .wikilink {
   color: #fb923c; /* orange-400 — warm, distinct from amber text */
