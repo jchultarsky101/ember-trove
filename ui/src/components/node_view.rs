@@ -268,7 +268,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                     </div>
                                     <div class="flex-1 overflow-auto p-6">
                                         <div
-                                            class="prose max-w-2xl dark:prose-invert"
+                                            class="prose max-w-none dark:prose-invert"
                                             inner_html=body_html
                                             on:click=handle_wikilink_click
                                         />
