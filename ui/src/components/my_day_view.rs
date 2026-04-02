@@ -195,7 +195,7 @@ pub fn MyDayView() -> impl IntoView {
                         }
 
                         view! {
-                            <div class="space-y-8 max-w-2xl mx-auto w-full">
+                            <div class="space-y-8 w-full">
                                 {grouped.into_iter().map(|(_, node_title, tasks)| {
                                     let node_id = tasks[0].node_id;
                                     view! {

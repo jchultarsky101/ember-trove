@@ -89,7 +89,7 @@ pub fn AdminView() -> impl IntoView {
     };
 
     view! {
-        <div class="p-6 max-w-4xl mx-auto">
+        <div class="p-6">
             // ── Page header ───────────────────────────────────────────────────
             <div class="flex items-center justify-between mb-6">
                 <div>
