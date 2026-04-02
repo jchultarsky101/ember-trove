@@ -14,6 +14,10 @@ pub struct NodeTemplate {
     pub node_type: NodeType,
     /// Markdown body pre-filled into the editor when the template is used.
     pub body: String,
+    /// When `true` this template is automatically applied to new nodes of
+    /// `node_type` created by the same user.  At most one template per owner
+    /// per node type can be the default (enforced by a partial unique index).
+    pub is_default: bool,
     /// Cognito sub of the creator.
     pub created_by: String,
     pub created_at: DateTime<Utc>,

@@ -274,12 +274,32 @@ pub fn TemplatesView() -> impl IntoView {
                     view! {
                         <div class="space-y-3">
                             {list.iter().map(|t| {
-                                let t_edit = t.clone();
-                                let t_del = t.clone();
-                                let t_use = t.clone();
-                                let type_label = node_type_label(&t.node_type);
-                                let name = t.name.clone();
-                                let desc = t.description.clone();
+                                let t_edit      = t.clone();
+                                let t_del       = t.clone();
+                                let t_use       = t.clone();
+                                let is_default  = t.is_default;
+                                let tid         = t.id.0;
+                                let type_label  = node_type_label(&t.node_type);
+                                let name        = t.name.clone();
+                                let desc        = t.description.clone();
+
+                                let star_class = if is_default {
+                                    "p-1.5 rounded-lg text-amber-500 \
+                                     hover:bg-stone-100 dark:hover:bg-stone-800 \
+                                     transition-colors cursor-pointer"
+                                } else {
+                                    "p-1.5 rounded-lg text-stone-300 dark:text-stone-600 \
+                                     hover:text-amber-500 \
+                                     hover:bg-stone-100 dark:hover:bg-stone-800 \
+                                     transition-colors cursor-pointer"
+                                };
+                                let star_icon   = if is_default { "star" } else { "star_border" };
+                                let star_title  = if is_default {
+                                    "Remove as default for this type"
+                                } else {
+                                    "Set as default for this type"
+                                };
+
                                 view! {
                                     <div class="p-4 rounded-xl border border-stone-200 dark:border-stone-700
                                                 bg-white dark:bg-stone-900
@@ -294,6 +314,14 @@ pub fn TemplatesView() -> impl IntoView {
                                                              text-stone-600 dark:text-stone-400">
                                                     {type_label}
                                                 </span>
+                                                // Default badge — only shown when is_default
+                                                {is_default.then_some(view! {
+                                                    <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-xs
+                                                                 font-medium bg-amber-100 dark:bg-amber-900/30
+                                                                 text-amber-700 dark:text-amber-400">
+                                                        "default"
+                                                    </span>
+                                                })}
                                             </div>
                                             {desc.map(|d| view! {
                                                 <p class="text-sm text-stone-500 dark:text-stone-400 truncate">
@@ -301,7 +329,34 @@ pub fn TemplatesView() -> impl IntoView {
                                                 </p>
                                             })}
                                         </div>
-                                        <div class="flex items-center gap-2 flex-shrink-0">
+                                        <div class="flex items-center gap-1 flex-shrink-0">
+                                            // ── Set/clear default star ──────────────────
+                                            <button
+                                                class=star_class
+                                                title=star_title
+                                                on:click=move |_| {
+                                                    leptos::task::spawn_local(async move {
+                                                        match crate::api::set_template_default(tid).await {
+                                                            Ok(updated) => {
+                                                                let msg = if updated.is_default {
+                                                                    "Set as default."
+                                                                } else {
+                                                                    "Default removed."
+                                                                };
+                                                                push_toast(ToastLevel::Success, msg);
+                                                                refresh.update(|n| *n += 1);
+                                                            }
+                                                            Err(e) => {
+                                                                push_toast(ToastLevel::Error, format!("Error: {e}"));
+                                                            }
+                                                        }
+                                                    });
+                                                }
+                                            >
+                                                <span class="material-symbols-outlined"
+                                                      style="font-size: 18px;">{star_icon}</span>
+                                            </button>
+                                            // ── Use ─────────────────────────────────────
                                             <button
                                                 class="px-3 py-1.5 rounded-lg text-xs font-medium
                                                        bg-amber-50 dark:bg-amber-900/20
@@ -312,6 +367,7 @@ pub fn TemplatesView() -> impl IntoView {
                                             >
                                                 "Use"
                                             </button>
+                                            // ── Edit ────────────────────────────────────
                                             <button
                                                 class="p-1.5 rounded-lg text-stone-400
                                                        hover:text-stone-700 dark:hover:text-stone-200
@@ -323,6 +379,7 @@ pub fn TemplatesView() -> impl IntoView {
                                                 <span class="material-symbols-outlined"
                                                       style="font-size: 18px;">"edit"</span>
                                             </button>
+                                            // ── Delete ──────────────────────────────────
                                             <button
                                                 class="p-1.5 rounded-lg text-stone-400
                                                        hover:text-red-600 dark:hover:text-red-400
