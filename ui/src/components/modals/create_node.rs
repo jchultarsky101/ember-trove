@@ -68,6 +68,38 @@ pub fn CreateNodeModal(
         }
     });
 
+    // Auto-apply the default template whenever the node type changes (or when
+    // templates finish loading).  If a default exists for the selected type,
+    // it is pre-selected in the picker and its body is pre-filled.  If no
+    // default exists, the picker is reset to "no template" (body is unchanged
+    // so user-typed content is preserved).
+    Effect::new(move |_| {
+        let nt     = node_type_str.get();
+        let templates = available_templates.get();
+        if let Some(t) = templates.iter().find(|t| {
+            t.is_default
+                && match &t.node_type {
+                    common::node::NodeType::Article   => nt == "article",
+                    common::node::NodeType::Project   => nt == "project",
+                    common::node::NodeType::Area      => nt == "area",
+                    common::node::NodeType::Resource  => nt == "resource",
+                    common::node::NodeType::Reference => nt == "reference",
+                }
+        }) {
+            let tid   = t.id;
+            let tbody = t.body.clone();
+            body.set(tbody);
+            selected_template_value.set(tid.0.to_string());
+            template_id_for_create.set(Some(tid));
+        } else {
+            // No default for this type — clear template selection.
+            // We intentionally leave body unchanged so manually typed content
+            // (if any) survives a type toggle.
+            selected_template_value.set(String::new());
+            template_id_for_create.set(None);
+        }
+    });
+
     let handle_submit = move || {
         let t = title.get_untracked();
         if t.trim().is_empty() {
