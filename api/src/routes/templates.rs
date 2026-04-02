@@ -1,7 +1,7 @@
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    routing::get,
+    routing::{get, put},
     Extension, Json, Router,
 };
 use common::{
@@ -18,6 +18,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_templates).post(create_template))
         .route("/{id}", get(get_template).put(update_template).delete(delete_template))
+        .route("/{id}/set-default", put(set_default_template))
 }
 
 async fn list_templates(
@@ -65,4 +66,22 @@ async fn delete_template(
 ) -> Result<StatusCode, ApiError> {
     state.templates.delete(TemplateId(id)).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Toggle the `is_default` flag for the given template.
+///
+/// Only the template's creator may change its default status.  Calling this
+/// when the template is already the default will clear the flag (toggle off).
+/// Calling it when it is not the default will set it and clear any sibling
+/// default for the same `(created_by, node_type)` pair.
+async fn set_default_template(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<NodeTemplate>, ApiError> {
+    let template = state
+        .templates
+        .set_default(TemplateId(id), &claims.sub)
+        .await?;
+    Ok(Json(template))
 }

@@ -1063,6 +1063,18 @@ pub async fn delete_template(id: uuid::Uuid) -> Result<(), UiError> {
     }
 }
 
+/// Toggle the `is_default` flag for the given template.
+///
+/// Returns the updated `NodeTemplate` (with `is_default` reflecting the new
+/// state).  Only the template's creator may call this successfully.
+pub async fn set_template_default(id: uuid::Uuid) -> Result<common::template::NodeTemplate, UiError> {
+    let resp = Request::put(&api_url(&format!("/templates/{id}/set-default")))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
 // ── Search presets ─────────────────────────────────────────────────────────────
 
 pub async fn fetch_search_presets() -> Result<Vec<SearchPreset>, UiError> {
