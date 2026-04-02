@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use leptos::prelude::*;
 use uuid::Uuid;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::{MouseEvent, WheelEvent};
+use web_sys::{MouseEvent, TouchEvent, WheelEvent};
 
 use common::{
     edge::{CreateEdgeRequest, Edge, EdgeType},
@@ -386,6 +386,12 @@ pub fn GraphView() -> impl IntoView {
     let last_mx = RwSignal::new(0.0_f64);
     let last_my = RwSignal::new(0.0_f64);
 
+    // Touch state — single-finger pan + two-finger pinch-to-zoom.
+    let last_tx = RwSignal::new(0.0_f64);
+    let last_ty = RwSignal::new(0.0_f64);
+    let pinch_start_dist = RwSignal::new(0.0_f64);
+    let pinch_start_zoom = RwSignal::new(1.0_f64);
+
     let drag_node: RwSignal<Option<Uuid>> = RwSignal::new(None);
     let drag_offset: RwSignal<(f64, f64)> = RwSignal::new((0.0, 0.0));
     let did_drag = RwSignal::new(false);
@@ -503,6 +509,39 @@ pub fn GraphView() -> impl IntoView {
                 >
                     "Fit"
                 </button>
+
+                // ── Zoom controls ─────────────────────────────────────────────
+                // Visible on all screen sizes; essential on mobile where wheel
+                // and pinch-to-zoom may be unavailable.
+                <div class="flex items-center gap-0 rounded-lg overflow-hidden
+                            border border-stone-200 dark:border-stone-700
+                            bg-white/80 dark:bg-stone-900/85 backdrop-blur-sm">
+                    <button
+                        class="px-2 py-1 text-stone-600 dark:text-stone-300
+                               hover:bg-stone-100 dark:hover:bg-stone-800
+                               cursor-pointer transition-colors"
+                        title="Zoom out (−)"
+                        on:click=move |_| zoom.update(|z| *z = (*z * 0.8).clamp(0.1, 8.0))
+                    >
+                        <span class="material-symbols-outlined" style="font-size: 14px;">"remove"</span>
+                    </button>
+                    <span
+                        class="px-2 py-1 text-xs font-medium text-stone-500 dark:text-stone-400
+                               border-x border-stone-200 dark:border-stone-700 min-w-[3.5rem] text-center
+                               tabular-nums select-none"
+                    >
+                        {move || format!("{:.0}%", zoom.get() * 100.0)}
+                    </span>
+                    <button
+                        class="px-2 py-1 text-stone-600 dark:text-stone-300
+                               hover:bg-stone-100 dark:hover:bg-stone-800
+                               cursor-pointer transition-colors"
+                        title="Zoom in (+)"
+                        on:click=move |_| zoom.update(|z| *z = (*z * 1.25).clamp(0.1, 8.0))
+                    >
+                        <span class="material-symbols-outlined" style="font-size: 14px;">"add"</span>
+                    </button>
+                </div>
             </div>
 
             // ── Add Edge popup ───────────────────────────────────────────────
@@ -1475,6 +1514,80 @@ pub fn GraphView() -> impl IntoView {
                             ev.prevent_default();
                             let factor = if ev.delta_y() > 0.0 { 0.9_f64 } else { 1.1_f64 };
                             zoom.update(|z| *z = (*z * factor).clamp(0.1, 8.0));
+                        }
+                        // ── Touch: single-finger pan, two-finger pinch-to-zoom ──────
+                        on:touchstart=move |ev: TouchEvent| {
+                            ev.prevent_default();
+                            let touches = ev.touches();
+                            match touches.length() {
+                                1 => {
+                                    if let Some(t) = touches.get(0) {
+                                        last_tx.set(t.client_x() as f64);
+                                        last_ty.set(t.client_y() as f64);
+                                        panning.set(true);
+                                    }
+                                }
+                                2 => {
+                                    panning.set(false);
+                                    if let (Some(t0), Some(t1)) =
+                                        (touches.get(0), touches.get(1))
+                                    {
+                                        let dx = t1.client_x() as f64 - t0.client_x() as f64;
+                                        let dy = t1.client_y() as f64 - t0.client_y() as f64;
+                                        pinch_start_dist
+                                            .set((dx * dx + dy * dy).sqrt());
+                                        pinch_start_zoom.set(zoom.get_untracked());
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        on:touchmove=move |ev: TouchEvent| {
+                            ev.prevent_default();
+                            let touches = ev.touches();
+                            match touches.length() {
+                                1 => {
+                                    if panning.get_untracked()
+                                        && let Some(t) = touches.get(0)
+                                    {
+                                        let tx = t.client_x() as f64;
+                                        let ty = t.client_y() as f64;
+                                        pan_x.update(|p| {
+                                            *p += tx - last_tx.get_untracked()
+                                        });
+                                        pan_y.update(|p| {
+                                            *p += ty - last_ty.get_untracked()
+                                        });
+                                        last_tx.set(tx);
+                                        last_ty.set(ty);
+                                    }
+                                }
+                                2 => {
+                                    if let (Some(t0), Some(t1)) =
+                                        (touches.get(0), touches.get(1))
+                                    {
+                                        let dx = t1.client_x() as f64 - t0.client_x() as f64;
+                                        let dy = t1.client_y() as f64 - t0.client_y() as f64;
+                                        let dist = (dx * dx + dy * dy).sqrt();
+                                        let start = pinch_start_dist.get_untracked();
+                                        if start > 0.0 {
+                                            let new_zoom = (pinch_start_zoom
+                                                .get_untracked()
+                                                * dist
+                                                / start)
+                                                .clamp(0.1, 8.0);
+                                            zoom.set(new_zoom);
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        on:touchend=move |_: TouchEvent| {
+                            panning.set(false);
+                        }
+                        on:touchcancel=move |_: TouchEvent| {
+                            panning.set(false);
                         }
                     >
                         <g transform=move || {
