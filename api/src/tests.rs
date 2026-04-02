@@ -219,6 +219,7 @@ impl TemplateRepo for StubTemplateRepo {
     async fn create(&self, _: &str, _: CreateTemplateRequest) -> Result<NodeTemplate, EmberTroveError> { unimplemented!() }
     async fn update(&self, _: TemplateId, _: UpdateTemplateRequest) -> Result<NodeTemplate, EmberTroveError> { unimplemented!() }
     async fn delete(&self, _: TemplateId) -> Result<(), EmberTroveError> { unimplemented!() }
+    async fn set_default(&self, _: TemplateId, _: &str) -> Result<NodeTemplate, EmberTroveError> { unimplemented!() }
 }
 
 struct StubNodeLinkRepo;
