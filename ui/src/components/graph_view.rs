@@ -385,14 +385,14 @@ fn force_layout_expanded(
 // ── Smart Auto-Arrange Layout ────────────────────────────────────────────────
 
 /// Minimum clearance radius to prevent text/tag overlap (shape + title + tags).
-const NODE_ENVELOPE: f64 = 60.0;
+const NODE_ENVELOPE: f64 = 50.0;
 
 /// Horizontal spacing between nodes within a layer.
-const LAYER_NODE_SPACING: f64 = 120.0;
+const LAYER_NODE_SPACING: f64 = 80.0;
 /// Vertical spacing between BFS layers.
-const LAYER_SPACING: f64 = 110.0;
+const LAYER_SPACING: f64 = 90.0;
 /// Spacing between disconnected components.
-const COMPONENT_SPACING: f64 = 250.0;
+const COMPONENT_SPACING: f64 = 180.0;
 
 /// Result of smart layout computation: positions + auto-fit transform.
 struct LayoutResult {
@@ -621,8 +621,8 @@ fn smart_layout(
         .map(|id| all_positions.get(id).map(|p| p.1).unwrap_or(0.0))
         .collect();
 
-    // Optimal spring length based on envelope size.
-    let k = NODE_ENVELOPE * 2.0;
+    // Optimal spring length — tight but leaves room for text/tags.
+    let k = NODE_ENVELOPE * 1.4;
     // Node type map for type-based repulsion.
     let type_map: HashMap<Uuid, NodeType> = nodes.iter().map(|n| (n.id.0, n.node_type.clone())).collect();
 
@@ -638,16 +638,16 @@ fn smart_layout(
                 let ddx = px[i] - px[j];
                 let ddy = py[i] - py[j];
                 let dist = (ddx * ddx + ddy * ddy).sqrt().max(0.1);
-                // Base repulsion: stronger than classic FR to prevent overlap.
+                // Base repulsion: just enough to prevent overlap.
                 let mut force = k * k / dist;
-                // Extra repulsion for same-type nodes to spread them visually.
+                // Extra repulsion for same-type nodes (reduced — keep them closer).
                 if type_map.get(&node_ids[i]) == type_map.get(&node_ids[j]) {
-                    force *= 1.5;
+                    force *= 1.2;
                 }
                 // Extra repulsion when nodes are within text-overlap distance.
-                let min_dist = NODE_ENVELOPE * 2.0;
+                let min_dist = NODE_ENVELOPE * 1.8;
                 if dist < min_dist {
-                    force *= (min_dist - dist) / min_dist * 3.0 + 1.0;
+                    force *= (min_dist - dist) / min_dist * 2.0 + 1.0;
                 }
                 let fx = ddx / dist * force;
                 let fy = ddy / dist * force;
@@ -658,15 +658,15 @@ fn smart_layout(
             }
         }
 
-        // Attractive forces — edges as springs.
+        // Attractive forces — edges as springs, stronger to keep connected nodes close.
         for (src, tgt) in edge_pairs {
             let si = idx_map[src];
             let ti = idx_map[tgt];
             let ddx = px[si] - px[ti];
             let ddy = py[si] - py[ti];
             let dist = (ddx * ddx + ddy * ddy).sqrt().max(0.1);
-            // Spring toward ideal length k.
-            let force = (dist - k).abs() / k;
+            // Stronger spring: scale by 2.0x to pull connected nodes together.
+            let force = (dist - k).abs() / k * 2.0;
             let fx = ddx / dist * force;
             let fy = ddy / dist * force;
             disp_x[si] -= fx;
@@ -675,7 +675,7 @@ fn smart_layout(
             disp_y[ti] += fy;
         }
 
-        // Component separation force — push different components apart.
+        // Component separation force — push different components apart (reduced).
         if components.len() > 1 {
             let comp_of: Vec<usize> = node_ids.iter().map(|id| {
                 components.iter().position(|c| c.contains(id)).unwrap_or(0)
@@ -686,7 +686,7 @@ fn smart_layout(
                         let ddx = px[i] - px[j];
                         let ddy = py[i] - py[j];
                         let dist = (ddx * ddx + ddy * ddy).sqrt().max(1.0);
-                        let force = COMPONENT_SPACING * 0.3 / dist;
+                        let force = COMPONENT_SPACING * 0.15 / dist;
                         disp_x[i] += ddx / dist * force;
                         disp_y[i] += ddy / dist * force;
                         disp_x[j] -= ddx / dist * force;
@@ -697,7 +697,7 @@ fn smart_layout(
         }
 
         // Apply displacements with exponential cooling.
-        let temp = 200.0_f64 * (0.95_f64.powi(iter as i32)).max(0.5);
+        let temp = 100.0_f64 * (0.95_f64.powi(iter as i32)).max(0.3);
         for i in 0..n {
             let mag = (disp_x[i] * disp_x[i] + disp_y[i] * disp_y[i])
                 .sqrt()
@@ -708,12 +708,13 @@ fn smart_layout(
         }
     }
 
-    // Center positions around origin.
-    let avg_x = px.iter().sum::<f64>() / n as f64;
-    let avg_y = py.iter().sum::<f64>() / n as f64;
+    // Shift all positions so the top-leftmost node is near the origin
+    // (upper-left corner of the viewport).
+    let min_x = px.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+    let min_y = py.iter().fold(f64::INFINITY, |a, &b| a.min(b));
     for i in 0..n {
-        px[i] -= avg_x;
-        py[i] -= avg_y;
+        px[i] -= min_x;
+        py[i] -= min_y;
     }
 
     for (i, id) in node_ids.iter().enumerate() {
@@ -726,18 +727,18 @@ fn smart_layout(
     let mut min_y = f64::MAX;
     let mut max_y = f64::MIN;
     for &(x, y) in all_positions.values() {
-        min_x = min_x.min(x - 60.0); // include text/tag width
-        max_x = max_x.max(x + 60.0);
-        min_y = min_y.min(y - 22.0); // include top of shape
-        max_y = max_y.max(y + 60.0); // include tag dots below
+        min_x = min_x.min(x - 50.0);
+        max_x = max_x.max(x + 50.0);
+        min_y = min_y.min(y - 22.0);
+        max_y = max_y.max(y + 50.0);
     }
 
     let graph_w = max_x - min_x;
     let graph_h = max_y - min_y;
-    let padding = 80.0;
+    let padding = 50.0;
     let fit_w = viewport_w - padding * 2.0;
     let fit_h = viewport_h - padding * 2.0;
-    let fit_zoom = (fit_w / graph_w).min(fit_h / graph_h).clamp(0.1, 2.0);
+    let fit_zoom = (fit_w / graph_w).min(fit_h / graph_h).clamp(0.3, 3.0);
     let graph_cx = (min_x + max_x) / 2.0;
     let graph_cy = (min_y + max_y) / 2.0;
     let fit_pan_x = viewport_w / 2.0 - graph_cx * fit_zoom;
