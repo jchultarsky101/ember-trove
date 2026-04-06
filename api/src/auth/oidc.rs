@@ -341,10 +341,10 @@ impl OidcClient {
     async fn get_jwks(&self) -> Result<JwkSet, ApiError> {
         {
             let cached = self.jwks.read().await;
-            if let Some(ref cached) = *cached {
-                if cached.fetched_at.elapsed() < JWKS_TTL {
-                    return Ok(cached.jwks.clone());
-                }
+            if let Some(ref cached) = *cached
+                && cached.fetched_at.elapsed() < JWKS_TTL
+            {
+                return Ok(cached.jwks.clone());
             }
         }
 

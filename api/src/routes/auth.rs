@@ -219,10 +219,10 @@ async fn logout(
     jar: PrivateCookieJar,
 ) -> (PrivateCookieJar, Json<RedirectResponse>) {
     // Revoke the refresh token server-side (RFC 7009).
-    if let Some(oidc) = state.oidc.as_ref() {
-        if let Some(refresh_token) = jar.get(REFRESH_COOKIE).map(|c| c.value().to_string()) {
-            oidc.backchannel_logout(&refresh_token).await;
-        }
+    if let Some(oidc) = state.oidc.as_ref()
+        && let Some(refresh_token) = jar.get(REFRESH_COOKIE).map(|c| c.value().to_string())
+    {
+        oidc.backchannel_logout(&refresh_token).await;
     }
 
     let updated_jar = jar
