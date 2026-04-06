@@ -31,12 +31,15 @@ pub fn VersionPanel(
     let restoring: RwSignal<Option<uuid::Uuid>> = RwSignal::new(None);
     let refresh = RwSignal::new(0u32);
 
-    let versions = LocalResource::new(move || async move {
+    let versions = LocalResource::new(move || {
         let _ = refresh.get(); // re-fetch after restore
-        if !open.get() {
-            return Ok(vec![]);
+        let is_open = open.get();
+        async move {
+            if !is_open {
+                return Ok(vec![]);
+            }
+            api::fetch_versions(node_id, Some(20)).await
         }
-        api::fetch_versions(node_id, Some(20)).await
     });
 
     let do_restore = move |version_id: uuid::Uuid| {

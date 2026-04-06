@@ -92,11 +92,14 @@ fn action_colour(action: &ActivityAction) -> &'static str {
 pub fn ActivityPanel(node_id: NodeId) -> impl IntoView {
     let open = RwSignal::new(false);
 
-    let entries = LocalResource::new(move || async move {
-        if !open.get() {
-            return Ok(vec![]);
+    let entries = LocalResource::new(move || {
+        let is_open = open.get();
+        async move {
+            if !is_open {
+                return Ok(vec![]);
+            }
+            api::fetch_activity(node_id, Some(50)).await
         }
-        api::fetch_activity(node_id, Some(50)).await
     });
 
     view! {
