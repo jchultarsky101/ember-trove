@@ -4,6 +4,13 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.75.4] - 2026-04-05
+
+### Changed
+- **CI/CD: migrate GitHub Actions to Node.js 24-compatible versions** — upgraded `actions/checkout` v4→v6, `docker/build-push-action` v6→v7, `docker/login-action` v3→v4, `docker/setup-buildx-action` v3→v4 to eliminate Node.js 20 deprecation warnings.
+
+---
+
 ## [1.51.0] - 2026-03-29
 
 ### Added
