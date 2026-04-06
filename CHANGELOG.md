@@ -4,6 +4,17 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.75.9] - 2026-04-05
+
+### Fixed
+- **Graph view: Auto-arrange now centers the graph in the viewport** — removed the force simulation that was pushing nodes far apart. The hierarchical BFS layering alone produces a clean, non-overlapping layout instantly.
+  - Nodes are now centered in the viewport after auto-arrange (not anchored to a corner)
+  - Minimum zoom is 0.5x so nodes stay readable at any graph size
+  - Disconnected components are tiled in a grid with proper spacing
+  - Computation is now near-instant (no 300-iteration force loop)
+
+---
+
 ## [1.75.8] - 2026-04-05
 
 ### Changed

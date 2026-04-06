@@ -384,15 +384,17 @@ fn force_layout_expanded(
 
 // ── Smart Auto-Arrange Layout ────────────────────────────────────────────────
 
-/// Minimum clearance radius to prevent text/tag overlap (shape + title + tags).
-const NODE_ENVELOPE: f64 = 50.0;
+/// Minimum clearance per-node to prevent text/tag overlap.
+/// Node shape radius (~22) + title pill (at cy+22..cy+36) + tag dots (at cy+42, r=5)
+/// = ~69px below center, ~22px above center → ~91px total vertical envelope.
+const NODE_H: f64 = 90.0;
+/// Horizontal envelope: node diameter + title text width (~5px/char avg).
+const NODE_W: f64 = 80.0;
 
-/// Horizontal spacing between nodes within a layer.
-const LAYER_NODE_SPACING: f64 = 80.0;
-/// Vertical spacing between BFS layers.
-const LAYER_SPACING: f64 = 90.0;
-/// Spacing between disconnected components.
-const COMPONENT_SPACING: f64 = 180.0;
+/// Vertical spacing between BFS layers (center-to-center).
+const LAYER_SPACING: f64 = 100.0;
+/// Spacing between disconnected components (grid cell size).
+const COMPONENT_SPACING: f64 = 200.0;
 
 /// Result of smart layout computation: positions + auto-fit transform.
 struct LayoutResult {
@@ -530,7 +532,8 @@ fn compute_total_degree(
 }
 
 /// Hierarchical initial placement for a single component.
-/// Returns positions centered around (origin_x, origin_y).
+/// Roots at top, BFS layers below, hubs centered within each layer.
+/// Positions start at (origin_x, origin_y) with no overlap.
 fn place_component(
     component: &[Uuid],
     edge_pairs: &[(Uuid, Uuid)],
@@ -541,19 +544,22 @@ fn place_component(
     let layers = assign_layers(component, edge_pairs, in_degree);
     let mut positions = HashMap::new();
 
-    for (li, layer) in layers.iter().enumerate() {
-        // Sort by degree: hubs toward center of the layer.
-        let deg = compute_total_degree(component, edge_pairs);
-        let mut sorted = layer.clone();
-        sorted.sort_by(|a, b| deg[b].cmp(&deg[a])); // descending
+    // Pre-compute total degree for all nodes (for hub sorting).
+    let deg = compute_total_degree(component, edge_pairs);
 
-        let y = origin_y + li as f64 * LAYER_SPACING;
-        let n = sorted.len() as f64;
-        let total_w = (n - 1.0) * LAYER_NODE_SPACING;
-        let start_x = origin_x - total_w / 2.0;
+    for (_li, layer) in layers.iter().enumerate() {
+        let y = origin_y + _li as f64 * LAYER_SPACING;
+        let n = layer.len() as f64;
+        let layer_w = (n - 1.0) * NODE_W;
+        // Center each layer within the component's max width.
+        let start_x = origin_x - layer_w / 2.0;
+
+        // Sort: hubs toward center, others outward.
+        let mut sorted = layer.clone();
+        sorted.sort_by(|a, b| deg[b].cmp(&deg[a]));
 
         for (i, nid) in sorted.iter().enumerate() {
-            let x = start_x + i as f64 * LAYER_NODE_SPACING;
+            let x = start_x + i as f64 * NODE_W;
             positions.insert(*nid, (x, y));
         }
     }
@@ -561,8 +567,10 @@ fn place_component(
     positions
 }
 
-/// Smart layout: hierarchical placement + enhanced force-directed refinement.
-/// Returns positions + auto-fit pan/zoom values.
+/// Smart layout: hierarchical BFS layering with no force simulation.
+/// Roots placed at top, layers fan out below, hubs centered within layers.
+/// Disconnected components arranged in a grid.
+/// Returns positions + auto-fit pan/zoom that guarantees readability.
 fn smart_layout(
     nodes: &[Node],
     edge_pairs: &[(Uuid, Uuid)],
@@ -580,8 +588,8 @@ fn smart_layout(
     if n == 1 {
         return LayoutResult {
             positions: [node_ids[0]].iter().map(|id| (*id, (0.0, 0.0))).collect(),
-            fit_pan_x: viewport_w / 2.0,
-            fit_pan_y: viewport_h / 2.0,
+            fit_pan_x: viewport_w / 2.0 - NODE_W / 2.0,
+            fit_pan_y: viewport_h / 2.0 - NODE_H / 2.0,
             fit_zoom: 1.0,
         };
     }
@@ -589,158 +597,60 @@ fn smart_layout(
     let in_degree = compute_in_degree(&node_ids, edge_pairs);
     let components = find_components(&node_ids, edge_pairs);
 
-    // ── Phase 1: Hierarchical initial placement ─────────────────────────────
+    // ── Phase 1: Hierarchical placement (no force simulation needed) ────────
     let mut all_positions = HashMap::new();
 
     if components.len() == 1 {
-        // Single component: center it.
         let comp = &components[0];
         let pos = place_component(comp, edge_pairs, &in_degree, 0.0, 0.0);
         all_positions.extend(pos);
     } else {
-        // Multiple components: arrange in a grid.
+        // Multiple components: arrange in a grid, each independently laid out.
         let cols = (components.len() as f64).sqrt().ceil() as usize;
         for (ci, comp) in components.iter().enumerate() {
             let col = ci % cols;
             let row = ci / cols;
-            let cx = col as f64 * COMPONENT_SPACING;
-            let cy = row as f64 * COMPONENT_SPACING;
-            let pos = place_component(comp, edge_pairs, &in_degree, cx, cy);
-            all_positions.extend(pos);
-        }
-    }
+            // Find bounding box of this component's placement.
+            let pos = place_component(comp, edge_pairs, &in_degree, 0.0, 0.0);
+            let c_min_x = pos.values().map(|p| p.0).fold(f64::INFINITY, f64::min);
+            let c_max_x = pos.values().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max);
+            let c_min_y = pos.values().map(|p| p.1).fold(f64::INFINITY, f64::min);
+            let c_max_y = pos.values().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
+            let c_w = c_max_x - c_min_x + COMPONENT_SPACING;
+            let c_h = c_max_y - c_min_y + COMPONENT_SPACING;
 
-    // ── Phase 2: Enhanced force-directed refinement ─────────────────────────
-    let idx_map: HashMap<Uuid, usize> = node_ids.iter().enumerate()
-        .map(|(i, id)| (*id, i)).collect();
-
-    let mut px: Vec<f64> = node_ids.iter()
-        .map(|id| all_positions.get(id).map(|p| p.0).unwrap_or(0.0))
-        .collect();
-    let mut py: Vec<f64> = node_ids.iter()
-        .map(|id| all_positions.get(id).map(|p| p.1).unwrap_or(0.0))
-        .collect();
-
-    // Optimal spring length — tight but leaves room for text/tags.
-    let k = NODE_ENVELOPE * 1.4;
-    // Node type map for type-based repulsion.
-    let type_map: HashMap<Uuid, NodeType> = nodes.iter().map(|n| (n.id.0, n.node_type.clone())).collect();
-
-    // Run 300 iterations for quality (user said computation time is OK).
-    let max_iter = 300_u32;
-    for iter in 0..max_iter {
-        let mut disp_x = vec![0.0_f64; n];
-        let mut disp_y = vec![0.0_f64; n];
-
-        // Repulsive forces — all pairs with envelope-based minimum distance.
-        for i in 0..n {
-            for j in (i + 1)..n {
-                let ddx = px[i] - px[j];
-                let ddy = py[i] - py[j];
-                let dist = (ddx * ddx + ddy * ddy).sqrt().max(0.1);
-                // Base repulsion: just enough to prevent overlap.
-                let mut force = k * k / dist;
-                // Extra repulsion for same-type nodes (reduced — keep them closer).
-                if type_map.get(&node_ids[i]) == type_map.get(&node_ids[j]) {
-                    force *= 1.2;
-                }
-                // Extra repulsion when nodes are within text-overlap distance.
-                let min_dist = NODE_ENVELOPE * 1.8;
-                if dist < min_dist {
-                    force *= (min_dist - dist) / min_dist * 2.0 + 1.0;
-                }
-                let fx = ddx / dist * force;
-                let fy = ddy / dist * force;
-                disp_x[i] += fx;
-                disp_y[i] += fy;
-                disp_x[j] -= fx;
-                disp_y[j] -= fy;
+            let ox = col as f64 * c_w;
+            let oy = row as f64 * c_h;
+            for (nid, (px, py)) in pos {
+                all_positions.insert(nid, (px - c_min_x + ox, py - c_min_y + oy));
             }
         }
-
-        // Attractive forces — edges as springs, stronger to keep connected nodes close.
-        for (src, tgt) in edge_pairs {
-            let si = idx_map[src];
-            let ti = idx_map[tgt];
-            let ddx = px[si] - px[ti];
-            let ddy = py[si] - py[ti];
-            let dist = (ddx * ddx + ddy * ddy).sqrt().max(0.1);
-            // Stronger spring: scale by 2.0x to pull connected nodes together.
-            let force = (dist - k).abs() / k * 2.0;
-            let fx = ddx / dist * force;
-            let fy = ddy / dist * force;
-            disp_x[si] -= fx;
-            disp_y[si] -= fy;
-            disp_x[ti] += fx;
-            disp_y[ti] += fy;
-        }
-
-        // Component separation force — push different components apart (reduced).
-        if components.len() > 1 {
-            let comp_of: Vec<usize> = node_ids.iter().map(|id| {
-                components.iter().position(|c| c.contains(id)).unwrap_or(0)
-            }).collect();
-            for i in 0..n {
-                for j in (i + 1)..n {
-                    if comp_of[i] != comp_of[j] {
-                        let ddx = px[i] - px[j];
-                        let ddy = py[i] - py[j];
-                        let dist = (ddx * ddx + ddy * ddy).sqrt().max(1.0);
-                        let force = COMPONENT_SPACING * 0.15 / dist;
-                        disp_x[i] += ddx / dist * force;
-                        disp_y[i] += ddy / dist * force;
-                        disp_x[j] -= ddx / dist * force;
-                        disp_y[j] -= ddy / dist * force;
-                    }
-                }
-            }
-        }
-
-        // Apply displacements with exponential cooling.
-        let temp = 100.0_f64 * (0.95_f64.powi(iter as i32)).max(0.3);
-        for i in 0..n {
-            let mag = (disp_x[i] * disp_x[i] + disp_y[i] * disp_y[i])
-                .sqrt()
-                .max(0.001);
-            let step = mag.min(temp);
-            px[i] += disp_x[i] / mag * step;
-            py[i] += disp_y[i] / mag * step;
-        }
     }
 
-    // Shift all positions so the top-leftmost node is near the origin
-    // (upper-left corner of the viewport).
-    let min_x = px.iter().fold(f64::INFINITY, |a, &b| a.min(b));
-    let min_y = py.iter().fold(f64::INFINITY, |a, &b| a.min(b));
-    for i in 0..n {
-        px[i] -= min_x;
-        py[i] -= min_y;
-    }
-
-    for (i, id) in node_ids.iter().enumerate() {
-        all_positions.insert(*id, (px[i], py[i]));
-    }
-
-    // ── Phase 3: Compute auto-fit transform ─────────────────────────────────
+    // ── Phase 2: Compute bounding box and auto-fit transform ────────────────
     let mut min_x = f64::MAX;
     let mut max_x = f64::MIN;
     let mut min_y = f64::MAX;
     let mut max_y = f64::MIN;
     for &(x, y) in all_positions.values() {
-        min_x = min_x.min(x - 50.0);
-        max_x = max_x.max(x + 50.0);
-        min_y = min_y.min(y - 22.0);
-        max_y = max_y.max(y + 50.0);
+        min_x = min_x.min(x - NODE_W / 2.0);
+        max_x = max_x.max(x + NODE_W / 2.0);
+        min_y = min_y.min(y - NODE_H / 2.0);
+        max_y = max_y.max(y + NODE_H / 2.0);
     }
 
     let graph_w = max_x - min_x;
     let graph_h = max_y - min_y;
-    let padding = 50.0;
-    let fit_w = viewport_w - padding * 2.0;
-    let fit_h = viewport_h - padding * 2.0;
-    let fit_zoom = (fit_w / graph_w).min(fit_h / graph_h).clamp(0.3, 3.0);
     let graph_cx = (min_x + max_x) / 2.0;
     let graph_cy = (min_y + max_y) / 2.0;
+
+    // Fit the graph into the viewport with padding.
+    let padding = 60.0;
+    let fit_w = viewport_w - padding * 2.0;
+    let fit_h = viewport_h - padding * 2.0;
+    // Zoom: fit the graph, but never go below 0.5x (nodes stay readable).
+    let fit_zoom = (fit_w / graph_w).min(fit_h / graph_h).clamp(0.5, 3.0);
+    // Center the graph in the viewport.
     let fit_pan_x = viewport_w / 2.0 - graph_cx * fit_zoom;
     let fit_pan_y = viewport_h / 2.0 - graph_cy * fit_zoom;
 
