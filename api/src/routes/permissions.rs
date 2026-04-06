@@ -17,7 +17,7 @@ use common::{
 use garde::Validate;
 use uuid::Uuid;
 
-use crate::{error::ApiError, state::AppState};
+use crate::{auth::permissions::require_owner, error::ApiError, state::AppState};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -43,9 +43,7 @@ async fn list_permissions(
 /// `PUT /permissions/{id}`
 ///
 /// Updates the role of an existing permission grant.
-/// Only the caller who originally granted the permission (or an owner) should
-/// be able to do this; for now the system is single-user so we just record
-/// the updater in `granted_by`.
+/// Only an owner of the associated node may modify permissions.
 async fn update_permission(
     State(state): State<AppState>,
     Extension(claims): Extension<AuthClaims>,
@@ -54,6 +52,16 @@ async fn update_permission(
 ) -> Result<Json<Permission>, ApiError> {
     req.validate()
         .map_err(|e| ApiError::Validation(e.to_string()))?;
+
+    // Look up the permission to find its parent node
+    let perm = state
+        .permissions
+        .find_by_id(PermissionId(id))
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("permission {id} not found")))?;
+
+    // Require owner on the associated node
+    require_owner(state.permissions.as_ref(), &claims, perm.node_id).await?;
 
     let perm = state
         .permissions
@@ -66,10 +74,22 @@ async fn update_permission(
 ///
 /// Convenience alias to the nested revoke route — operates on the permission
 /// ID directly without needing to know the parent node.
+/// Only an owner of the associated node may revoke permissions.
 async fn delete_permission(
     State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
+    // Look up the permission to find its parent node
+    let perm = state
+        .permissions
+        .find_by_id(PermissionId(id))
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("permission {id} not found")))?;
+
+    // Require owner on the associated node
+    require_owner(state.permissions.as_ref(), &claims, perm.node_id).await?;
+
     state.permissions.revoke(PermissionId(id)).await?;
     Ok(StatusCode::NO_CONTENT)
 }

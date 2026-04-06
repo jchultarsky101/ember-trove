@@ -235,25 +235,38 @@ impl OidcClient {
     }
 
     /// Validate a JWT (typically the ID token), returning decoded claims.
+    ///
+    /// On failure, a generic error is returned to the client while the
+    /// detailed reason is logged server-side to avoid leaking implementation
+    /// details (key IDs, audience mismatches, etc.).
     pub async fn validate_token(&self, token: &str) -> Result<OidcClaims, ApiError> {
         let jwks = self.get_jwks().await?;
 
         let header = jsonwebtoken::decode_header(token)
-            .map_err(|e| ApiError::Unauthorized(format!("invalid JWT header: {e}")))?;
+            .map_err(|e| {
+                tracing::warn!(%e, "JWT decode header failed");
+                ApiError::Unauthorized("invalid token".to_string())
+            })?;
 
         let kid = header
             .kid
             .as_deref()
-            .ok_or_else(|| ApiError::Unauthorized("JWT missing kid".to_string()))?;
+            .ok_or_else(|| ApiError::Unauthorized("invalid token".to_string()))?;
 
         let jwk = jwks
             .keys
             .iter()
             .find(|k| k.common.key_id.as_deref() == Some(kid))
-            .ok_or_else(|| ApiError::Unauthorized(format!("unknown key id: {kid}")))?;
+            .ok_or_else(|| {
+                tracing::warn!(%kid, "JWT references unknown key ID");
+                ApiError::Unauthorized("invalid token".to_string())
+            })?;
 
         let decoding_key = DecodingKey::from_jwk(jwk)
-            .map_err(|e| ApiError::Unauthorized(format!("invalid JWK: {e}")))?;
+            .map_err(|e| {
+                tracing::warn!(%e, %kid, "failed to derive decoding key from JWK");
+                ApiError::Unauthorized("invalid token".to_string())
+            })?;
 
         // Cognito ID tokens set `aud` to the App Client ID.
         // Validate it explicitly so tokens issued for other apps in the same
@@ -263,7 +276,10 @@ impl OidcClient {
         validation.validate_exp = true;
 
         let token_data = jsonwebtoken::decode::<OidcClaims>(token, &decoding_key, &validation)
-            .map_err(|e| ApiError::Unauthorized(format!("JWT validation failed: {e}")))?;
+            .map_err(|e| {
+                tracing::warn!(%e, %kid, "JWT validation failed");
+                ApiError::Unauthorized("invalid token".to_string())
+            })?;
 
         Ok(token_data.claims)
     }

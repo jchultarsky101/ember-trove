@@ -150,6 +150,7 @@ impl PermissionRepo for StubPermissionRepo {
     async fn list(&self, _: NodeId) -> Result<Vec<Permission>, EmberTroveError> { unimplemented!() }
     async fn find(&self, _: NodeId, _: &str) -> Result<Option<Permission>, EmberTroveError> { unimplemented!() }
     async fn list_all(&self, _: Option<NodeId>) -> Result<Vec<Permission>, EmberTroveError> { unimplemented!() }
+    async fn find_by_id(&self, _: PermissionId) -> Result<Option<Permission>, EmberTroveError> { unimplemented!() }
     async fn update(&self, _: PermissionId, _: PermissionRole, _: &str) -> Result<Permission, EmberTroveError> { unimplemented!() }
 }
 

@@ -33,6 +33,12 @@ pub trait PermissionRepo: Send + Sync {
         node_id: Option<NodeId>,
     ) -> Result<Vec<Permission>, EmberTroveError>;
 
+    /// Look up a single permission grant by its ID.
+    async fn find_by_id(
+        &self,
+        id: PermissionId,
+    ) -> Result<Option<Permission>, EmberTroveError>;
+
     /// Update the role on an existing permission by its ID.
     async fn update(
         &self,
@@ -195,6 +201,25 @@ impl PermissionRepo for PgPermissionRepo {
         .map_err(|e| EmberTroveError::Internal(format!("list_all permissions failed: {e}")))?;
 
         rows.into_iter().map(|r| r.into_permission()).collect()
+    }
+
+    async fn find_by_id(
+        &self,
+        id: PermissionId,
+    ) -> Result<Option<Permission>, EmberTroveError> {
+        let row = sqlx::query_as::<_, PermissionRow>(
+            r#"
+            SELECT id, node_id, subject_id, role::text, granted_by, created_at
+            FROM permissions
+            WHERE id = $1
+            "#,
+        )
+        .bind(id.inner())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("find_by_id permission failed: {e}")))?;
+
+        row.map(|r| r.into_permission()).transpose()
     }
 
     async fn update(

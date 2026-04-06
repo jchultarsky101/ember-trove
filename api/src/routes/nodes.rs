@@ -159,6 +159,8 @@ async fn update_node(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateNodeRequest>,
 ) -> Result<Json<Node>, ApiError> {
+    req.validate()
+        .map_err(|e| ApiError::Validation(e.to_string()))?;
     require_editor(state.permissions.as_ref(), &claims, NodeId(id)).await?;
     let node = state.nodes.update(NodeId(id), req).await?;
     sync_wikilinks(&state, node.id, node.body.as_deref().unwrap_or("")).await?;

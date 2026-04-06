@@ -70,11 +70,18 @@ fn default_metadata() -> serde_json::Value {
     serde_json::Value::Object(serde_json::Map::new())
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+/// Maximum allowed markdown body length (1 MiB).
+const MAX_BODY_LEN: usize = 1_048_576;
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, garde::Validate)]
 pub struct UpdateNodeRequest {
+    #[garde(length(max = 500))]
     pub title: Option<String>,
+    #[garde(length(max = MAX_BODY_LEN))]
     pub body: Option<String>,
+    #[garde(skip)]
     pub metadata: Option<serde_json::Value>,
+    #[garde(skip)]
     pub status: Option<NodeStatus>,
 }
 
