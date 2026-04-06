@@ -171,6 +171,7 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                     <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                         "Attachments"
                     </h2>
+                    <Suspense fallback=|| ()>
                     {move || {
                         attachments.with(|r| r.as_ref().and_then(|res| match res {
                             Ok(v) if !v.is_empty() => Some(view! {
@@ -183,6 +184,7 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                             _ => None,
                         }))
                     }}
+                    </Suspense>
                 </button>
             </div>
 
