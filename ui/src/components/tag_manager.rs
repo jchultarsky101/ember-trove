@@ -180,22 +180,14 @@ pub fn TagManager() -> impl IntoView {
                         border-b border-stone-200 dark:border-stone-800">
                 <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">"Tags"</h1>
                 <button
-                    class=move || {
-                        let base = "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg \
-                                    font-medium transition-colors";
-                        if show_create.get() {
-                            format!("{base} bg-stone-100 dark:bg-stone-800 \
-                                    text-stone-600 dark:text-stone-400")
-                        } else {
-                            format!("{base} bg-amber-600 hover:bg-amber-700 text-white")
-                        }
-                    }
+                    class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                        hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                    title=move || if show_create.get() { "Cancel" } else { "New Tag" }
                     on:click=move |_| show_create.update(|v| *v = !*v)
                 >
-                    <span class="material-symbols-outlined" style="font-size: 16px;">
+                    <span class="material-symbols-outlined" style="font-size: 18px;">
                         {move || if show_create.get() { "close" } else { "add" }}
                     </span>
-                    {move || if show_create.get() { "Cancel" } else { "New Tag" }}
                 </button>
             </div>
 
@@ -227,11 +219,12 @@ pub fn TagManager() -> impl IntoView {
                             }
                         />
                         <button
-                            class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white
-                                   text-sm font-medium rounded-lg transition-colors flex-shrink-0"
+                            class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
+                                   hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors cursor-pointer"
+                            title="Create tag"
                             on:click=move |_| do_create()
                         >
-                            "Create"
+                            <span class="material-symbols-outlined">"check"</span>
                         </button>
                     </div>
                     // Colour picker (palette + native escape hatch)
@@ -373,21 +366,20 @@ pub fn TagManager() -> impl IntoView {
                                                                                 on:input=move |ev| edit_name.set(event_target_value(&ev))
                                                                             />
                                                                             <button
-                                                                                class="px-2 py-1 text-xs
-                                                                                       bg-amber-600 text-white
-                                                                                       rounded transition-colors
-                                                                                       hover:bg-amber-700"
+                                                                                class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
+                                                                                       hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors cursor-pointer"
+                                                                                title="Save"
                                                                                 on:click=on_save_edit
                                                                             >
-                                                                                "Save"
+                                                                                <span class="material-symbols-outlined">"check"</span>
                                                                             </button>
                                                                             <button
-                                                                                class="px-2 py-1 text-xs
-                                                                                       text-stone-500
-                                                                                       hover:text-stone-700"
+                                                                                class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                                                                                       hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                                                                                title="Cancel"
                                                                                 on:click=move |_| editing_id.set(None)
                                                                             >
-                                                                                "Cancel"
+                                                                                <span class="material-symbols-outlined">"close"</span>
                                                                             </button>
                                                                         </div>
                                                                         // Colour picker

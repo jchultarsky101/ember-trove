@@ -140,14 +140,14 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
 
                 {move || (is_owner && !collapsed.get()).then(|| view! {
                     <button
-                        class="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400
-                            hover:text-amber-700 dark:hover:text-amber-300 transition-colors cursor-pointer"
+                        class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                            hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                        title=move || if show_form.get() { "Cancel" } else { "Add note" }
                         on:click=move |_| show_form.update(|v| *v = !*v)
                     >
-                        <span class="material-symbols-outlined" style="font-size: 16px;">
+                        <span class="material-symbols-outlined" style="font-size: 18px;">
                             {move || if show_form.get() { "close" } else { "add" }}
                         </span>
-                        {move || if show_form.get() { "Cancel" } else { "Add note" }}
                     </button>
                 })}
             </div>
@@ -172,13 +172,14 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                             <div class="flex items-center justify-between mt-2">
                                 <ColorPicker selected=new_color />
                                 <button
-                                    class="px-3 py-1 text-xs font-medium rounded
-                                        bg-amber-500 hover:bg-amber-600 text-white transition-colors
-                                        cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                    class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
+                                        hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors cursor-pointer
+                                        disabled:opacity-40 disabled:cursor-not-allowed"
+                                    title="Save note"
                                     disabled=move || body.get().trim().is_empty()
                                     on:click=on_add
                                 >
-                                    "Save note"
+                                    <span class="material-symbols-outlined">"check"</span>
                                 </button>
                             </div>
                         </div>
@@ -322,25 +323,24 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                                                             })}
                                                             <div class="flex items-center justify-between mt-2">
                                                                 <ColorPicker selected=edit_color />
-                                                                <div class="flex items-center gap-2">
+                                                                <div class="flex items-center gap-1">
                                                                     <button
-                                                                        class="px-2 py-1 text-xs
-                                                                            text-stone-500 dark:text-stone-400
-                                                                            hover:text-stone-700 dark:hover:text-stone-200
-                                                                            transition-colors cursor-pointer"
+                                                                        class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                                                                            hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                                                                        title="Cancel"
                                                                         on:click=move |_| {
                                                                             editing.set(false);
                                                                             edit_body.set(orig_body.get_untracked());
                                                                             edit_color.set(orig_color.get_untracked());
                                                                         }
                                                                     >
-                                                                        "Cancel"
+                                                                        <span class="material-symbols-outlined">"close"</span>
                                                                     </button>
                                                                     <button
-                                                                        class="px-3 py-1 text-xs font-medium rounded
-                                                                            bg-amber-500 hover:bg-amber-600 text-white
-                                                                            transition-colors cursor-pointer
-                                                                            disabled:opacity-40"
+                                                                        class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
+                                                                            hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors cursor-pointer
+                                                                            disabled:opacity-40 disabled:cursor-not-allowed"
+                                                                        title="Save"
                                                                         disabled=move || edit_body.get().trim().is_empty()
                                                                         on:click=move |_| {
                                                                             let new_body =
@@ -366,7 +366,7 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                                                                             });
                                                                         }
                                                                     >
-                                                                        "Save"
+                                                                        <span class="material-symbols-outlined">"check"</span>
                                                                     </button>
                                                                 </div>
                                                             </div>

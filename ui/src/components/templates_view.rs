@@ -145,12 +145,12 @@ pub fn TemplatesView() -> impl IntoView {
                     "Templates"
                 </h1>
                 <button
-                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
-                           bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer"
+                    class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                           hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                    title="New Template"
                     on:click=start_create
                 >
                     <span class="material-symbols-outlined" style="font-size: 18px;">"add"</span>
-                    "New Template"
                 </button>
             </div>
 
@@ -236,23 +236,22 @@ pub fn TemplatesView() -> impl IntoView {
                                 on:input=move |ev| form_body.set(event_target_value(&ev))
                             />
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-1">
                             <button
-                                class="px-4 py-2 rounded-lg text-sm font-medium
-                                       bg-amber-500 hover:bg-amber-600 text-white
-                                       transition-colors cursor-pointer"
+                                class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
+                                       hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors cursor-pointer"
+                                title="Save"
                                 on:click=on_save
                             >
-                                "Save"
+                                <span class="material-symbols-outlined">"check"</span>
                             </button>
                             <button
-                                class="px-4 py-2 rounded-lg text-sm font-medium
-                                       text-stone-600 dark:text-stone-400
-                                       hover:bg-stone-100 dark:hover:bg-stone-800
-                                       transition-colors cursor-pointer"
+                                class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                                       hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                                title="Cancel"
                                 on:click=cancel_edit
                             >
-                                "Cancel"
+                                <span class="material-symbols-outlined">"close"</span>
                             </button>
                         </div>
                     </div>

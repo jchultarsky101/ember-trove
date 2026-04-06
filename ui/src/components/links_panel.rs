@@ -201,24 +201,26 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
                                                                         {move || edit_error.get().map(|e| view! {
                                                                             <p class="text-xs text-red-500">{e}</p>
                                                                         })}
-                                                                        <div class="flex gap-2">
+                                                                        <div class="flex gap-1">
                                                                             <button
-                                                                                class="px-2.5 py-1 text-xs rounded
-                                                                                       bg-amber-500 hover:bg-amber-600
-                                                                                       text-white font-medium cursor-pointer"
+                                                                                class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
+                                                                                       hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors cursor-pointer"
+                                                                                title="Save"
                                                                                 on:click=move |_| do_save_edit()
-                                                                            >"Save"</button>
+                                                                            >
+                                                                                <span class="material-symbols-outlined">"check"</span>
+                                                                            </button>
                                                                             <button
-                                                                                class="px-2.5 py-1 text-xs rounded
-                                                                                       bg-stone-200 dark:bg-stone-700
-                                                                                       text-stone-700 dark:text-stone-200
-                                                                                       hover:bg-stone-300 dark:hover:bg-stone-600
-                                                                                       cursor-pointer"
+                                                                                class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                                                                                       hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                                                                                title="Cancel"
                                                                                 on:click=move |_| {
                                                                                     editing_id.set(None);
                                                                                     edit_error.set(None);
                                                                                 }
-                                                                            >"Cancel"</button>
+                                                                            >
+                                                                                <span class="material-symbols-outlined">"close"</span>
+                                                                            </button>
                                                                         </div>
                                                                     </div>
                                                                 }.into_any()
@@ -319,26 +321,28 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
                                                     {move || add_error.get().map(|e| view! {
                                                         <p class="text-xs text-red-500">{e}</p>
                                                     })}
-                                                    <div class="flex gap-2">
+                                                    <div class="flex gap-1">
                                                         <button
-                                                            class="px-2.5 py-1 text-xs rounded
-                                                                   bg-amber-500 hover:bg-amber-600
-                                                                   text-white font-medium cursor-pointer"
+                                                            class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
+                                                                   hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors cursor-pointer"
+                                                            title="Add link"
                                                             on:click=move |_| do_add()
-                                                        >"Add"</button>
+                                                        >
+                                                            <span class="material-symbols-outlined">"check"</span>
+                                                        </button>
                                                         <button
-                                                            class="px-2.5 py-1 text-xs rounded
-                                                                   bg-stone-200 dark:bg-stone-700
-                                                                   text-stone-700 dark:text-stone-200
-                                                                   hover:bg-stone-300 dark:hover:bg-stone-600
-                                                                   cursor-pointer"
+                                                            class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                                                                   hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                                                            title="Cancel"
                                                             on:click=move |_| {
                                                                 show_add.set(false);
                                                                 new_name.set(String::new());
                                                                 new_url.set(String::new());
                                                                 add_error.set(None);
                                                             }
-                                                        >"Cancel"</button>
+                                                        >
+                                                            <span class="material-symbols-outlined">"close"</span>
+                                                        </button>
                                                     </div>
                                                 </div>
                                             })}

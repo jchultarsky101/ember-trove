@@ -163,14 +163,14 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
                     "Tasks"
                 </h3>
                 <button
-                    class="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400
-                        hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
+                    class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                        hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                    title=move || if show_form.get() { "Cancel" } else { "Add task" }
                     on:click=move |_| show_form.update(|v| *v = !*v)
                 >
-                    <span class="material-symbols-outlined text-sm">
-                        {move || if show_form.get() { "remove" } else { "add" }}
+                    <span class="material-symbols-outlined" style="font-size: 18px;">
+                        {move || if show_form.get() { "close" } else { "add" }}
                     </span>
-                    {move || if show_form.get() { "Cancel" } else { "Add task" }}
                 </button>
             </div>
 
@@ -210,12 +210,16 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
                         />
                         <span class="flex-1"/>
                         <button
-                            class="text-xs bg-amber-500 hover:bg-amber-600 text-white
-                                rounded px-3 py-1 transition-colors disabled:opacity-50"
+                            class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
+                                hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors cursor-pointer
+                                disabled:opacity-50 disabled:cursor-not-allowed"
+                            title=move || if adding.get() { "Adding…" } else { "Add task" }
                             on:click=on_add
                             disabled=move || adding.get()
                         >
-                            {move || if adding.get() { "Adding…" } else { "Add" }}
+                            <span class="material-symbols-outlined">
+                                {move || if adding.get() { "hourglass_empty" } else { "add" }}
+                            </span>
                         </button>
                     </div>
                     {move || add_error.get().map(|msg| view! {
@@ -475,21 +479,23 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
                                 />
                                 <span class="flex-1"/>
                                 <button
-                                    class="text-xs bg-amber-500 hover:bg-amber-600 text-white
-                                        rounded px-2 py-0.5 transition-colors"
+                                    class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
+                                        hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors cursor-pointer"
+                                    title="Save"
                                     on:click=move |_| do_save_edit()
                                 >
-                                    "Save"
+                                    <span class="material-symbols-outlined">"check"</span>
                                 </button>
                                 <button
-                                    class="text-xs text-stone-400 hover:text-stone-600
-                                        dark:hover:text-stone-300 transition-colors"
+                                    class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                                        hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                                    title="Cancel"
                                     on:click=move |_| {
                                         editing_title.set(false);
                                         edit_title.set(orig_title.get_untracked());
                                     }
                                 >
-                                    "Cancel"
+                                    <span class="material-symbols-outlined">"close"</span>
                                 </button>
                             </div>
                         </div>

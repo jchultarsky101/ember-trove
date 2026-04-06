@@ -4,6 +4,16 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.75.10] - 2026-04-05
+
+### Changed
+- **UI: unified save/cancel buttons across all sections** — replaced text-label buttons with consistent icon-only buttons (`check` for save, `close` for cancel) everywhere:
+  - Task panel, My Day view, Note panel, Links panel, Tag Manager, Templates view
+- **UI: unified add/cancel toggles** — section header "Add" buttons now use icon-only (`add` ↔ `close`) in Task panel, Note panel, Tag Manager, and Templates view
+- All icon buttons share the same visual language: `p-1.5 rounded-lg`, green hover for save, stone hover for cancel
+
+---
+
 ## [1.75.9] - 2026-04-05
 
 ### Fixed

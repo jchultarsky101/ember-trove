@@ -472,21 +472,23 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                                 />
                                 <span class="flex-1"/>
                                 <button
-                                    class="text-xs bg-amber-500 hover:bg-amber-600 text-white
-                                        rounded px-2.5 py-0.5 transition-colors cursor-pointer"
+                                    class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
+                                        hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors cursor-pointer"
+                                    title="Save"
                                     on:click=move |_| do_save()
                                 >
-                                    "Save"
+                                    <span class="material-symbols-outlined">"check"</span>
                                 </button>
                                 <button
-                                    class="text-xs text-stone-400 hover:text-stone-700
-                                        dark:hover:text-stone-200 transition-colors cursor-pointer"
+                                    class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
+                                        hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                                    title="Cancel"
                                     on:click=move |_| {
                                         editing.set(false);
                                         edit_title.set(orig_title.get_untracked());
                                     }
                                 >
-                                    "Cancel"
+                                    <span class="material-symbols-outlined">"close"</span>
                                 </button>
                             </div>
                         </div>
