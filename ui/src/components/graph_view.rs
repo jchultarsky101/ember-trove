@@ -33,9 +33,9 @@ use crate::{
     components::node_meta::{status_color_hex, status_label, type_icon, type_label},
 };
 
-const W: f64 = 1000.0;
-const H: f64 = 700.0;
-const MARGIN: f64 = 80.0;
+const W: f64 = 3000.0;
+const H: f64 = 2000.0;
+const MARGIN: f64 = 150.0;
 /// Effective radius used for edge start/end offset (conservative for all shapes).
 const NODE_R: f64 = 22.0;
 const ARROW_OFFSET: f64 = NODE_R + 4.0;
@@ -44,9 +44,13 @@ const TEXT_Y_OFFSET: f64 = 33.0;
 
 /// Minimap overlay dimensions (pixels) and scale factors relative to the canvas.
 const MINI_W: f64 = 160.0;
-const MINI_H: f64 = 112.0; // 160 × (700/1000)
+const MINI_H: f64 = 106.667; // 160 × (2000/3000)
 const MINI_SCALE_X: f64 = MINI_W / W;
 const MINI_SCALE_Y: f64 = MINI_H / H;
+
+/// Minimum zoom (out) and maximum zoom (in).
+const ZOOM_MIN: f64 = 0.05;
+const ZOOM_MAX: f64 = 16.0;
 
 // ── Hover card data ──────────────────────────────────────────────────────────
 
@@ -292,24 +296,34 @@ fn compute_path(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
 // ── Layout ───────────────────────────────────────────────────────────────────
 
 fn force_layout(node_ids: &[Uuid], edge_pairs: &[(Uuid, Uuid)]) -> HashMap<Uuid, (f64, f64)> {
+    force_layout_expanded(node_ids, edge_pairs, W, H, MARGIN)
+}
+
+fn force_layout_expanded(
+    node_ids: &[Uuid],
+    edge_pairs: &[(Uuid, Uuid)],
+    cw: f64,
+    ch: f64,
+    margin: f64,
+) -> HashMap<Uuid, (f64, f64)> {
     let n = node_ids.len();
     if n == 0 {
         return HashMap::new();
     }
     if n == 1 {
         let mut m = HashMap::new();
-        m.insert(node_ids[0], (W / 2.0, H / 2.0));
+        m.insert(node_ids[0], (cw / 2.0, ch / 2.0));
         return m;
     }
 
-    let uw = W - 2.0 * MARGIN;
-    let uh = H - 2.0 * MARGIN;
+    let uw = cw - 2.0 * margin;
+    let uh = ch - 2.0 * margin;
 
     let mut px: Vec<f64> = (0..n)
-        .map(|_| MARGIN + js_sys::Math::random() * uw)
+        .map(|_| margin + js_sys::Math::random() * uw)
         .collect();
     let mut py: Vec<f64> = (0..n)
-        .map(|_| MARGIN + js_sys::Math::random() * uh)
+        .map(|_| margin + js_sys::Math::random() * uh)
         .collect();
 
     let k = (uw * uh / n as f64).sqrt();
@@ -356,8 +370,8 @@ fn force_layout(node_ids: &[Uuid], edge_pairs: &[(Uuid, Uuid)]) -> HashMap<Uuid,
                 .sqrt()
                 .max(0.001);
             let step = mag.min(temp);
-            px[i] = (px[i] + disp_x[i] / mag * step).clamp(MARGIN, W - MARGIN);
-            py[i] = (py[i] + disp_y[i] / mag * step).clamp(MARGIN, H - MARGIN);
+            px[i] = (px[i] + disp_x[i] / mag * step).clamp(margin, cw - margin);
+            py[i] = (py[i] + disp_y[i] / mag * step).clamp(margin, ch - margin);
         }
     }
 
@@ -396,6 +410,9 @@ pub fn GraphView() -> impl IntoView {
     let drag_offset: RwSignal<(f64, f64)> = RwSignal::new((0.0, 0.0));
     let did_drag = RwSignal::new(false);
 
+    // Re-layout trigger: when set to true, re-runs the force simulation.
+    let re_layout: RwSignal<bool> = RwSignal::new(false);
+
     let edge_hover: RwSignal<Option<EdgeHover>> = RwSignal::new(None);
     let node_hover: RwSignal<Option<NodeHoverInfo>> = RwSignal::new(None);
 
@@ -428,6 +445,8 @@ pub fn GraphView() -> impl IntoView {
     let dot_clicked = RwSignal::new(false);
 
     Effect::new(move |_| {
+        // Re-layout effect: re-run when re_layout signal is set to true.
+        let _trigger = re_layout.get();
         spawn_local(async move {
             match fetch_nodes().await {
                 Err(e) => {
@@ -440,7 +459,14 @@ pub fn GraphView() -> impl IntoView {
                     let edge_pairs: Vec<(Uuid, Uuid)> =
                         edges.iter().map(|e| (e.source_id.0, e.target_id.0)).collect();
 
-                    let mut layout = force_layout(&node_ids, &edge_pairs);
+                    // Auto-grow: increase effective canvas area based on node count.
+                    let n = node_ids.len() as f64;
+                    let grow_factor = (n / 50.0).clamp(1.0, 4.0);
+                    let eff_w = W * grow_factor;
+                    let eff_h = H * grow_factor;
+                    let eff_margin = MARGIN * grow_factor;
+
+                    let mut layout = force_layout_expanded(&node_ids, &edge_pairs, eff_w, eff_h, eff_margin);
 
                     if let Ok(saved) = fetch_positions().await {
                         for pos in saved {
@@ -509,6 +535,19 @@ pub fn GraphView() -> impl IntoView {
                 >
                     "Fit"
                 </button>
+                <button
+                    class="px-2.5 py-1 rounded-lg text-xs font-medium
+                           bg-white/80 dark:bg-stone-900/85 backdrop-blur-sm
+                           border border-stone-200 dark:border-stone-700
+                           text-stone-600 dark:text-stone-300
+                           hover:bg-stone-50 dark:hover:bg-stone-800 cursor-pointer transition-colors"
+                    title="Re-run force-directed layout to spread nodes apart"
+                    on:click=move |_| {
+                        re_layout.set(true);
+                    }
+                >
+                    "Re-layout"
+                </button>
 
                 // ── Zoom controls ─────────────────────────────────────────────
                 // Visible on all screen sizes; essential on mobile where wheel
@@ -521,7 +560,7 @@ pub fn GraphView() -> impl IntoView {
                                hover:bg-stone-100 dark:hover:bg-stone-800
                                cursor-pointer transition-colors"
                         title="Zoom out (−)"
-                        on:click=move |_| zoom.update(|z| *z = (*z * 0.8).clamp(0.1, 8.0))
+                        on:click=move |_| zoom.update(|z| *z = (*z * 0.8).clamp(ZOOM_MIN, ZOOM_MAX))
                     >
                         <span class="material-symbols-outlined" style="font-size: 14px;">"remove"</span>
                     </button>
@@ -537,7 +576,7 @@ pub fn GraphView() -> impl IntoView {
                                hover:bg-stone-100 dark:hover:bg-stone-800
                                cursor-pointer transition-colors"
                         title="Zoom in (+)"
-                        on:click=move |_| zoom.update(|z| *z = (*z * 1.25).clamp(0.1, 8.0))
+                        on:click=move |_| zoom.update(|z| *z = (*z * 1.25).clamp(ZOOM_MIN, ZOOM_MAX))
                     >
                         <span class="material-symbols-outlined" style="font-size: 14px;">"add"</span>
                     </button>
@@ -1469,13 +1508,20 @@ pub fn GraphView() -> impl IntoView {
                             if let Some(nid) = drag_node.get_untracked() {
                                 ev.prevent_default();
                                 did_drag.set(true);
+                                // Compute expanded bounds same as the layout effect.
+                                let n = positions.get().len() as f64;
+                                let grow_factor = (n / 50.0).clamp(1.0, 4.0);
+                                let eff_w = W * grow_factor;
+                                let eff_h = H * grow_factor;
+                                let eff_margin = MARGIN * grow_factor;
+
                                 let mx = (ev.client_x() as f64 - pan_x.get_untracked())
                                     / zoom.get_untracked();
                                 let my = (ev.client_y() as f64 - pan_y.get_untracked())
                                     / zoom.get_untracked();
                                 let (ox, oy) = drag_offset.get_untracked();
-                                let new_x = (mx - ox).clamp(MARGIN, W - MARGIN);
-                                let new_y = (my - oy).clamp(MARGIN, H - MARGIN);
+                                let new_x = (mx - ox).clamp(eff_margin, eff_w - eff_margin);
+                                let new_y = (my - oy).clamp(eff_margin, eff_h - eff_margin);
                                 positions.update(|map| {
                                     map.insert(nid, (new_x, new_y));
                                 });
@@ -1513,7 +1559,7 @@ pub fn GraphView() -> impl IntoView {
                         on:wheel=move |ev: WheelEvent| {
                             ev.prevent_default();
                             let factor = if ev.delta_y() > 0.0 { 0.9_f64 } else { 1.1_f64 };
-                            zoom.update(|z| *z = (*z * factor).clamp(0.1, 8.0));
+                            zoom.update(|z| *z = (*z * factor).clamp(ZOOM_MIN, ZOOM_MAX));
                         }
                         // ── Touch: single-finger pan, two-finger pinch-to-zoom ──────
                         on:touchstart=move |ev: TouchEvent| {
@@ -1575,7 +1621,7 @@ pub fn GraphView() -> impl IntoView {
                                                 .get_untracked()
                                                 * dist
                                                 / start)
-                                                .clamp(0.1, 8.0);
+                                                .clamp(ZOOM_MIN, ZOOM_MAX);
                                             zoom.set(new_zoom);
                                         }
                                     }

@@ -4,6 +4,16 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.75.5] - 2026-04-05
+
+### Changed
+- **Graph view: significantly expanded work area** — virtual canvas enlarged from 1000×700 to 3000×2000 (~6× more space) with proportionally scaled margins and minimap.
+- **Graph view: auto-grow canvas** — force layout bounds now dynamically expand based on node count (up to 4× for 200+ nodes), so the canvas grows with your database.
+- **Graph view: "Re-layout" button** — new toolbar button that re-runs the force-directed simulation to spread nodes apart when the graph gets crowded.
+- **Graph view: wider zoom range** — zoom out to 0.05× (was 0.1×) and zoom in to 16× (was 8×) for finer control over large graphs.
+
+---
+
 ## [1.75.4] - 2026-04-05
 
 ### Changed
