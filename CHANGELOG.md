@@ -4,6 +4,13 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.75.11] - 2026-04-06
+
+### Changed
+- **Housekeeping**: removed dead `force_layout()` function, updated module doc comment, bumped `api` version to match current release, standardized `edition = "2024"` across all crates, added CHANGELOG gap note for versions 1.52.0–1.75.3.
+
+---
+
 ## [1.75.10] - 2026-04-05
 
 ### Changed
@@ -69,10 +76,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+<!-- Note: versions 1.52.0–1.75.3 (24 releases) are documented in git commit history: https://github.com/jchultarsky101/ember-trove/tags -->
+
+---
+
 ## [1.51.0] - 2026-03-29
 
 ### Added
-- **Calendar view** — new sidebar entry (between My Day and Dashboard) showing a month grid of tasks that have a due date. Tasks without a due date are not shown. Navigate forward/backward by month with chevron buttons or jump to the current month with "Today". Each day cell shows colour-coded chips (priority tint + text) for its tasks; done/cancelled tasks are struck through. Clicking a chip opens the node detail view. Today's cell is highlighted with an amber ring. The grid is Mon–Sun with leading blank cells for offset days.
+- **Calendar view** — new sidebar entry (between My Day and Dashboard) showing a month grid of tasks that have a due date. Navigate forward/backward by month with chevron buttons or jump to the current month with "Today". Each day cell shows colour-coded chips (priority tint + text) for its tasks; done/cancelled tasks are struck through. Clicking a chip opens the node detail view. Today's cell is highlighted with an amber ring. The grid is Mon–Sun with leading blank cells for offset days.
 - **`GET /api/calendar?year={y}&month={m}`** endpoint — returns `Vec<MyDayTask>` for tasks whose `due_date` falls within the given calendar month. Accessible to any authenticated user; results scoped to the caller's own tasks.
 
 ---

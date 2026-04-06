@@ -1,9 +1,10 @@
-/// Visual knowledge graph — force-directed SVG node-link diagram.
+/// Visual knowledge graph — SVG node-link diagram with hierarchical layout.
 ///
-/// Fetches all nodes and edges, runs a Fruchterman-Reingold layout in WASM,
-/// then overlays saved positions from the API.  Nodes are draggable; positions
-/// are persisted to the DB on mouse-up.  The canvas supports pan (drag on
-/// background) and zoom (wheel).
+/// Fetches all nodes and edges, runs a BFS-layered smart layout that places
+/// root nodes at the top and connected nodes in layers below.  An "Auto-arrange"
+/// button re-computes positions.  Saved positions from the API are overlaid.
+/// Nodes are draggable; positions are persisted to the DB on mouse-up.
+/// The canvas supports pan (drag on background) and zoom (wheel).
 ///
 /// Node shapes convey type: circle=Article, diamond=Project, rounded-rect=Area,
 /// hexagon=Resource, triangle=Reference.  Each type has a distinct fill colour.
@@ -294,10 +295,6 @@ fn compute_path(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
 }
 
 // ── Layout ───────────────────────────────────────────────────────────────────
-
-fn force_layout(node_ids: &[Uuid], edge_pairs: &[(Uuid, Uuid)]) -> HashMap<Uuid, (f64, f64)> {
-    force_layout_expanded(node_ids, edge_pairs, W, H, MARGIN)
-}
 
 fn force_layout_expanded(
     node_ids: &[Uuid],
