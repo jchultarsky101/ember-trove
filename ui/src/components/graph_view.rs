@@ -603,11 +603,19 @@ fn smart_layout(
         all_positions.extend(pos);
     } else {
         // Multiple components: arrange in a grid, each independently laid out.
+        // Two-pass: first compute each component's bounding box and accumulate
+        // per-column max widths + per-row max heights, then place with cumulative
+        // offsets so wider/taller components in one cell cannot overlap neighbours.
         let cols = (components.len() as f64).sqrt().ceil() as usize;
+        let rows = components.len().div_ceil(cols);
+        struct CompPlacement { pos: HashMap<Uuid, (f64, f64)>, min_x: f64, min_y: f64 }
+        let mut placements: Vec<CompPlacement> = Vec::new();
+        let mut col_widths = vec![0.0_f64; cols];
+        let mut row_heights = vec![0.0_f64; rows];
+
         for (ci, comp) in components.iter().enumerate() {
             let col = ci % cols;
             let row = ci / cols;
-            // Find bounding box of this component's placement.
             let pos = place_component(comp, edge_pairs, &in_degree, 0.0, 0.0);
             let c_min_x = pos.values().map(|p| p.0).fold(f64::INFINITY, f64::min);
             let c_max_x = pos.values().map(|p| p.0).fold(f64::NEG_INFINITY, f64::max);
@@ -615,12 +623,44 @@ fn smart_layout(
             let c_max_y = pos.values().map(|p| p.1).fold(f64::NEG_INFINITY, f64::max);
             let c_w = c_max_x - c_min_x + COMPONENT_SPACING;
             let c_h = c_max_y - c_min_y + COMPONENT_SPACING;
+            col_widths[col] = col_widths[col].max(c_w);
+            row_heights[row] = row_heights[row].max(c_h);
+            placements.push(CompPlacement { pos, min_x: c_min_x, min_y: c_min_y });
+        }
 
-            let ox = col as f64 * c_w;
-            let oy = row as f64 * c_h;
-            for (nid, (px, py)) in pos {
-                all_positions.insert(nid, (px - c_min_x + ox, py - c_min_y + oy));
+        // Cumulative column/row offsets derived from the widest/tallest cell.
+        let col_offsets: Vec<f64> = (0..cols)
+            .map(|i| col_widths[..i].iter().sum())
+            .collect();
+        let row_offsets: Vec<f64> = (0..rows)
+            .map(|i| row_heights[..i].iter().sum())
+            .collect();
+
+        for (ci, p) in placements.into_iter().enumerate() {
+            let col = ci % cols;
+            let row = ci / cols;
+            let ox = col_offsets[col];
+            let oy = row_offsets[row];
+            for (nid, (px, py)) in p.pos {
+                all_positions.insert(nid, (px - p.min_x + ox, py - p.min_y + oy));
             }
+        }
+    }
+
+    // ── Phase 1.5: Translate so all positions fall inside drag-and-drop bounds ─
+    // Drag clamping enforces [eff_margin, eff_{W,H} - eff_margin].  Auto-arrange
+    // produces positions near (0,0) which is outside that range, causing a
+    // visible snap the first time the user clicks a freshly-arranged node.
+    {
+        let grow_factor = (n as f64 / 50.0).clamp(1.0, 4.0);
+        let eff_margin = MARGIN * grow_factor;
+        let raw_min_x = all_positions.values().map(|p| p.0).fold(f64::INFINITY, f64::min);
+        let raw_min_y = all_positions.values().map(|p| p.1).fold(f64::INFINITY, f64::min);
+        let shift_x = eff_margin - raw_min_x;
+        let shift_y = eff_margin - raw_min_y;
+        for pos in all_positions.values_mut() {
+            pos.0 += shift_x;
+            pos.1 += shift_y;
         }
     }
 
