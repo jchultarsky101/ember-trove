@@ -4,6 +4,21 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.75.8] - 2026-04-05
+
+### Changed
+- **Graph view: unified toolbar design** — all controls (Add Edge, Fit, Auto-arrange, zoom) are now in a single cohesive container with consistent height, dividers, and visual treatment.
+- **Graph view: manual zoom input** — the zoom percentage is now an editable number field. Type any value (e.g. `100` for 100%) and press Enter to set it exactly. The field syncs bidirectionally with wheel and pinch-to-zoom gestures.
+
+---
+
+## [1.75.7] - 2026-04-05
+
+### Fixed
+- **Graph view: tighten auto-arrange spacing** — nodes now cluster closer together with reduced spacing constants (120→80px horizontal, 110→90px vertical), stronger edge attraction, and weaker repulsion. Layout anchored to upper-left corner instead of centered for immediate visibility.
+
+---
+
 ## [1.75.6] - 2026-04-05
 
 ### Added

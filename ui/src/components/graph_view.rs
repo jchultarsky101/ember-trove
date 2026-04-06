@@ -764,6 +764,8 @@ pub fn GraphView() -> impl IntoView {
     let pan_x = RwSignal::new(0.0_f64);
     let pan_y = RwSignal::new(0.0_f64);
     let zoom = RwSignal::new(1.0_f64);
+    // Editable zoom percentage input (synced bidirectionally with `zoom`).
+    let zoom_input: RwSignal<String> = RwSignal::new("100".to_string());
     let panning = RwSignal::new(false);
     let last_mx = RwSignal::new(0.0_f64);
     let last_my = RwSignal::new(0.0_f64);
@@ -885,6 +887,7 @@ pub fn GraphView() -> impl IntoView {
             pan_x.set(result.fit_pan_x);
             pan_y.set(result.fit_pan_y);
             zoom.set(result.fit_zoom);
+            zoom_input.set(format!("{:.0}", result.fit_zoom * 100.0));
 
             re_layout.set(false);
             re_layouting.set(false);
@@ -900,18 +903,23 @@ pub fn GraphView() -> impl IntoView {
         <div class="relative w-full h-full overflow-hidden bg-stone-50 dark:bg-stone-950 select-none">
             // ── Legend overlay ───────────────────────────────────────────────
             // ── Toolbar (top-right) ──────────────────────────────────────────
-            <div class="absolute top-3 right-3 z-10 flex items-center gap-2">
+            // Single unified container: action buttons + zoom controls,
+            // all sharing the same visual language.
+            <div class="absolute top-3 right-3 z-10 flex items-center gap-0
+                        bg-white/85 dark:bg-stone-900/90 backdrop-blur-md
+                        border border-stone-200 dark:border-stone-700
+                        rounded-xl overflow-hidden shadow-lg">
+                // ── Action buttons ─────────────────────────────────────────
                 // Add Edge button — toggles edge-create mode.
                 <button
                     class=move || {
-                        let base = "px-2.5 py-1 rounded-lg text-xs font-medium backdrop-blur-sm \
-                                    border cursor-pointer transition-colors flex items-center gap-1";
+                        let base = "h-8 px-2.5 text-xs font-medium \
+                                    cursor-pointer transition-colors flex items-center gap-1 \
+                                    border-r border-stone-200 dark:border-stone-700";
                         if edge_create_mode.get() {
-                            format!("{base} bg-amber-500/90 border-amber-600 text-white")
+                            format!("{base} bg-amber-500/90 text-white")
                         } else {
-                            format!("{base} bg-white/80 dark:bg-stone-900/85 \
-                                     border-stone-200 dark:border-stone-700 \
-                                     text-stone-600 dark:text-stone-300 \
+                            format!("{base} text-stone-600 dark:text-stone-300 \
                                      hover:bg-stone-50 dark:hover:bg-stone-800")
                         }
                     }
@@ -928,32 +936,32 @@ pub fn GraphView() -> impl IntoView {
                     <span class="material-symbols-outlined" style="font-size: 14px;">"add_link"</span>
                     {move || if edge_create_mode.get() { "Cancel" } else { "Add Edge" }}
                 </button>
+                // Fit button
                 <button
-                    class="px-2.5 py-1 rounded-lg text-xs font-medium
-                           bg-white/80 dark:bg-stone-900/85 backdrop-blur-sm
-                           border border-stone-200 dark:border-stone-700
+                    class="h-8 px-2.5 text-xs font-medium
                            text-stone-600 dark:text-stone-300
-                           hover:bg-stone-50 dark:hover:bg-stone-800 cursor-pointer transition-colors"
+                           hover:bg-stone-50 dark:hover:bg-stone-800 cursor-pointer transition-colors
+                           border-r border-stone-200 dark:border-stone-700"
                     title="Fit all nodes into view"
                     on:click=move |_| {
                         pan_x.set(0.0);
                         pan_y.set(0.0);
                         zoom.set(1.0);
+                        zoom_input.set("100".to_string());
                     }
                 >
                     "Fit"
                 </button>
+                // Auto-arrange button
                 <button
                     class=move || {
-                        let base = "px-2.5 py-1 rounded-lg text-xs font-medium \
-                                    backdrop-blur-sm border cursor-pointer transition-colors";
+                        let base = "h-8 px-2.5 text-xs font-medium \
+                                    cursor-pointer transition-colors \
+                                    border-r border-stone-200 dark:border-stone-700";
                         if re_layouting.get() {
-                            format!("{base} bg-amber-500/90 border-amber-600 text-white \
-                                     opacity-70 cursor-wait")
+                            format!("{base} bg-amber-500/90 text-white opacity-70 cursor-wait")
                         } else {
-                            format!("{base} bg-white/80 dark:bg-stone-900/85 \
-                                     border-stone-200 dark:border-stone-700 \
-                                     text-stone-600 dark:text-stone-300 \
+                            format!("{base} text-stone-600 dark:text-stone-300 \
                                      hover:bg-stone-50 dark:hover:bg-stone-800")
                         }
                     }
@@ -978,37 +986,77 @@ pub fn GraphView() -> impl IntoView {
                     }}
                 </button>
 
-                // ── Zoom controls ─────────────────────────────────────────────
-                // Visible on all screen sizes; essential on mobile where wheel
-                // and pinch-to-zoom may be unavailable.
-                <div class="flex items-center gap-0 rounded-lg overflow-hidden
-                            border border-stone-200 dark:border-stone-700
-                            bg-white/80 dark:bg-stone-900/85 backdrop-blur-sm">
+                // ── Zoom controls ──────────────────────────────────────────
+                // Zoom-out button | manual input | Zoom-in button
+                <div class="flex items-center">
                     <button
-                        class="px-2 py-1 text-stone-600 dark:text-stone-300
+                        class="h-8 w-8 flex items-center justify-center
+                               text-stone-500 dark:text-stone-400
                                hover:bg-stone-100 dark:hover:bg-stone-800
+                               hover:text-stone-700 dark:hover:text-stone-200
                                cursor-pointer transition-colors"
                         title="Zoom out (−)"
-                        on:click=move |_| zoom.update(|z| *z = (*z * 0.8).clamp(ZOOM_MIN, ZOOM_MAX))
+                        on:click=move |_| {
+                            zoom.update(|z| *z = (*z * 0.8).clamp(ZOOM_MIN, ZOOM_MAX));
+                            zoom_input.set(format!("{:.0}", zoom.get_untracked() * 100.0));
+                        }
                     >
-                        <span class="material-symbols-outlined" style="font-size: 14px;">"remove"</span>
+                        <span class="material-symbols-outlined" style="font-size: 16px;">"remove"</span>
                     </button>
-                    <span
-                        class="px-2 py-1 text-xs font-medium text-stone-500 dark:text-stone-400
-                               border-x border-stone-200 dark:border-stone-700 min-w-[3.5rem] text-center
-                               tabular-nums select-none"
-                    >
-                        {move || format!("{:.0}%", zoom.get() * 100.0)}
-                    </span>
+                    // Manual zoom input — type a percentage and press Enter.
+                    <input
+                        type="number"
+                        min="5"
+                        max="1600"
+                        step="5"
+                        class="w-14 h-6 text-center text-xs font-medium
+                               bg-transparent text-stone-700 dark:text-stone-200
+                               border-x border-stone-200 dark:border-stone-700
+                               focus:outline-none focus:bg-stone-100 dark:focus:bg-stone-800
+                               tabular-nums appearance-none
+                               [&::-webkit-inner-spin-button]:appearance-none
+                               [&::-webkit-outer-spin-button]:appearance-none
+                               [-moz-appearance:textfield]"
+                        prop:value=move || zoom_input.get()
+                        on:keydown=move |ev: web_sys::KeyboardEvent| {
+                            if ev.key() == "Enter" {
+                                let val = event_target_value(&ev);
+                                if let Ok(pct) = val.parse::<f64>() {
+                                    let new_zoom = (pct / 100.0).clamp(ZOOM_MIN, ZOOM_MAX);
+                                    zoom.set(new_zoom);
+                                    zoom_input.set(format!("{:.0}", pct));
+                                }
+                                ev.prevent_default();
+                            }
+                        }
+                        on:blur=move |ev: web_sys::FocusEvent| {
+                            // On blur, snap to current zoom if invalid.
+                            let val = event_target_value(&ev);
+                            if let Ok(pct) = val.parse::<f64>() {
+                                let new_zoom = (pct / 100.0).clamp(ZOOM_MIN, ZOOM_MAX);
+                                zoom.set(new_zoom);
+                                zoom_input.set(format!("{:.0}", new_zoom * 100.0));
+                            } else {
+                                zoom_input.set(format!("{:.0}", zoom.get_untracked() * 100.0));
+                            }
+                        }
+                    />
                     <button
-                        class="px-2 py-1 text-stone-600 dark:text-stone-300
+                        class="h-8 w-8 flex items-center justify-center
+                               text-stone-500 dark:text-stone-400
                                hover:bg-stone-100 dark:hover:bg-stone-800
+                               hover:text-stone-700 dark:hover:text-stone-200
                                cursor-pointer transition-colors"
                         title="Zoom in (+)"
-                        on:click=move |_| zoom.update(|z| *z = (*z * 1.25).clamp(ZOOM_MIN, ZOOM_MAX))
+                        on:click=move |_| {
+                            zoom.update(|z| *z = (*z * 1.25).clamp(ZOOM_MIN, ZOOM_MAX));
+                            zoom_input.set(format!("{:.0}", zoom.get_untracked() * 100.0));
+                        }
                     >
-                        <span class="material-symbols-outlined" style="font-size: 14px;">"add"</span>
+                        <span class="material-symbols-outlined" style="font-size: 16px;">"add"</span>
                     </button>
+                    <span class="px-1.5 text-[10px] font-medium text-stone-400 dark:text-stone-500
+                               select-none">"%"</span>
                 </div>
             </div>
 
@@ -1994,6 +2042,7 @@ pub fn GraphView() -> impl IntoView {
                             ev.prevent_default();
                             let factor = if ev.delta_y() > 0.0 { 0.9_f64 } else { 1.1_f64 };
                             zoom.update(|z| *z = (*z * factor).clamp(ZOOM_MIN, ZOOM_MAX));
+                            zoom_input.set(format!("{:.0}", zoom.get_untracked() * 100.0));
                         }
                         // ── Touch: single-finger pan, two-finger pinch-to-zoom ──────
                         on:touchstart=move |ev: TouchEvent| {
@@ -2057,6 +2106,7 @@ pub fn GraphView() -> impl IntoView {
                                                 / start)
                                                 .clamp(ZOOM_MIN, ZOOM_MAX);
                                             zoom.set(new_zoom);
+                                            zoom_input.set(format!("{:.0}", new_zoom * 100.0));
                                         }
                                     }
                                 }
