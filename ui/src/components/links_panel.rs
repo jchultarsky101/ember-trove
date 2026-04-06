@@ -26,8 +26,9 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
 
     let links_res = LocalResource::new(move || {
         let _ = refresh.get();
+        let is_open = open.get();
         async move {
-            if !open.get() { return Ok(vec![]); }
+            if !is_open { return Ok(vec![]); }
             crate::api::fetch_node_links(node_id).await
         }
     });

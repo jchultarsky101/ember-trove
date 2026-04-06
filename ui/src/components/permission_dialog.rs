@@ -30,9 +30,10 @@ pub fn PermissionPanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
 
     let permissions = LocalResource::new(move || {
         let _ = refresh.get();
+        let is_open = open.get();
         let node_id = node_id;
         async move {
-            if !open.get() { return Ok(vec![]); }
+            if !is_open { return Ok(vec![]); }
             api::list_permissions(node_id).await
         }
     });
