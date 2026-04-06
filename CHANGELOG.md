@@ -4,6 +4,18 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.75.6] - 2026-04-05
+
+### Added
+- **Graph view: Auto-arrange button** — smart layout algorithm that re-arranges all nodes to eliminate overlap (shapes + titles + tag dots) with optimal spacing for readability.
+  - **Hierarchical placement** — root nodes (no incoming edges) placed in a top row, then BFS layers fan out below; hubs sorted toward the center of each layer.
+  - **Multi-component support** — disconnected subgraphs are arranged in a grid, each independently laid out.
+  - **Enhanced force refinement** — envelope-based repulsion prevents text overlap, same-type nodes get extra separation, component separation force keeps subgraphs apart.
+  - **Auto-fit viewport** — after layout, pan and zoom automatically adjust to frame all nodes.
+  - **Progress spinner** — full-screen overlay with animated spinner and message during computation.
+
+---
+
 ## [1.75.5] - 2026-04-05
 
 ### Changed
