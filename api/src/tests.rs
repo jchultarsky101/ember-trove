@@ -165,6 +165,7 @@ struct StubGraphRepo;
 impl GraphRepo for StubGraphRepo {
     async fn list_positions(&self) -> Result<Vec<NodePosition>, EmberTroveError> { unimplemented!() }
     async fn upsert_position(&self, _: Uuid, _: f64, _: f64) -> Result<(), EmberTroveError> { unimplemented!() }
+    async fn save_positions(&self, _: &[(Uuid, f64, f64)]) -> Result<(), EmberTroveError> { unimplemented!() }
 }
 
 struct StubBackupRepo;

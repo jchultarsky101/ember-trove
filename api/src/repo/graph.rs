@@ -7,6 +7,10 @@ use uuid::Uuid;
 pub trait GraphRepo: Send + Sync {
     async fn list_positions(&self) -> Result<Vec<NodePosition>, EmberTroveError>;
     async fn upsert_position(&self, node_id: Uuid, x: f64, y: f64) -> Result<(), EmberTroveError>;
+    async fn save_positions(
+        &self,
+        positions: &[(Uuid, f64, f64)],
+    ) -> Result<(), EmberTroveError>;
 }
 
 pub struct PgGraphRepo {
@@ -60,6 +64,41 @@ impl GraphRepo for PgGraphRepo {
         .execute(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("upsert_position failed: {e}")))?;
+
+        Ok(())
+    }
+
+    async fn save_positions(
+        &self,
+        positions: &[(Uuid, f64, f64)],
+    ) -> Result<(), EmberTroveError> {
+        if positions.is_empty() {
+            return Ok(());
+        }
+
+        let mut tx = self.pool.begin().await
+            .map_err(|e| EmberTroveError::Internal(format!("save_positions tx begin: {e}")))?;
+
+        sqlx::query("DELETE FROM node_positions")
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| EmberTroveError::Internal(format!("save_positions clear: {e}")))?;
+
+        for (node_id, x, y) in positions {
+            sqlx::query(
+                "INSERT INTO node_positions (node_id, x, y) VALUES ($1, $2, $3)
+                 ON CONFLICT (node_id) DO UPDATE SET x = EXCLUDED.x, y = EXCLUDED.y",
+            )
+            .bind(node_id)
+            .bind(*x)
+            .bind(*y)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| EmberTroveError::Internal(format!("save_positions insert: {e}")))?;
+        }
+
+        tx.commit().await
+            .map_err(|e| EmberTroveError::Internal(format!("save_positions commit: {e}")))?;
 
         Ok(())
     }

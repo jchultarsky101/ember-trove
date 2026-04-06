@@ -29,7 +29,7 @@ use common::{
 };
 
 use crate::{
-    api::{create_edge, delete_edge, fetch_all_edges, fetch_nodes, fetch_positions, save_position},
+    api::{create_edge, delete_edge, fetch_all_edges, fetch_nodes, fetch_positions, save_position, save_positions},
     app::View,
     components::node_meta::{status_color_hex, status_label, type_icon, type_label},
 };
@@ -789,6 +789,16 @@ pub fn GraphView() -> impl IntoView {
                 .unwrap_or(800.0);
 
             let result = smart_layout(&nodes, &edge_pairs, viewport_w, viewport_h);
+
+            // Persist all positions to the DB in a single batch call.
+            let batch: Vec<(NodeId, f64, f64)> = result
+                .positions
+                .iter()
+                .map(|(id, (x, y))| (NodeId(*id), *x, *y))
+                .collect();
+            if let Err(e) = save_positions(&batch).await {
+                tracing::error!("Failed to save auto-arrange positions: {e}");
+            }
 
             positions.set(result.positions);
             pan_x.set(result.fit_pan_x);

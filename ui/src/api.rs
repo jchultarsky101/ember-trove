@@ -678,6 +678,31 @@ pub async fn save_position(node_id: uuid::Uuid, x: f64, y: f64) -> Result<(), Ui
     }
 }
 
+/// Batch-save all node positions at once (used by auto-arrange).
+pub async fn save_positions(
+    positions: &[(common::id::NodeId, f64, f64)],
+) -> Result<(), UiError> {
+    let req = common::graph::SavePositionsRequest {
+        positions: positions.to_vec(),
+    };
+    let resp = Request::put(&api_url("/graph/positions"))
+        .json(&req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    if resp.ok() {
+        Ok(())
+    } else {
+        let status = resp.status();
+        let text = resp
+            .text()
+            .await
+            .unwrap_or_else(|_| "unknown error".to_string());
+        Err(UiError::api(status, text))
+    }
+}
+
 // ── Search ──────────────────────────────────────────────────────────────
 
 /// Search nodes.

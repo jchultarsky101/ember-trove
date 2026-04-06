@@ -4,6 +4,13 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [1.75.12] - 2026-04-06
+
+### Fixed
+- **Graph view: Auto-arrange now persists positions to the database** — added a batch `PUT /graph/positions` endpoint so all node positions are saved in a single transaction after auto-arrange runs.
+
+---
+
 ## [1.75.11] - 2026-04-06
 
 ### Changed
