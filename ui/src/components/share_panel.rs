@@ -72,6 +72,7 @@ pub fn SharePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                     <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                         "Public Links"
                     </h2>
+                    <Suspense fallback=|| ()>
                     {move || {
                         tokens.with(|r| r.as_ref().and_then(|res| match res {
                             Ok(v) if !v.is_empty() => Some(view! {
@@ -84,6 +85,7 @@ pub fn SharePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                             _ => None,
                         }))
                     }}
+                    </Suspense>
                 </button>
                 {move || (open.get() && is_owner).then(|| view! {
                     <button

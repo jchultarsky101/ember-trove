@@ -419,6 +419,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                     <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                         "Connections"
                     </h2>
+                    <Suspense fallback=|| ()>
                     {move || {
                         edges.with(|r| r.as_ref().and_then(|res| match res {
                             Ok(v) if !v.is_empty() => Some(view! {
@@ -431,6 +432,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                             _ => None,
                         }))
                     }}
+                    </Suspense>
                 </button>
                 {move || open.get().then(|| view! {
                     <button
@@ -662,6 +664,7 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
                 <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                     "Linked Here"
                 </h2>
+                <Suspense fallback=|| ()>
                 {move || {
                     backlinks.with(|r| r.as_ref().and_then(|res| match res {
                         Ok(v) if !v.is_empty() => Some(view! {
@@ -674,6 +677,7 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
                         _ => None,
                     }))
                 }}
+                </Suspense>
             </button>
             {move || open.get().then(|| view! {
                 <div class="mt-4">

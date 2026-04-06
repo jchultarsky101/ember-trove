@@ -116,6 +116,7 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
                     <h2 class="text-sm font-semibold text-stone-700 dark:text-stone-300">
                         "External Links"
                     </h2>
+                    <Suspense fallback=|| ()>
                     {move || {
                         links_res.with(|r| r.as_ref().and_then(|res| match res {
                             Ok(v) if !v.is_empty() => Some(view! {
@@ -128,6 +129,7 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
                             _ => None,
                         }))
                     }}
+                    </Suspense>
                 </button>
                 {move || (open.get() && is_editor).then(|| view! {
                     <button
