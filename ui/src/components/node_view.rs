@@ -342,9 +342,10 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
     let edges: LocalResource<Result<Vec<EdgeWithTitles>, crate::error::UiError>> =
         LocalResource::new(move || {
             let _ = refresh_edges.get();
+            let is_open = open.get();
             let node_id = node_id;
             async move {
-                if !open.get() { return Ok(vec![]); }
+                if !is_open { return Ok(vec![]); }
                 crate::api::fetch_edges_for_node(node_id).await
             }
         });
@@ -632,9 +633,10 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
     let open = RwSignal::new(false);
 
     let backlinks = LocalResource::new(move || {
+        let is_open = open.get();
         let node_id = node_id;
         async move {
-            if !open.get() { return Ok(vec![]); }
+            if !is_open { return Ok(vec![]); }
             crate::api::fetch_backlinks(node_id).await
         }
     });

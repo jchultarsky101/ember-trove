@@ -4,11 +4,17 @@
 ///   - Click the drop zone (or the folder icon) to open a multi-file picker.
 ///   - Drag files onto the drop zone to queue them.
 ///   - Files are uploaded sequentially; a progress counter shows (n / total).
-use common::id::NodeId;
+use common::id::{AttachmentId, NodeId};
 use leptos::{html::Input, prelude::*};
 use wasm_bindgen::JsCast;
 
 use crate::api;
+
+/// Copy `text` to the clipboard via the JS Clipboard API.
+fn copy_to_clipboard(text: &str) {
+    let escaped = text.replace('\\', "\\\\").replace('\'', "\\'");
+    let _ = js_sys::eval(&format!("navigator.clipboard.writeText('{escaped}')"));
+}
 
 /// Returns true for MIME types the browser can display inline.
 fn is_previewable(content_type: &str) -> bool {
@@ -31,10 +37,14 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
     // open must be declared before attachments so the resource closure can capture it.
     let open = RwSignal::new(false);
 
+    // Track which attachment's URL was most recently copied (for brief visual feedback).
+    let copied_att: RwSignal<Option<AttachmentId>> = RwSignal::new(None);
+
     let attachments = LocalResource::new(move || {
         let _ = refresh.get();
+        let is_open = open.get();
         async move {
-            if !open.get() { return Ok(vec![]); }
+            if !is_open { return Ok(vec![]); }
             api::fetch_attachments(node_id).await
         }
     });
@@ -354,6 +364,7 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                                             let is_image = content_type.starts_with("image/");
                                             let preview_open = RwSignal::new(false);
                                             let url_for_preview = download_url.clone();
+                                            let url_for_copy = download_url.clone();
                                             view! {
                                                 <div class="rounded-lg border border-stone-200 dark:border-stone-700
                                                             bg-stone-50 dark:bg-stone-800/30">
@@ -388,6 +399,36 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                                                                 </span>
                                                             </button>
                                                         })}
+                                                        // Copy URL button
+                                                        <button
+                                                            class="p-0.5 text-stone-400 hover:text-amber-500
+                                                                   dark:hover:text-amber-400 cursor-pointer
+                                                                   transition-colors"
+                                                            title=move || if copied_att.get() == Some(att_id) {
+                                                                "URL copied!"
+                                                            } else {
+                                                                "Copy attachment URL"
+                                                            }
+                                                            on:click=move |_| {
+                                                                copy_to_clipboard(&url_for_copy);
+                                                                copied_att.set(Some(att_id));
+                                                                wasm_bindgen_futures::spawn_local(async move {
+                                                                    gloo_timers::future::TimeoutFuture::new(2000).await;
+                                                                    if copied_att.get_untracked() == Some(att_id) {
+                                                                        copied_att.set(None);
+                                                                    }
+                                                                });
+                                                            }
+                                                        >
+                                                            <span class="material-symbols-outlined"
+                                                                  style="font-size: 16px;">
+                                                                {move || if copied_att.get() == Some(att_id) {
+                                                                    "check"
+                                                                } else {
+                                                                    "link"
+                                                                }}
+                                                            </span>
+                                                        </button>
                                                         // Download link
                                                         <a
                                                             href=download_url
