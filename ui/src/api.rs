@@ -12,7 +12,7 @@ use common::{
     search::{CreateSearchPresetRequest, SearchPreset, SearchResponse},
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
     note::{CreateNoteRequest, FeedNote, Note, UpdateNoteRequest},
-    task::{CreateTaskRequest, MyDayTask, ProjectDashboardEntry, Task, UpdateTaskRequest},
+    task::{CreateTaskRequest, MyDayTask, ProjectDashboardEntry, ReorderTaskEntry, ReorderTasksRequest, Task, UpdateTaskRequest},
 };
 use gloo_net::http::Request;
 use serde::Deserialize;
@@ -859,6 +859,28 @@ pub async fn update_task(task_id: TaskId, req: &UpdateTaskRequest) -> Result<Tas
 
 pub async fn delete_task(task_id: TaskId) -> Result<(), UiError> {
     let resp = Request::delete(&api_url(&format!("/tasks/{task_id}")))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    if resp.ok() {
+        Ok(())
+    } else {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        Err(UiError::api(status, text))
+    }
+}
+
+pub async fn reorder_tasks(entries: &[(TaskId, i32)]) -> Result<(), UiError> {
+    let req = ReorderTasksRequest {
+        tasks: entries
+            .iter()
+            .map(|(id, order)| ReorderTaskEntry { id: *id, sort_order: *order })
+            .collect(),
+    };
+    let resp = Request::put(&api_url("/tasks/reorder"))
+        .json(&req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
         .send()
         .await
         .map_err(|e| UiError::Network(e.to_string()))?;
