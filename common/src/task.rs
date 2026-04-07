@@ -22,6 +22,17 @@ pub enum TaskPriority {
     High,
 }
 
+/// How often a recurring task should repeat after being marked Done.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RecurrenceRule {
+    Daily,
+    Weekly,
+    Biweekly,
+    Monthly,
+    Yearly,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Task {
     pub id: TaskId,
@@ -33,6 +44,10 @@ pub struct Task {
     /// Non-null when this task is in the user's My Day for that date.
     pub focus_date: Option<NaiveDate>,
     pub due_date: Option<NaiveDate>,
+    /// Recurrence rule — when Done a new instance is automatically scheduled.
+    pub recurrence: Option<RecurrenceRule>,
+    /// Manual ordering within My Day (0 = default, higher = later in list).
+    pub sort_order: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -75,6 +90,8 @@ pub struct CreateTaskRequest {
     pub focus_date: Option<NaiveDate>,
     #[garde(skip)]
     pub due_date: Option<NaiveDate>,
+    #[garde(skip)]
+    pub recurrence: Option<RecurrenceRule>,
 }
 
 /// Deserialises `Option<Option<T>>` correctly:
@@ -103,4 +120,20 @@ pub struct UpdateTaskRequest {
     /// `None` = leave unchanged · `Some(None)` = clear · `Some(Some(d))` = set to date
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deser_double_opt")]
     pub due_date: Option<Option<NaiveDate>>,
+    /// `None` = leave unchanged · `Some(None)` = clear recurrence · `Some(Some(r))` = set
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deser_double_opt")]
+    pub recurrence: Option<Option<RecurrenceRule>>,
+}
+
+/// One entry in a bulk sort-order update (drag-to-reorder in My Day).
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ReorderTaskEntry {
+    pub id: TaskId,
+    pub sort_order: i32,
+}
+
+/// Request body for `PUT /tasks/reorder`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ReorderTasksRequest {
+    pub tasks: Vec<ReorderTaskEntry>,
 }

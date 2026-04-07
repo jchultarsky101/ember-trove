@@ -4,7 +4,8 @@ use common::{
     EmberTroveError,
     id::{NodeId, TaskId},
     task::{
-        CreateTaskRequest, MyDayTask, Task, TaskCounts, TaskPriority, TaskStatus, UpdateTaskRequest,
+        CreateTaskRequest, MyDayTask, RecurrenceRule, Task, TaskCounts, TaskPriority, TaskStatus,
+        UpdateTaskRequest,
     },
 };
 use sqlx::PgPool;
@@ -59,6 +60,13 @@ pub trait TaskRepo: Send + Sync {
 
     /// All tasks across all owners — used for full backup.
     async fn list_all(&self) -> Result<Vec<Task>, EmberTroveError>;
+
+    /// Bulk update sort_order for drag-to-reorder; only touches rows owned by `owner_id`.
+    async fn reorder(
+        &self,
+        updates: &[(TaskId, i32)],
+        owner_id: &str,
+    ) -> Result<(), EmberTroveError>;
 }
 
 // ── PgTaskRepo ────────────────────────────────────────────────────────────────
@@ -84,6 +92,8 @@ struct TaskRow {
     priority: String,
     focus_date: Option<NaiveDate>,
     due_date: Option<NaiveDate>,
+    recurrence: Option<String>,
+    sort_order: i32,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -111,6 +121,19 @@ fn parse_priority(s: &str) -> Result<TaskPriority, EmberTroveError> {
     }
 }
 
+pub fn parse_recurrence(s: &str) -> Result<RecurrenceRule, EmberTroveError> {
+    match s {
+        "daily"    => Ok(RecurrenceRule::Daily),
+        "weekly"   => Ok(RecurrenceRule::Weekly),
+        "biweekly" => Ok(RecurrenceRule::Biweekly),
+        "monthly"  => Ok(RecurrenceRule::Monthly),
+        "yearly"   => Ok(RecurrenceRule::Yearly),
+        other => Err(EmberTroveError::Internal(format!(
+            "unknown recurrence: {other}"
+        ))),
+    }
+}
+
 fn status_str(s: &TaskStatus) -> &'static str {
     match s {
         TaskStatus::Open => "open",
@@ -128,8 +151,23 @@ fn priority_str(p: &TaskPriority) -> &'static str {
     }
 }
 
+pub fn recurrence_str(r: &RecurrenceRule) -> &'static str {
+    match r {
+        RecurrenceRule::Daily    => "daily",
+        RecurrenceRule::Weekly   => "weekly",
+        RecurrenceRule::Biweekly => "biweekly",
+        RecurrenceRule::Monthly  => "monthly",
+        RecurrenceRule::Yearly   => "yearly",
+    }
+}
+
 impl TaskRow {
     fn into_task(self) -> Result<Task, EmberTroveError> {
+        let recurrence = self
+            .recurrence
+            .as_deref()
+            .map(parse_recurrence)
+            .transpose()?;
         Ok(Task {
             id: TaskId(self.id),
             node_id: NodeId(self.node_id),
@@ -139,6 +177,8 @@ impl TaskRow {
             priority: parse_priority(&self.priority)?,
             focus_date: self.focus_date,
             due_date: self.due_date,
+            recurrence,
+            sort_order: self.sort_order,
             created_at: self.created_at,
             updated_at: self.updated_at,
         })
@@ -149,7 +189,7 @@ const SELECT_COLS: &str = r#"
     id, node_id, owner_id, title,
     status::text    AS status,
     priority::text  AS priority,
-    focus_date, due_date, created_at, updated_at
+    focus_date, due_date, recurrence, sort_order, created_at, updated_at
 "#;
 
 #[derive(sqlx::FromRow)]
@@ -162,6 +202,8 @@ struct MyDayRow {
     priority: String,
     focus_date: Option<NaiveDate>,
     due_date: Option<NaiveDate>,
+    recurrence: Option<String>,
+    sort_order: i32,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
     node_title: String,
@@ -177,6 +219,8 @@ fn my_day_row_to_task(r: MyDayRow) -> Result<MyDayTask, EmberTroveError> {
         priority: r.priority,
         focus_date: r.focus_date,
         due_date: r.due_date,
+        recurrence: r.recurrence,
+        sort_order: r.sort_order,
         created_at: r.created_at,
         updated_at: r.updated_at,
     }
@@ -200,11 +244,13 @@ impl TaskRepo for PgTaskRepo {
             .priority
             .as_ref()
             .map_or("medium", |p| priority_str(p));
+        let recurrence = req.recurrence.as_ref().map(|r| recurrence_str(r).to_string());
 
         let row = sqlx::query_as::<_, TaskRow>(&format!(
             r#"
-            INSERT INTO node_tasks (node_id, owner_id, title, status, priority, focus_date, due_date)
-            VALUES ($1, $2, $3, $4::task_status, $5::task_priority, $6, $7)
+            INSERT INTO node_tasks
+                (node_id, owner_id, title, status, priority, focus_date, due_date, recurrence)
+            VALUES ($1, $2, $3, $4::task_status, $5::task_priority, $6, $7, $8)
             RETURNING {SELECT_COLS}
             "#
         ))
@@ -215,6 +261,7 @@ impl TaskRepo for PgTaskRepo {
         .bind(priority)
         .bind(req.focus_date)
         .bind(req.due_date)
+        .bind(recurrence)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("create task failed: {e}")))?;
@@ -271,6 +318,11 @@ impl TaskRepo for PgTaskRepo {
     async fn update(&self, id: TaskId, req: UpdateTaskRequest) -> Result<Task, EmberTroveError> {
         let status_s = req.status.as_ref().map(|s| status_str(s).to_string());
         let priority_s = req.priority.as_ref().map(|p| priority_str(p).to_string());
+        let recurrence_update = req.recurrence.is_some();
+        let recurrence_val = req
+            .recurrence
+            .and_then(|r| r)
+            .map(|r| recurrence_str(&r).to_string());
 
         let row = sqlx::query_as::<_, TaskRow>(&format!(
             r#"
@@ -279,7 +331,8 @@ impl TaskRepo for PgTaskRepo {
                 status     = COALESCE($3::task_status,   status),
                 priority   = COALESCE($4::task_priority, priority),
                 focus_date = CASE WHEN $5 THEN $6 ELSE focus_date END,
-                due_date   = CASE WHEN $7 THEN $8 ELSE due_date END
+                due_date   = CASE WHEN $7 THEN $8 ELSE due_date   END,
+                recurrence = CASE WHEN $9 THEN $10 ELSE recurrence END
             WHERE id = $1
             RETURNING {SELECT_COLS}
             "#
@@ -292,6 +345,8 @@ impl TaskRepo for PgTaskRepo {
         .bind(req.focus_date.and_then(|d| d))
         .bind(req.due_date.is_some())
         .bind(req.due_date.and_then(|d| d))
+        .bind(recurrence_update)
+        .bind(recurrence_val)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("update task failed: {e}")))?
@@ -324,7 +379,8 @@ impl TaskRepo for PgTaskRepo {
                 t.id, t.node_id, t.owner_id, t.title,
                 t.status::text    AS status,
                 t.priority::text  AS priority,
-                t.focus_date, t.due_date, t.created_at, t.updated_at,
+                t.focus_date, t.due_date, t.recurrence, t.sort_order,
+                t.created_at, t.updated_at,
                 n.title           AS node_title
             FROM node_tasks t
             JOIN nodes n ON n.id = t.node_id
@@ -336,6 +392,7 @@ impl TaskRepo for PgTaskRepo {
                   OR t.status::text NOT IN ('done', 'cancelled')
               )
             ORDER BY
+                t.sort_order ASC,
                 CASE t.priority::text
                     WHEN 'high'   THEN 0
                     WHEN 'medium' THEN 1
@@ -365,7 +422,8 @@ impl TaskRepo for PgTaskRepo {
                 t.id, t.node_id, t.owner_id, t.title,
                 t.status::text    AS status,
                 t.priority::text  AS priority,
-                t.focus_date, t.due_date, t.created_at, t.updated_at,
+                t.focus_date, t.due_date, t.recurrence, t.sort_order,
+                t.created_at, t.updated_at,
                 n.title           AS node_title
             FROM node_tasks t
             JOIN nodes n ON n.id = t.node_id
@@ -474,5 +532,39 @@ impl TaskRepo for PgTaskRepo {
         .map_err(|e| EmberTroveError::Internal(format!("list_all tasks failed: {e}")))?;
 
         rows.into_iter().map(TaskRow::into_task).collect()
+    }
+
+    async fn reorder(
+        &self,
+        updates: &[(TaskId, i32)],
+        owner_id: &str,
+    ) -> Result<(), EmberTroveError> {
+        if updates.is_empty() {
+            return Ok(());
+        }
+        let ids: Vec<Uuid> = updates.iter().map(|(id, _)| id.0).collect();
+        let orders: Vec<i32> = updates.iter().map(|(_, o)| *o).collect();
+
+        sqlx::query(
+            r#"
+            UPDATE node_tasks
+            SET sort_order = u.sort_order
+            FROM (
+                SELECT
+                    unnest($1::uuid[])  AS id,
+                    unnest($2::int4[])  AS sort_order
+            ) AS u
+            WHERE node_tasks.id = u.id
+              AND node_tasks.owner_id = $3
+            "#,
+        )
+        .bind(&ids)
+        .bind(&orders)
+        .bind(owner_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("reorder tasks failed: {e}")))?;
+
+        Ok(())
     }
 }

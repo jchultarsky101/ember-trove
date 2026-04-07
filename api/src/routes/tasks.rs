@@ -2,14 +2,17 @@ use axum::{
     Extension, Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    routing::{get, patch},
+    routing::{get, patch, put},
 };
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use common::{
     auth::AuthClaims,
     id::{NodeId, TaskId},
     node::{NodeListParams, NodeType},
-    task::{CreateTaskRequest, MyDayTask, ProjectDashboardEntry, Task, TaskCounts, UpdateTaskRequest},
+    task::{
+        CreateTaskRequest, MyDayTask, ProjectDashboardEntry, RecurrenceRule, ReorderTasksRequest,
+        Task, TaskCounts, TaskStatus, UpdateTaskRequest,
+    },
 };
 use garde::Validate;
 use serde::Deserialize;
@@ -26,6 +29,7 @@ pub fn node_task_router() -> Router<AppState> {
 pub fn task_router() -> Router<AppState> {
     Router::new()
         .route("/{id}", patch(update_task).delete(delete_task))
+        .route("/reorder", put(reorder_tasks))
 }
 
 #[derive(Deserialize)]
@@ -43,6 +47,37 @@ pub fn calendar_router() -> Router<AppState> {
 
 pub fn dashboard_router() -> Router<AppState> {
     Router::new().route("/", get(project_dashboard))
+}
+
+// ── Recurrence helpers ────────────────────────────────────────────────────────
+
+/// Advance `d` by one recurrence interval. Falls back to `d` on edge cases
+/// (e.g. Feb 29 in non-leap year advances to Feb 28).
+fn advance_date(d: NaiveDate, rule: &RecurrenceRule) -> NaiveDate {
+    match rule {
+        RecurrenceRule::Daily    => d + chrono::Duration::days(1),
+        RecurrenceRule::Weekly   => d + chrono::Duration::weeks(1),
+        RecurrenceRule::Biweekly => d + chrono::Duration::weeks(2),
+        RecurrenceRule::Monthly  => {
+            let (y, m) = if d.month() == 12 {
+                (d.year() + 1, 1u32)
+            } else {
+                (d.year(), d.month() + 1)
+            };
+            NaiveDate::from_ymd_opt(y, m, d.day())
+                .or_else(|| NaiveDate::from_ymd_opt(y, m, 28))
+                .unwrap_or(d)
+        }
+        RecurrenceRule::Yearly => {
+            NaiveDate::from_ymd_opt(d.year() + 1, d.month(), d.day())
+                .or_else(|| NaiveDate::from_ymd_opt(d.year() + 1, d.month(), 28))
+                .unwrap_or(d)
+        }
+    }
+}
+
+fn status_is_done(s: &TaskStatus) -> bool {
+    matches!(s, TaskStatus::Done | TaskStatus::Cancelled)
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
@@ -76,12 +111,50 @@ async fn create_task(
 
 async fn update_task(
     State(state): State<AppState>,
-    Extension(_claims): Extension<AuthClaims>,
+    Extension(claims): Extension<AuthClaims>,
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateTaskRequest>,
 ) -> Result<Json<Task>, ApiError> {
-    let task = state.tasks.update(TaskId(id), req).await?;
-    Ok(Json(task))
+    // Check if this update transitions to Done — needed for recurrence.
+    let becoming_done = req
+        .status
+        .as_ref()
+        .is_some_and(|s| matches!(s, TaskStatus::Done));
+
+    // Fetch pre-update state only when we might need to create a recurrence.
+    let pre = if becoming_done {
+        state.tasks.get(TaskId(id)).await.ok()
+    } else {
+        None
+    };
+
+    let updated = state.tasks.update(TaskId(id), req).await?;
+
+    // If the task had recurrence and was not already done, schedule next occurrence.
+    if let Some(pre_task) = pre
+        && let Some(rule) = &pre_task.recurrence
+        && !status_is_done(&pre_task.status)
+    {
+        let today = chrono::Utc::now().date_naive();
+        let base_focus = pre_task.focus_date.unwrap_or(today);
+        let next_focus = advance_date(base_focus, rule);
+        let next_due = pre_task.due_date.map(|d| advance_date(d, rule));
+        let next_req = CreateTaskRequest {
+            title: pre_task.title.clone(),
+            status: Some(TaskStatus::Open),
+            priority: Some(pre_task.priority.clone()),
+            focus_date: Some(next_focus),
+            due_date: next_due,
+            recurrence: Some(rule.clone()),
+        };
+        // Best-effort — ignore errors so the Done update still succeeds.
+        let _ = state
+            .tasks
+            .create(pre_task.node_id, &claims.sub, next_req)
+            .await;
+    }
+
+    Ok(Json(updated))
 }
 
 async fn delete_task(
@@ -90,6 +163,21 @@ async fn delete_task(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     state.tasks.delete(TaskId(id)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// PUT /tasks/reorder — bulk update sort_order for drag-to-reorder in My Day.
+async fn reorder_tasks(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Json(req): Json<ReorderTasksRequest>,
+) -> Result<StatusCode, ApiError> {
+    let updates: Vec<(TaskId, i32)> = req
+        .tasks
+        .iter()
+        .map(|e| (e.id, e.sort_order))
+        .collect();
+    state.tasks.reorder(&updates, &claims.sub).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

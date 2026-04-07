@@ -120,6 +120,7 @@ impl TaskRepo for StubTaskRepo {
     async fn list_all_for_owner(&self, _: &str) -> Result<Vec<Task>, EmberTroveError> { unimplemented!() }
     async fn list_all(&self) -> Result<Vec<Task>, EmberTroveError> { unimplemented!() }
     async fn list_by_due_range(&self, _: &str, _: NaiveDate, _: NaiveDate) -> Result<Vec<MyDayTask>, EmberTroveError> { unimplemented!() }
+    async fn reorder(&self, _: &[(TaskId, i32)], _: &str) -> Result<(), EmberTroveError> { unimplemented!() }
 }
 
 struct StubNoteRepo;
