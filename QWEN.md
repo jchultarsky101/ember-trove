@@ -44,9 +44,48 @@
 ## Git Workflow
 
 - **Branches**: `main` (production), `develop` (integration). Features: `feature/jc/<name>` from `develop`. Releases: `release/<semver>` from `develop`, merged to `main` with tag. Hotfixes: `hotfix/<name>` from `main`.
-- **Worktrees**: `.claude/worktrees/<name>/` — used by Claude Code sessions. Clean up with `rm -rf .claude/worktrees/<name>` then `git branch -D`.
 - **Syncing develop**: `git checkout develop && git merge --ff-only main && git push origin develop`
 - **Release flow**: Bump `api/Cargo.toml` version → add CHANGELOG entry → commit → tag `vX.Y.Z` → push commit + tag.
+
+### Git Worktrees — Best Practice
+
+Worktrees let you check out multiple branches in parallel without stashing or switching directories. They share the same `.git` object store, so there's no refetch.
+
+**When to use worktrees:**
+- **Hotfix while working on a feature** — `git worktree add ../hotfix-tmp main`
+- **Code review** — `git worktree add ../review-tmp feature/pr-branch`
+- **Agent sessions** — AI tools can work in isolated worktrees without disrupting main work
+- **Parallel experiments** — two feature branches side-by-side for comparison
+
+**Creating a worktree:**
+```bash
+# Standard: checkout a new branch
+git worktree add ../ember-trove-feat feature/new-thing
+
+# Detached HEAD for quick inspection
+git worktree add --detach ../tmp-check
+
+# With an existing branch
+git worktree add ../ember-trove-fix hotfix/urgent
+```
+
+**Cleaning up (mandatory):**
+```bash
+rm -rf ../path-to-worktree     # Remove the working directory first
+git worktree prune             # Clean up git's internal refs
+git branch -d feature-branch   # Delete the branch if merged
+git branch -D feature-branch   # Force delete if unmerged
+```
+
+**⚠️ Gotchas:**
+- **Branches in use by worktrees cannot be deleted** — `git branch -d` will error
+- **Orphaned worktrees** (deleted without `prune`) block branch deletion and clutter `git branch -a`
+- **Agent auto-cleanup** — AI tools may create worktrees and leave them behind. Always check `git worktree list` before releasing branches.
+- **`.claude/` cleanup** — orphaned Claude sessions leave stale data in `.claude/projects/` and `.claude/worktrees/`. Clean periodically:
+  ```bash
+  rm -rf .claude/projects/* .claude/worktrees/*
+  ```
+- **IDE confusion** — some editors lock onto the original repo's `.git`. Open the worktree root, not the parent.
 
 ---
 
