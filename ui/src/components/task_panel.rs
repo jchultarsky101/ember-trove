@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use common::{
     id::NodeId,
-    task::{CreateTaskRequest, Task, TaskPriority, TaskStatus, UpdateTaskRequest},
+    task::{CreateTaskRequest, RecurrenceRule, Task, TaskPriority, TaskStatus, UpdateTaskRequest},
 };
 use leptos::prelude::*;
 
@@ -108,12 +108,13 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
     let show_completed = RwSignal::new(false);
 
     // New task form state
-    let new_title = RwSignal::new(String::new());
-    let new_priority = RwSignal::new("medium".to_string());
-    let new_due = RwSignal::new(String::new());
-    let adding = RwSignal::new(false);
-    let show_form = RwSignal::new(false);
-    let add_error = RwSignal::new(Option::<String>::None);
+    let new_title      = RwSignal::new(String::new());
+    let new_priority   = RwSignal::new("medium".to_string());
+    let new_due        = RwSignal::new(String::new());
+    let new_recurrence = RwSignal::new(String::new());
+    let adding         = RwSignal::new(false);
+    let show_form      = RwSignal::new(false);
+    let add_error      = RwSignal::new(Option::<String>::None);
 
     let do_add = move || {
         let title = new_title.get_untracked().trim().to_string();
@@ -127,6 +128,14 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
             .trim()
             .parse::<NaiveDate>()
             .ok();
+        let recurrence = match new_recurrence.get_untracked().as_str() {
+            "daily"    => Some(RecurrenceRule::Daily),
+            "weekly"   => Some(RecurrenceRule::Weekly),
+            "biweekly" => Some(RecurrenceRule::Biweekly),
+            "monthly"  => Some(RecurrenceRule::Monthly),
+            "yearly"   => Some(RecurrenceRule::Yearly),
+            _          => None,
+        };
         adding.set(true);
         add_error.set(None);
         wasm_bindgen_futures::spawn_local(async move {
@@ -136,12 +145,14 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
                 priority: Some(priority),
                 focus_date: None,
                 due_date,
+                recurrence,
             };
             match crate::api::create_task(node_id, &req).await {
                 Ok(_) => {
                     new_title.set(String::new());
                     new_priority.set("medium".to_string());
                     new_due.set(String::new());
+                    new_recurrence.set(String::new());
                     show_form.set(false);
                     task_refresh.update(|n| *n += 1);
                 }
@@ -208,6 +219,19 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
                             prop:value=move || new_due.get()
                             on:input=move |ev| new_due.set(event_target_value(&ev))
                         />
+                        <select
+                            class="text-xs bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300
+                                rounded px-2 py-1 focus:outline-none"
+                            title="Recurrence"
+                            on:change=move |ev| new_recurrence.set(event_target_value(&ev))
+                        >
+                            <option value="" selected>"No repeat"</option>
+                            <option value="daily">"Daily"</option>
+                            <option value="weekly">"Weekly"</option>
+                            <option value="biweekly">"Every 2 weeks"</option>
+                            <option value="monthly">"Monthly"</option>
+                            <option value="yearly">"Yearly"</option>
+                        </select>
                         <span class="flex-1"/>
                         <button
                             class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
@@ -359,6 +383,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
             priority: new_priority,
             focus_date: None,
             due_date: new_due,
+            recurrence: None,
         };
         wasm_bindgen_futures::spawn_local(async move {
             let _ = crate::api::update_task(task_id, &req).await;
@@ -377,6 +402,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
             priority: None,
             focus_date: None,
             due_date: None,
+            recurrence: None,
         };
         status_sig.set(next.to_string());
         wasm_bindgen_futures::spawn_local(async move {
@@ -396,6 +422,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
             priority: None,
             focus_date: Some(new_focus),
             due_date: None,
+            recurrence: None,
         };
         wasm_bindgen_futures::spawn_local(async move {
             let _ = crate::api::update_task(task_id, &req).await;
@@ -411,7 +438,8 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
         });
     };
 
-    let title_display = task.title.clone();
+    let title_display  = task.title.clone();
+    let has_recurrence = task.recurrence.is_some();
 
     view! {
         <div class="group flex items-start gap-2 py-2 border-b border-stone-100 dark:border-stone-800 last:border-0">
@@ -534,6 +562,13 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
                                 {overdue.then_some(" · overdue")}
                             </span>
                         }
+                    })}
+                    // Recurrence badge
+                    {has_recurrence.then(|| view! {
+                        <span class="flex items-center gap-0.5 text-xs text-stone-400 dark:text-stone-500"
+                            title="Recurring task">
+                            <span class="material-symbols-outlined" style="font-size:12px;">"repeat"</span>
+                        </span>
                     })}
                     // Status badge (if not open/done)
                     {(!matches!(parse_status(&status_val), TaskStatus::Open | TaskStatus::Done)).then(|| {

@@ -1,5 +1,8 @@
 use chrono::NaiveDate;
-use common::task::{MyDayTask, Task, TaskPriority, TaskStatus, UpdateTaskRequest};
+use common::{
+    id::TaskId,
+    task::{MyDayTask, RecurrenceRule, Task, TaskPriority, TaskStatus, UpdateTaskRequest},
+};
 use leptos::prelude::*;
 
 use crate::app::{TaskRefresh, View};
@@ -54,10 +57,47 @@ fn parse_priority(s: &str) -> TaskPriority {
     }
 }
 
-// ── Sort: incomplete first (high→med→low, due asc), done last ─────────────────
+// ── Recurrence helpers ────────────────────────────────────────────────────────
+
+fn recurrence_value(r: &RecurrenceRule) -> &'static str {
+    match r {
+        RecurrenceRule::Daily    => "daily",
+        RecurrenceRule::Weekly   => "weekly",
+        RecurrenceRule::Biweekly => "biweekly",
+        RecurrenceRule::Monthly  => "monthly",
+        RecurrenceRule::Yearly   => "yearly",
+    }
+}
+
+fn recurrence_label(r: &RecurrenceRule) -> &'static str {
+    match r {
+        RecurrenceRule::Daily    => "Daily",
+        RecurrenceRule::Weekly   => "Weekly",
+        RecurrenceRule::Biweekly => "Every 2 weeks",
+        RecurrenceRule::Monthly  => "Monthly",
+        RecurrenceRule::Yearly   => "Yearly",
+    }
+}
+
+fn parse_recurrence_opt(s: &str) -> Option<RecurrenceRule> {
+    match s {
+        "daily"    => Some(RecurrenceRule::Daily),
+        "weekly"   => Some(RecurrenceRule::Weekly),
+        "biweekly" => Some(RecurrenceRule::Biweekly),
+        "monthly"  => Some(RecurrenceRule::Monthly),
+        "yearly"   => Some(RecurrenceRule::Yearly),
+        _          => None,
+    }
+}
+
+// ── Sort: honour sort_order first, then incomplete/done, then priority/due ────
 
 fn sort_tasks(tasks: &mut [Task]) {
     tasks.sort_by(|a, b| {
+        // Primary: manual sort_order
+        let so = a.sort_order.cmp(&b.sort_order);
+        if so != std::cmp::Ordering::Equal { return so; }
+        // Secondary: incomplete before done
         let a_done = status_done(&a.status);
         let b_done = status_done(&b.status);
         match (a_done, b_done) {
@@ -98,7 +138,7 @@ pub fn MyDayView() -> impl IntoView {
         <div class="flex flex-col h-full">
 
             // ── Header ────────────────────────────────────────────────────────
-            <div class="px-6 py-4 border-b border-stone-200 dark:border-stone-800">
+            <div class="px-4 md:px-6 py-4 border-b border-stone-200 dark:border-stone-800">
                 <div class="flex items-center gap-3 mb-2">
                     <span class="material-symbols-outlined text-amber-500" style="font-size: 22px;">
                         "wb_sunny"
@@ -152,7 +192,7 @@ pub fn MyDayView() -> impl IntoView {
             </div>
 
             // ── Content ───────────────────────────────────────────────────────
-            <div class="flex-1 overflow-auto p-6 flex flex-col">
+            <div class="flex-1 overflow-auto p-4 md:p-6 flex flex-col">
                 <Suspense fallback=move || view! {
                     <p class="text-sm text-stone-400">"Loading…"</p>
                 }>
@@ -180,7 +220,7 @@ pub fn MyDayView() -> impl IntoView {
                             }.into_any();
                         }
 
-                        // Group by node_id, then sort within each group
+                        // Group by node_id, preserving server sort_order within each group.
                         let mut grouped: Vec<(String, String, Vec<Task>)> = vec![];
                         for MyDayTask { task, node_title } in raw_tasks {
                             let node_id_str = task.node_id.to_string();
@@ -230,11 +270,16 @@ fn MyDayGroup(
     let _ = node_id;
     let show_done = RwSignal::new(false);
 
-    // Split sorted tasks into active and done
+    // Split pre-sorted tasks into active and done buckets.
     let (active, done): (Vec<Task>, Vec<Task>) =
         tasks.into_iter().partition(|t| !status_done(&t.status));
     let done_count  = done.len();
     let done_stored = StoredValue::new(done);
+
+    // Reactive ordering for drag-to-reorder (active tasks only).
+    let task_list: RwSignal<Vec<Task>> = RwSignal::new(active);
+    let drag_src: RwSignal<Option<usize>> = RwSignal::new(None);
+    let drag_over: RwSignal<Option<usize>> = RwSignal::new(None);
 
     view! {
         <div>
@@ -251,9 +296,51 @@ fn MyDayGroup(
             </button>
 
             <div class="space-y-0.5 pl-2 border-l-2 border-stone-200 dark:border-stone-700">
-                // Active tasks
-                {active.into_iter().map(|task| {
-                    view! { <MyDayTaskRow task=task refresh=refresh /> }
+                // Active tasks — draggable for reordering
+                {move || task_list.get().into_iter().enumerate().map(|(idx, task)| {
+                    view! {
+                        <div
+                            draggable="true"
+                            style=move || if drag_over.get() == Some(idx) {
+                                "border-top: 2px solid #f59e0b; margin-top: -2px;"
+                            } else { "" }
+                            on:dragstart=move |_| drag_src.set(Some(idx))
+                            on:dragover=move |ev| {
+                                ev.prevent_default();
+                                drag_over.set(Some(idx));
+                            }
+                            on:dragleave=move |_| {
+                                if drag_over.get_untracked() == Some(idx) {
+                                    drag_over.set(None);
+                                }
+                            }
+                            on:drop=move |ev| {
+                                ev.prevent_default();
+                                if let Some(src) = drag_src.get_untracked()
+                                    && src != idx
+                                {
+                                    task_list.update(|tasks| {
+                                        let t = tasks.remove(src);
+                                        let dst = if src < idx { idx - 1 } else { idx };
+                                        tasks.insert(dst.min(tasks.len()), t);
+                                    });
+                                    let updates: Vec<(TaskId, i32)> = task_list
+                                        .get_untracked()
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(i, t)| (t.id, (i as i32) * 10))
+                                        .collect();
+                                    wasm_bindgen_futures::spawn_local(async move {
+                                        let _ = crate::api::reorder_tasks(&updates).await;
+                                    });
+                                }
+                                drag_src.set(None);
+                                drag_over.set(None);
+                            }
+                        >
+                            <MyDayTaskRow task=task refresh=refresh />
+                        </div>
+                    }
                 }).collect_view()}
 
                 // Completed tasks — collapsed by default
@@ -300,20 +387,28 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
     let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
 
     // Edit form state
-    let editing       = RwSignal::new(false);
-    let edit_title    = RwSignal::new(task.title.clone());
-    let orig_title    = RwSignal::new(task.title.clone());
-    let edit_due      = RwSignal::new(
+    let editing         = RwSignal::new(false);
+    let edit_title      = RwSignal::new(task.title.clone());
+    let orig_title      = RwSignal::new(task.title.clone());
+    let edit_due        = RwSignal::new(
         task.due_date
             .map(|d| d.format("%Y-%m-%d").to_string())
             .unwrap_or_default(),
     );
-    let edit_priority = RwSignal::new(priority_value(&task.priority).to_string());
+    let edit_priority   = RwSignal::new(priority_value(&task.priority).to_string());
+    let edit_recurrence = RwSignal::new(
+        task.recurrence
+            .as_ref()
+            .map(|r| recurrence_value(r).to_string())
+            .unwrap_or_default(),
+    );
 
     let do_save = move || {
         let new_title = edit_title.get_untracked().trim().to_string();
         if new_title.is_empty() { return; }
-        let new_priority = parse_priority(&edit_priority.get_untracked());
+        let new_priority  = parse_priority(&edit_priority.get_untracked());
+        let new_recurrence_str = edit_recurrence.get_untracked();
+        let new_recurrence = parse_recurrence_opt(&new_recurrence_str);
         editing.set(false);
         orig_title.set(new_title.clone());
         priority_val.set(priority_value(&new_priority).to_string());
@@ -325,6 +420,7 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
             priority:   Some(new_priority),
             focus_date: None,
             due_date:   new_due,
+            recurrence: Some(new_recurrence),
         };
         wasm_bindgen_futures::spawn_local(async move {
             let _ = crate::api::update_task(task_id, &req).await;
@@ -337,7 +433,7 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
         let next    = if current == "done" { "open" } else { "done" };
         let req = UpdateTaskRequest {
             title: None, status: Some(parse_status(next)),
-            priority: None, focus_date: None, due_date: None,
+            priority: None, focus_date: None, due_date: None, recurrence: None,
         };
         status_val.set(next.to_string());
         wasm_bindgen_futures::spawn_local(async move {
@@ -349,7 +445,7 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
     let on_remove = move |_| {
         let req = UpdateTaskRequest {
             title: None, status: None, priority: None,
-            focus_date: Some(None), due_date: None,
+            focus_date: Some(None), due_date: None, recurrence: None,
         };
         wasm_bindgen_futures::spawn_local(async move {
             let _ = crate::api::update_task(task_id, &req).await;
@@ -369,10 +465,12 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
         .unwrap_or(false);
     let due          = task.due_date;
     let carried_from = task.focus_date.filter(|&d| d < today);
+    let has_recurrence = task.recurrence.is_some();
+    let recurrence_tip = task.recurrence.as_ref().map(|r| recurrence_label(r));
 
     view! {
         <div class="group flex items-start gap-2 py-2 px-3 rounded-lg
-            hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors">
+            hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors cursor-grab active:cursor-grabbing">
 
             // Checkbox
             <button
@@ -435,7 +533,7 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                                 }
                             />
                             // Priority selector
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1.5 flex-wrap">
                                 <span class="text-xs text-stone-400 dark:text-stone-500">"Priority"</span>
                                 {["low", "medium", "high"].iter().map(|&p| {
                                     let (label, sel_style) = match p {
@@ -458,8 +556,8 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                                     }
                                 }).collect_view()}
                             </div>
-                            // Due date + Save/Cancel
-                            <div class="flex items-center gap-2">
+                            // Due date + Recurrence row
+                            <div class="flex items-center gap-2 flex-wrap">
                                 <input
                                     type="date"
                                     class="text-xs bg-stone-100 dark:bg-stone-700
@@ -470,6 +568,32 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                                     prop:value=move || edit_due.get()
                                     on:input=move |ev| edit_due.set(event_target_value(&ev))
                                 />
+                                // Recurrence selector
+                                <select
+                                    class="text-xs bg-stone-100 dark:bg-stone-700
+                                        text-stone-700 dark:text-stone-300
+                                        rounded px-2 py-0.5 focus:outline-none
+                                        focus:ring-1 focus:ring-amber-500"
+                                    title="Recurrence"
+                                    on:change=move |ev| edit_recurrence.set(event_target_value(&ev))
+                                >
+                                    <option value="" selected=move || edit_recurrence.get().is_empty()>
+                                        "No repeat"
+                                    </option>
+                                    {[
+                                        ("daily",    "Daily"),
+                                        ("weekly",   "Weekly"),
+                                        ("biweekly", "Every 2 weeks"),
+                                        ("monthly",  "Monthly"),
+                                        ("yearly",   "Yearly"),
+                                    ].iter().map(|&(val, label)| {
+                                        view! {
+                                            <option value=val selected=move || edit_recurrence.get() == val>
+                                                {label}
+                                            </option>
+                                        }
+                                    }).collect_view()}
+                                </select>
                                 <span class="flex-1"/>
                                 <button
                                     class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
@@ -496,7 +620,7 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                 } else {
                     // ── Display row ───────────────────────────────────────────
                     view! {
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             // Title — click navigates to the parent node
                             <span
                                 class="flex-1 min-w-0 text-sm text-stone-800 dark:text-stone-200
@@ -510,6 +634,19 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                             >
                                 {move || orig_title.get()}
                             </span>
+
+                            // Recurrence badge
+                            {has_recurrence.then(|| {
+                                let tip = recurrence_tip.unwrap_or("");
+                                view! {
+                                    <span
+                                        class="flex-shrink-0 text-stone-400 dark:text-stone-500"
+                                        title=format!("Repeats: {tip}")
+                                    >
+                                        <span class="material-symbols-outlined" style="font-size:13px;">"repeat"</span>
+                                    </span>
+                                }
+                            })}
 
                             // Carried-over badge
                             {carried_from.map(|d| view! {
