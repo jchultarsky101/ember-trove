@@ -837,6 +837,24 @@ pub async fn fetch_tasks(node_id: NodeId) -> Result<Vec<Task>, UiError> {
     parse_json(resp).await
 }
 
+pub async fn list_inbox() -> Result<Vec<Task>, UiError> {
+    let resp = Request::get(&api_url("/tasks/inbox"))
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
+pub async fn create_standalone_task(req: &CreateTaskRequest) -> Result<Task, UiError> {
+    let resp = Request::post(&api_url("/tasks"))
+        .json(req)
+        .map_err(|e| UiError::Parse(e.to_string()))?
+        .send()
+        .await
+        .map_err(|e| UiError::Network(e.to_string()))?;
+    parse_json(resp).await
+}
+
 pub async fn create_task(node_id: NodeId, req: &CreateTaskRequest) -> Result<Task, UiError> {
     let resp = Request::post(&api_url(&format!("/nodes/{node_id}/tasks")))
         .json(req)

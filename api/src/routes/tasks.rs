@@ -2,7 +2,7 @@ use axum::{
     Extension, Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    routing::{get, patch, put},
+    routing::{get, patch, post, put},
 };
 use chrono::{Datelike, NaiveDate};
 use common::{
@@ -28,6 +28,8 @@ pub fn node_task_router() -> Router<AppState> {
 
 pub fn task_router() -> Router<AppState> {
     Router::new()
+        .route("/", post(create_standalone_task))
+        .route("/inbox", get(list_inbox))
         .route("/{id}", patch(update_task).delete(delete_task))
         .route("/reorder", put(reorder_tasks))
 }
@@ -104,9 +106,32 @@ async fn create_task(
         .map_err(|e| ApiError::Validation(e.to_string()))?;
     let task = state
         .tasks
-        .create(NodeId(node_id), &claims.sub, req)
+        .create(Some(NodeId(node_id)), &claims.sub, req)
         .await?;
     Ok((StatusCode::CREATED, Json(task)))
+}
+
+/// POST /tasks — create a standalone (inbox) task with no parent node.
+async fn create_standalone_task(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+    Json(req): Json<CreateTaskRequest>,
+) -> Result<(StatusCode, Json<Task>), ApiError> {
+    req.validate()
+        .map_err(|e| ApiError::Validation(e.to_string()))?;
+    // `node_id` from the body (if provided) is used; otherwise task is standalone.
+    let node_id = req.node_id;
+    let task = state.tasks.create(node_id, &claims.sub, req).await?;
+    Ok((StatusCode::CREATED, Json(task)))
+}
+
+/// GET /tasks/inbox — standalone tasks (node_id IS NULL) for the authenticated user.
+async fn list_inbox(
+    State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
+) -> Result<Json<Vec<Task>>, ApiError> {
+    let tasks = state.tasks.list_inbox(&claims.sub).await?;
+    Ok(Json(tasks))
 }
 
 async fn update_task(
@@ -141,6 +166,7 @@ async fn update_task(
         let next_due = pre_task.due_date.map(|d| advance_date(d, rule));
         let next_req = CreateTaskRequest {
             title: pre_task.title.clone(),
+            node_id: pre_task.node_id,
             status: Some(TaskStatus::Open),
             priority: Some(pre_task.priority.clone()),
             focus_date: Some(next_focus),
@@ -148,9 +174,10 @@ async fn update_task(
             recurrence: Some(rule.clone()),
         };
         // Best-effort — ignore errors so the Done update still succeeds.
+        let next_node_id = next_req.node_id;
         let _ = state
             .tasks
-            .create(pre_task.node_id, &claims.sub, next_req)
+            .create(next_node_id, &claims.sub, next_req)
             .await;
     }
 

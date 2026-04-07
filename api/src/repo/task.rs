@@ -15,9 +15,10 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait TaskRepo: Send + Sync {
+    /// Create a task. `node_id = None` produces a standalone (inbox) task.
     async fn create(
         &self,
-        node_id: NodeId,
+        node_id: Option<NodeId>,
         owner_id: &str,
         req: CreateTaskRequest,
     ) -> Result<Task, EmberTroveError>;
@@ -40,6 +41,9 @@ pub trait TaskRepo: Send + Sync {
         owner_id: &str,
         date: NaiveDate,
     ) -> Result<Vec<MyDayTask>, EmberTroveError>;
+
+    /// Standalone tasks (node_id IS NULL) owned by `owner_id`.
+    async fn list_inbox(&self, owner_id: &str) -> Result<Vec<Task>, EmberTroveError>;
 
     /// Tasks with a due_date in [from, to] inclusive, ordered by due_date then priority.
     async fn list_by_due_range(
@@ -85,7 +89,7 @@ impl PgTaskRepo {
 #[derive(sqlx::FromRow)]
 struct TaskRow {
     id: Uuid,
-    node_id: Uuid,
+    node_id: Option<Uuid>,
     owner_id: String,
     title: String,
     status: String,
@@ -170,7 +174,7 @@ impl TaskRow {
             .transpose()?;
         Ok(Task {
             id: TaskId(self.id),
-            node_id: NodeId(self.node_id),
+            node_id: self.node_id.map(NodeId),
             owner_id: self.owner_id,
             title: self.title,
             status: parse_status(&self.status)?,
@@ -195,7 +199,7 @@ const SELECT_COLS: &str = r#"
 #[derive(sqlx::FromRow)]
 struct MyDayRow {
     id: Uuid,
-    node_id: Uuid,
+    node_id: Option<Uuid>,
     owner_id: String,
     title: String,
     status: String,
@@ -206,7 +210,7 @@ struct MyDayRow {
     sort_order: i32,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
-    node_title: String,
+    node_title: Option<String>,
 }
 
 fn my_day_row_to_task(r: MyDayRow) -> Result<MyDayTask, EmberTroveError> {
@@ -232,18 +236,14 @@ fn my_day_row_to_task(r: MyDayRow) -> Result<MyDayTask, EmberTroveError> {
 impl TaskRepo for PgTaskRepo {
     async fn create(
         &self,
-        node_id: NodeId,
+        node_id: Option<NodeId>,
         owner_id: &str,
         req: CreateTaskRequest,
     ) -> Result<Task, EmberTroveError> {
-        let status = req
-            .status
-            .as_ref()
-            .map_or("open", |s| status_str(s));
-        let priority = req
-            .priority
-            .as_ref()
-            .map_or("medium", |p| priority_str(p));
+        // node_id from path param takes precedence; fall back to body field.
+        let resolved_node_id = node_id.or(req.node_id).map(|n| n.0);
+        let status = req.status.as_ref().map_or("open", |s| status_str(s));
+        let priority = req.priority.as_ref().map_or("medium", |p| priority_str(p));
         let recurrence = req.recurrence.as_ref().map(|r| recurrence_str(r).to_string());
 
         let row = sqlx::query_as::<_, TaskRow>(&format!(
@@ -254,7 +254,7 @@ impl TaskRepo for PgTaskRepo {
             RETURNING {SELECT_COLS}
             "#
         ))
-        .bind(node_id.0)
+        .bind(resolved_node_id)
         .bind(owner_id)
         .bind(&req.title)
         .bind(status)
@@ -316,13 +316,13 @@ impl TaskRepo for PgTaskRepo {
     }
 
     async fn update(&self, id: TaskId, req: UpdateTaskRequest) -> Result<Task, EmberTroveError> {
-        let status_s = req.status.as_ref().map(|s| status_str(s).to_string());
-        let priority_s = req.priority.as_ref().map(|p| priority_str(p).to_string());
+        let status_s      = req.status.as_ref().map(|s| status_str(s).to_string());
+        let priority_s    = req.priority.as_ref().map(|p| priority_str(p).to_string());
         let recurrence_update = req.recurrence.is_some();
-        let recurrence_val = req
-            .recurrence
-            .and_then(|r| r)
+        let recurrence_val    = req.recurrence.and_then(|r| r)
             .map(|r| recurrence_str(&r).to_string());
+        let node_id_update = req.node_id.is_some();
+        let node_id_val    = req.node_id.and_then(|n| n).map(|n| n.0);
 
         let row = sqlx::query_as::<_, TaskRow>(&format!(
             r#"
@@ -330,9 +330,10 @@ impl TaskRepo for PgTaskRepo {
                 title      = COALESCE($2, title),
                 status     = COALESCE($3::task_status,   status),
                 priority   = COALESCE($4::task_priority, priority),
-                focus_date = CASE WHEN $5 THEN $6 ELSE focus_date END,
-                due_date   = CASE WHEN $7 THEN $8 ELSE due_date   END,
-                recurrence = CASE WHEN $9 THEN $10 ELSE recurrence END
+                focus_date = CASE WHEN $5  THEN $6  ELSE focus_date END,
+                due_date   = CASE WHEN $7  THEN $8  ELSE due_date   END,
+                recurrence = CASE WHEN $9  THEN $10 ELSE recurrence END,
+                node_id    = CASE WHEN $11 THEN $12 ELSE node_id    END
             WHERE id = $1
             RETURNING {SELECT_COLS}
             "#
@@ -347,6 +348,8 @@ impl TaskRepo for PgTaskRepo {
         .bind(req.due_date.and_then(|d| d))
         .bind(recurrence_update)
         .bind(recurrence_val)
+        .bind(node_id_update)
+        .bind(node_id_val)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("update task failed: {e}")))?
@@ -383,7 +386,7 @@ impl TaskRepo for PgTaskRepo {
                 t.created_at, t.updated_at,
                 n.title           AS node_title
             FROM node_tasks t
-            JOIN nodes n ON n.id = t.node_id
+            LEFT JOIN nodes n ON n.id = t.node_id
             WHERE t.owner_id = $1
               AND t.focus_date IS NOT NULL
               AND t.focus_date <= $2
@@ -398,7 +401,8 @@ impl TaskRepo for PgTaskRepo {
                     WHEN 'medium' THEN 1
                     WHEN 'low'    THEN 2
                 END,
-                t.node_id, t.created_at
+                t.node_id NULLS FIRST,
+                t.created_at
             "#,
         )
         .bind(owner_id)
@@ -408,6 +412,31 @@ impl TaskRepo for PgTaskRepo {
         .map_err(|e| EmberTroveError::Internal(format!("list my day failed: {e}")))?;
 
         rows.into_iter().map(my_day_row_to_task).collect()
+    }
+
+    async fn list_inbox(&self, owner_id: &str) -> Result<Vec<Task>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, TaskRow>(&format!(
+            r#"
+            SELECT {SELECT_COLS}
+            FROM node_tasks
+            WHERE owner_id = $1
+              AND node_id IS NULL
+            ORDER BY
+                sort_order ASC,
+                CASE priority::text
+                    WHEN 'high'   THEN 0
+                    WHEN 'medium' THEN 1
+                    WHEN 'low'    THEN 2
+                END,
+                created_at ASC
+            "#
+        ))
+        .bind(owner_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list inbox failed: {e}")))?;
+
+        rows.into_iter().map(TaskRow::into_task).collect()
     }
 
     async fn list_by_due_range(
@@ -426,7 +455,7 @@ impl TaskRepo for PgTaskRepo {
                 t.created_at, t.updated_at,
                 n.title           AS node_title
             FROM node_tasks t
-            JOIN nodes n ON n.id = t.node_id
+            LEFT JOIN nodes n ON n.id = t.node_id
             WHERE t.owner_id = $1
               AND t.due_date >= $2
               AND t.due_date <= $3

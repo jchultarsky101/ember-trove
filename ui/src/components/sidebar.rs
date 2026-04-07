@@ -106,6 +106,11 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
             />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             <SidebarLink
+                icon="inbox" label="Inbox"
+                on_click=move || { current_view.set(View::Inbox); on_nav.run(()); }
+                collapsed=collapsed
+            />
+            <SidebarLink
                 icon="wb_sunny" label="My Day"
                 on_click=move || { current_view.set(View::MyDay); on_nav.run(()); }
                 collapsed=collapsed
