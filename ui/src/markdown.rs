@@ -49,6 +49,7 @@ fn sanitizer() -> ammonia::Builder<'static> {
     b.add_tag_attributes("a", &["class", "data-node-id"]);
     b.add_tag_attributes("span", &["class"]);
     b.add_tag_attributes("input", &["type", "checked", "disabled"]);
+    b.add_tag_attributes("img", &["src", "alt", "width", "height", "style"]);
     for &tag in STYLED_ELEMENTS {
         b.add_tag_attributes(tag, &["style"]);
     }
