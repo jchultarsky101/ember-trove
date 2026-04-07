@@ -237,7 +237,9 @@ pub fn CalendarView() -> impl IntoView {
                                                         )
                                                         title=title.clone()
                                                         on:click=move |_| {
-                                                            current_view.set(View::NodeDetail(node_id));
+                                                            if let Some(nid) = node_id {
+                                                                current_view.set(View::NodeDetail(nid));
+                                                            }
                                                         }
                                                     >
                                                         {title.clone()}

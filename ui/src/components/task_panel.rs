@@ -141,6 +141,7 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
         wasm_bindgen_futures::spawn_local(async move {
             let req = CreateTaskRequest {
                 title,
+                node_id: None,
                 status: None,
                 priority: Some(priority),
                 focus_date: None,
@@ -384,6 +385,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
             focus_date: None,
             due_date: new_due,
             recurrence: None,
+            node_id: None,
         };
         wasm_bindgen_futures::spawn_local(async move {
             let _ = crate::api::update_task(task_id, &req).await;
@@ -403,6 +405,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
             focus_date: None,
             due_date: None,
             recurrence: None,
+            node_id: None,
         };
         status_sig.set(next.to_string());
         wasm_bindgen_futures::spawn_local(async move {
@@ -423,6 +426,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
             focus_date: Some(new_focus),
             due_date: None,
             recurrence: None,
+            node_id: None,
         };
         wasm_bindgen_futures::spawn_local(async move {
             let _ = crate::api::update_task(task_id, &req).await;

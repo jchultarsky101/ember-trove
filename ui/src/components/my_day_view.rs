@@ -220,10 +220,11 @@ pub fn MyDayView() -> impl IntoView {
                             }.into_any();
                         }
 
-                        // Group by node_id, preserving server sort_order within each group.
-                        let mut grouped: Vec<(String, String, Vec<Task>)> = vec![];
+                        // Group by node_id (or "inbox" for standalone), preserving sort_order.
+                        let mut grouped: Vec<(String, Option<String>, Vec<Task>)> = vec![];
                         for MyDayTask { task, node_title } in raw_tasks {
-                            let node_id_str = task.node_id.to_string();
+                            let node_id_str = task.node_id
+                                .map_or_else(|| "inbox".to_string(), |n| n.to_string());
                             if let Some(g) = grouped.iter_mut().find(|(id, _, _)| id == &node_id_str) {
                                 g.2.push(task);
                             } else {
@@ -244,7 +245,11 @@ pub fn MyDayView() -> impl IntoView {
                                             node_title=node_title
                                             tasks=tasks
                                             refresh=refresh
-                                            on_navigate=move || current_view.set(View::NodeDetail(node_id))
+                                            on_navigate=move || {
+                                                if let Some(nid) = node_id {
+                                                    current_view.set(View::NodeDetail(nid));
+                                                }
+                                            }
                                         />
                                     }
                                 }).collect_view()}
@@ -261,8 +266,8 @@ pub fn MyDayView() -> impl IntoView {
 
 #[component]
 fn MyDayGroup(
-    node_id: common::id::NodeId,
-    node_title: String,
+    node_id: Option<common::id::NodeId>,
+    node_title: Option<String>,
     tasks: Vec<Task>,
     refresh: RwSignal<u32>,
     on_navigate: impl Fn() + Copy + 'static,
@@ -283,16 +288,20 @@ fn MyDayGroup(
 
     view! {
         <div>
-            // Clickable project header
+            // Clickable project header (or "Inbox" label for standalone tasks)
             <button
                 class="flex items-center gap-2 mb-2 text-xs font-semibold
                     text-stone-500 dark:text-stone-400 uppercase tracking-wider
                     hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
                 on:click=move |_| on_navigate()
             >
-                <span class="material-symbols-outlined" style="font-size: 14px;">"rocket_launch"</span>
-                {node_title}
-                <span class="material-symbols-outlined" style="font-size: 12px;">"open_in_new"</span>
+                <span class="material-symbols-outlined" style="font-size: 14px;">
+                    {if node_id.is_some() { "rocket_launch" } else { "inbox" }}
+                </span>
+                {node_title.unwrap_or_else(|| "Inbox".to_string())}
+                {node_id.is_some().then(|| view! {
+                    <span class="material-symbols-outlined" style="font-size: 12px;">"open_in_new"</span>
+                })}
             </button>
 
             <div class="space-y-0.5 pl-2 border-l-2 border-stone-200 dark:border-stone-700">
@@ -421,6 +430,7 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
             focus_date: None,
             due_date:   new_due,
             recurrence: Some(new_recurrence),
+            node_id:    None,
         };
         wasm_bindgen_futures::spawn_local(async move {
             let _ = crate::api::update_task(task_id, &req).await;
@@ -433,7 +443,7 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
         let next    = if current == "done" { "open" } else { "done" };
         let req = UpdateTaskRequest {
             title: None, status: Some(parse_status(next)),
-            priority: None, focus_date: None, due_date: None, recurrence: None,
+            priority: None, focus_date: None, due_date: None, recurrence: None, node_id: None,
         };
         status_val.set(next.to_string());
         wasm_bindgen_futures::spawn_local(async move {
@@ -445,7 +455,7 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
     let on_remove = move |_| {
         let req = UpdateTaskRequest {
             title: None, status: None, priority: None,
-            focus_date: Some(None), due_date: None, recurrence: None,
+            focus_date: Some(None), due_date: None, recurrence: None, node_id: None,
         };
         wasm_bindgen_futures::spawn_local(async move {
             let _ = crate::api::update_task(task_id, &req).await;
@@ -629,7 +639,11 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                                 style=move || if status_done(&parse_status(&status_val.get())) {
                                     "text-decoration:line-through;opacity:0.45;"
                                 } else { "" }
-                                on:click=move |_| current_view.set(View::NodeDetail(node_id))
+                                on:click=move |_| {
+                                    if let Some(nid) = node_id {
+                                        current_view.set(View::NodeDetail(nid));
+                                    }
+                                }
                                 title="Open parent node"
                             >
                                 {move || orig_title.get()}

@@ -36,7 +36,8 @@ pub enum RecurrenceRule {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Task {
     pub id: TaskId,
-    pub node_id: NodeId,
+    /// `None` for standalone (inbox) tasks not yet associated with a node.
+    pub node_id: Option<NodeId>,
     pub owner_id: String,
     pub title: String,
     pub status: TaskStatus,
@@ -62,11 +63,12 @@ pub struct TaskCounts {
 }
 
 /// A task enriched with its parent node's title, returned by the My Day endpoint.
+/// `node_title` is `None` for standalone (inbox) tasks.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct MyDayTask {
     #[serde(flatten)]
     pub task: Task,
-    pub node_title: String,
+    pub node_title: Option<String>,
 }
 
 /// One row in the Project Dashboard — a project node plus its task counts.
@@ -78,10 +80,25 @@ pub struct ProjectDashboardEntry {
     pub task_counts: TaskCounts,
 }
 
+/// Deserialises `Option<Option<T>>` correctly:
+/// - field absent        → `None`           (via `#[serde(default)]`)
+/// - field present/null  → `Some(None)`
+/// - field present/value → `Some(Some(v))`
+fn deser_double_opt<'de, T, D>(d: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: serde::Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Ok(Some(Option::<T>::deserialize(d)?))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct CreateTaskRequest {
     #[garde(length(min = 1, max = 500))]
     pub title: String,
+    /// If absent, the task is standalone (no node association).
+    #[garde(skip)]
+    pub node_id: Option<NodeId>,
     #[garde(skip)]
     pub status: Option<TaskStatus>,
     #[garde(skip)]
@@ -92,21 +109,6 @@ pub struct CreateTaskRequest {
     pub due_date: Option<NaiveDate>,
     #[garde(skip)]
     pub recurrence: Option<RecurrenceRule>,
-}
-
-/// Deserialises `Option<Option<T>>` correctly:
-/// - field absent        → `None`           (via `#[serde(default)]`)
-/// - field present/null  → `Some(None)`
-/// - field present/value → `Some(Some(v))`
-///
-/// Without this, serde maps JSON `null` to the *outer* `None`, making it
-/// impossible to distinguish "don't touch this field" from "clear this field".
-fn deser_double_opt<'de, T, D>(d: D) -> Result<Option<Option<T>>, D::Error>
-where
-    T: serde::Deserialize<'de>,
-    D: serde::Deserializer<'de>,
-{
-    Ok(Some(Option::<T>::deserialize(d)?))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -123,6 +125,9 @@ pub struct UpdateTaskRequest {
     /// `None` = leave unchanged · `Some(None)` = clear recurrence · `Some(Some(r))` = set
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deser_double_opt")]
     pub recurrence: Option<Option<RecurrenceRule>>,
+    /// `None` = leave unchanged · `Some(None)` = detach from node · `Some(Some(id))` = associate
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deser_double_opt")]
+    pub node_id: Option<Option<NodeId>>,
 }
 
 /// One entry in a bulk sort-order update (drag-to-reorder in My Day).

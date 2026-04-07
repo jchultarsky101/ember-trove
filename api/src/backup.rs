@@ -378,7 +378,7 @@ pub async fn execute_restore(
             "#,
         )
         .bind(task.id.0)
-        .bind(task.node_id.0)
+        .bind(task.node_id.map(|n| n.0))
         .bind(&task.owner_id)
         .bind(&task.title)
         .bind(status_str)
