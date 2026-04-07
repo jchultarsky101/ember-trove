@@ -110,12 +110,13 @@ impl TagRepo for StubTagRepo {
 struct StubTaskRepo;
 #[async_trait]
 impl TaskRepo for StubTaskRepo {
-    async fn create(&self, _: NodeId, _: &str, _: CreateTaskRequest) -> Result<Task, EmberTroveError> { unimplemented!() }
+    async fn create(&self, _: Option<NodeId>, _: &str, _: CreateTaskRequest) -> Result<Task, EmberTroveError> { unimplemented!() }
     async fn list_for_node(&self, _: NodeId, _: &str) -> Result<Vec<Task>, EmberTroveError> { unimplemented!() }
     async fn get(&self, _: TaskId) -> Result<Task, EmberTroveError> { unimplemented!() }
     async fn update(&self, _: TaskId, _: UpdateTaskRequest) -> Result<Task, EmberTroveError> { unimplemented!() }
     async fn delete(&self, _: TaskId) -> Result<(), EmberTroveError> { unimplemented!() }
     async fn list_my_day(&self, _: &str, _: NaiveDate) -> Result<Vec<MyDayTask>, EmberTroveError> { unimplemented!() }
+    async fn list_inbox(&self, _: &str) -> Result<Vec<Task>, EmberTroveError> { unimplemented!() }
     async fn counts_for_nodes(&self, _: &[NodeId]) -> Result<Vec<(NodeId, TaskCounts)>, EmberTroveError> { unimplemented!() }
     async fn list_all_for_owner(&self, _: &str) -> Result<Vec<Task>, EmberTroveError> { unimplemented!() }
     async fn list_all(&self) -> Result<Vec<Task>, EmberTroveError> { unimplemented!() }

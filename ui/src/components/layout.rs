@@ -7,11 +7,11 @@ use crate::{
         admin_view::AdminView, backup_view::BackupView,
         bulk_permissions_view::BulkPermissionsView, calendar_view::CalendarView,
         dark_mode_toggle::DarkModeToggle,
-        graph_view::GraphView, modals::create_node::CreateNodeModal, my_day_view::MyDayView,
-        node_editor::NodeEditor, node_list::NodeList, node_view::NodeView,
-        notes_view::NotesView, project_dashboard::ProjectDashboard, search_view::SearchView,
-        sidebar::Sidebar, tag_manager::TagManager, templates_view::TemplatesView,
-        toast::ToastOverlay,
+        graph_view::GraphView, inbox_view::InboxView, modals::create_node::CreateNodeModal,
+        my_day_view::MyDayView, node_editor::NodeEditor, node_list::NodeList,
+        node_view::NodeView, notes_view::NotesView, project_dashboard::ProjectDashboard,
+        search_view::SearchView, sidebar::Sidebar, tag_manager::TagManager,
+        templates_view::TemplatesView, toast::ToastOverlay,
     },
 };
 
@@ -242,6 +242,7 @@ fn ViewSwitch() -> impl IntoView {
         View::Backup => view! { <BackupView /> }.into_any(),
         View::Templates => view! { <TemplatesView /> }.into_any(),
         View::BulkPermissions => view! { <BulkPermissionsView /> }.into_any(),
+        View::Inbox => view! { <InboxView /> }.into_any(),
     }
 }
 
