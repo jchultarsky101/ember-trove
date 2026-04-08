@@ -54,12 +54,39 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                 }
             }}
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
-            // Favorites — pinned nodes and external URLs
-            <FavoritesSection collapsed=collapsed on_nav=on_nav />
+            // ── Section 1: Daily workflow ──────────────────────────────────────
+            <SidebarLink
+                icon="inbox" label="Inbox"
+                on_click=move || { current_view.set(View::Inbox); on_nav.run(()); }
+                collapsed=collapsed
+            />
+            <SidebarLink
+                icon="wb_sunny" label="My Day"
+                on_click=move || { current_view.set(View::MyDay); on_nav.run(()); }
+                collapsed=collapsed
+            />
+            <SidebarLink
+                icon="calendar_month" label="Calendar"
+                on_click=move || { current_view.set(View::Calendar); on_nav.run(()); }
+                collapsed=collapsed
+            />
+            <SidebarLink
+                icon="sticky_note_2" label="Notes"
+                on_click=move || { current_view.set(View::Notes); on_nav.run(()); }
+                collapsed=collapsed
+            />
+            <SidebarLink
+                icon="dashboard" label="Dashboard"
+                on_click=move || { current_view.set(View::ProjectDashboard); on_nav.run(()); }
+                collapsed=collapsed
+            />
+            <SidebarLink
+                icon="share" label="Graph"
+                on_click=move || { current_view.set(View::Graph); on_nav.run(()); }
+                collapsed=collapsed
+            />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
-            // Recent nodes — re-reads localStorage on every view change
-            <RecentSection collapsed=collapsed on_nav=on_nav />
-            <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
+            // ── Section 2: Knowledge base ──────────────────────────────────────
             // "All Nodes" + per-type sub-links
             <SidebarLink
                 icon="segment" label="All Nodes"
@@ -88,15 +115,15 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                     </div>
                 }.into_any())
             }}
+            // Favorites — pinned nodes and external URLs
+            <FavoritesSection collapsed=collapsed on_nav=on_nav />
+            // Recent nodes — re-reads localStorage on every view change
+            <RecentSection collapsed=collapsed on_nav=on_nav />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
+            // ── Section 3: Content tools ───────────────────────────────────────
             <SidebarLink
                 icon="label" label="Tags"
                 on_click=move || { current_view.set(View::TagManager); on_nav.run(()); }
-                collapsed=collapsed
-            />
-            <SidebarLink
-                icon="sticky_note_2" label="Notes"
-                on_click=move || { current_view.set(View::Notes); on_nav.run(()); }
                 collapsed=collapsed
             />
             <SidebarLink
@@ -104,33 +131,7 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                 on_click=move || { current_view.set(View::Templates); on_nav.run(()); }
                 collapsed=collapsed
             />
-            <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
-            <SidebarLink
-                icon="inbox" label="Inbox"
-                on_click=move || { current_view.set(View::Inbox); on_nav.run(()); }
-                collapsed=collapsed
-            />
-            <SidebarLink
-                icon="wb_sunny" label="My Day"
-                on_click=move || { current_view.set(View::MyDay); on_nav.run(()); }
-                collapsed=collapsed
-            />
-            <SidebarLink
-                icon="calendar_month" label="Calendar"
-                on_click=move || { current_view.set(View::Calendar); on_nav.run(()); }
-                collapsed=collapsed
-            />
-            <SidebarLink
-                icon="dashboard" label="Dashboard"
-                on_click=move || { current_view.set(View::ProjectDashboard); on_nav.run(()); }
-                collapsed=collapsed
-            />
-            <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
-            <SidebarLink
-                icon="share" label="Graph"
-                on_click=move || { current_view.set(View::Graph); on_nav.run(()); }
-                collapsed=collapsed
-            />
+            // ── Section 4: Admin (only visible to admins) ─────────────────────
             {move || {
                 if let AuthStatus::Authenticated(ref u) = auth_state.get()
                     && u.roles.contains(&"admin".to_string())
@@ -153,24 +154,22 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                                 on_click=move || { current_view.set(View::Backup); on_nav.run(()); }
                                 collapsed=collapsed
                             />
+                            <SidebarLink
+                                icon="download"
+                                label="Export ZIP"
+                                on_click=move || {
+                                    if let Some(window) = web_sys::window() {
+                                        let _ = window.open_with_url("/api/export");
+                                    }
+                                }
+                                collapsed=collapsed
+                            />
                         </div>
                     }.into_any())
                 } else {
                     None
                 }
             }}
-            <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
-            // Export all nodes as a ZIP of Markdown files
-            <SidebarLink
-                icon="download"
-                label="Export ZIP"
-                on_click=move || {
-                    if let Some(window) = web_sys::window() {
-                        let _ = window.open_with_url("/api/export");
-                    }
-                }
-                collapsed=collapsed
-            />
         </nav>
         // User / logout section
         <div class="px-2 py-3 border-t border-stone-200 dark:border-stone-800">
