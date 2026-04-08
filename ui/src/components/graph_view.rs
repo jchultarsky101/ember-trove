@@ -30,9 +30,9 @@ use common::{
 
 use crate::{
     api::{create_edge, delete_edge, fetch_all_edges, fetch_nodes, fetch_positions, save_position, save_positions},
-    app::View,
     components::node_meta::{status_color_hex, status_label, type_icon, type_label},
 };
+use leptos_router::hooks::use_navigate;
 
 const W: f64 = 3000.0;
 const H: f64 = 2000.0;
@@ -701,7 +701,7 @@ fn smart_layout(
 
 #[component]
 pub fn GraphView() -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = use_navigate();
     let loading = RwSignal::new(true);
     let error_msg = RwSignal::new(Option::<String>::None);
     let nodes_sig: RwSignal<Vec<Node>> = RwSignal::new(vec![]);
@@ -1594,10 +1594,13 @@ pub fn GraphView() -> impl IntoView {
                                         }
                                     }
                                 }
-                                on:dblclick=move |ev: MouseEvent| {
-                                    ev.stop_propagation();
-                                    if !edge_create_mode.get_untracked() {
-                                        current_view.set(View::NodeDetail(node_id));
+                                on:dblclick={
+                                    let nav = navigate.clone();
+                                    move |ev: MouseEvent| {
+                                        ev.stop_propagation();
+                                        if !edge_create_mode.get_untracked() {
+                                            nav(&format!("/nodes/{node_id}"), Default::default());
+                                        }
                                     }
                                 }
                                 on:mouseover=move |ev: MouseEvent| {

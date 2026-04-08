@@ -8,8 +8,8 @@ use common::{
 use leptos::prelude::*;
 use uuid::Uuid;
 
-use crate::app::View;
 use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
+use leptos_router::hooks::use_navigate;
 use crate::components::toast::{ToastLevel, push_toast};
 
 // ── Sorting ────────────────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ fn body_preview(body: &str) -> Option<String> {
 
 #[component]
 pub fn NodeList() -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = use_navigate();
     let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
     let tag_filter =
         use_context::<RwSignal<Option<Tag>>>().unwrap_or_else(|| RwSignal::new(None));
@@ -215,7 +215,7 @@ pub fn NodeList() -> impl IntoView {
                     <button
                         class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
                             hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
-                        on:click=move |_| current_view.set(View::NodeCreate)
+                        on:click=move |_| navigate("/nodes/new", Default::default())
                         title="New node"
                     >
                         <span class="material-symbols-outlined">"add"</span>
@@ -502,7 +502,6 @@ pub fn NodeList() -> impl IntoView {
                                     view! {
                                         <NodeCards
                                             nodes=sorted
-                                            current_view=current_view
                                             available_tags=available_tags
                                             selected_ids=selected_ids
                                         />
@@ -525,10 +524,10 @@ pub fn NodeList() -> impl IntoView {
 #[component]
 fn NodeCards(
     nodes: Vec<Node>,
-    current_view: RwSignal<View>,
     available_tags: Vec<Tag>,
     selected_ids: RwSignal<HashSet<Uuid>>,
 ) -> impl IntoView {
+    let navigate = use_navigate();
     let tag_filter =
         use_context::<RwSignal<Option<Tag>>>().unwrap_or_else(|| RwSignal::new(None));
     let refresh =
@@ -559,6 +558,7 @@ fn NodeCards(
                 let s_color = status_color(&st);
 
                 let node_uuid = id.0;
+                let nav = navigate.clone();
                 view! {
                     <li
                         class="px-4 py-3.5 hover:bg-stone-50 dark:hover:bg-stone-900/60
@@ -567,7 +567,7 @@ fn NodeCards(
                             // Only navigate if nothing is selected (bulk mode off)
                             // — prevents accidental navigation while selecting.
                             if selected_ids.get_untracked().is_empty() {
-                                current_view.set(View::NodeDetail(id));
+                                nav(&format!("/nodes/{id}"), Default::default());
                             }
                         }
                     >

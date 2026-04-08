@@ -1,7 +1,7 @@
 use leptos::prelude::*;
+use leptos_router::hooks::{use_location, use_navigate};
 
 use crate::{
-    app::View,
     auth::{AuthState, AuthStatus},
     components::{
         change_password_modal::ChangePasswordModal,
@@ -10,12 +10,10 @@ use crate::{
         search_bar::SearchBar,
     },
 };
-use common::id::NodeId;
 
 #[component]
 pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
-
+    let navigate = StoredValue::new(use_navigate());
     let show_change_pw = RwSignal::new(false);
 
     let on_logout = move |_| {
@@ -31,17 +29,25 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
     let node_type_filter =
         use_context::<RwSignal<Option<String>>>().expect("node_type_filter signal must be provided");
 
+    // Macro to reduce cloning boilerplate for each nav closure.
+    // Each SidebarLink on_click needs its own clone of navigate + on_nav.
+    macro_rules! nav {
+        ($path:expr) => {{
+            let n = navigate.get_value();
+            move || { n($path, Default::default()); on_nav.run(()); }
+        }};
+    }
+
     view! {
         <nav class="flex-1 overflow-y-auto px-2 py-4 space-y-1">
-            // Search — top of sidebar, always first
-            // Expanded: inline SearchBar + "Browse by tag" shortcut
-            // Collapsed: icon navigates to Search view
+            // Search — top of sidebar
             {move || {
                 if collapsed.get() {
+                    let n = navigate.get_value();
                     view! {
                         <SidebarLink
                             icon="search" label="Search"
-                            on_click=move || current_view.set(View::Search)
+                            on_click=move || n("/search", Default::default())
                             collapsed=collapsed
                         />
                     }.into_any()
@@ -55,45 +61,19 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
             }}
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             // ── Section 1: Daily workflow ──────────────────────────────────────
-            <SidebarLink
-                icon="inbox" label="Inbox"
-                on_click=move || { current_view.set(View::Inbox); on_nav.run(()); }
-                collapsed=collapsed
-            />
-            <SidebarLink
-                icon="wb_sunny" label="My Day"
-                on_click=move || { current_view.set(View::MyDay); on_nav.run(()); }
-                collapsed=collapsed
-            />
-            <SidebarLink
-                icon="calendar_month" label="Calendar"
-                on_click=move || { current_view.set(View::Calendar); on_nav.run(()); }
-                collapsed=collapsed
-            />
-            <SidebarLink
-                icon="sticky_note_2" label="Notes"
-                on_click=move || { current_view.set(View::Notes); on_nav.run(()); }
-                collapsed=collapsed
-            />
-            <SidebarLink
-                icon="dashboard" label="Dashboard"
-                on_click=move || { current_view.set(View::ProjectDashboard); on_nav.run(()); }
-                collapsed=collapsed
-            />
-            <SidebarLink
-                icon="share" label="Graph"
-                on_click=move || { current_view.set(View::Graph); on_nav.run(()); }
-                collapsed=collapsed
-            />
+            <SidebarLink icon="inbox"          label="Inbox"     on_click=nav!("/inbox")     collapsed=collapsed />
+            <SidebarLink icon="wb_sunny"       label="My Day"    on_click=nav!("/my-day")    collapsed=collapsed />
+            <SidebarLink icon="calendar_month" label="Calendar"  on_click=nav!("/calendar")  collapsed=collapsed />
+            <SidebarLink icon="sticky_note_2"  label="Notes"     on_click=nav!("/notes")     collapsed=collapsed />
+            <SidebarLink icon="dashboard"      label="Dashboard" on_click=nav!("/dashboard") collapsed=collapsed />
+            <SidebarLink icon="share"          label="Graph"     on_click=nav!("/graph")     collapsed=collapsed />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             // ── Section 2: Knowledge base ──────────────────────────────────────
-            // "All Nodes" + per-type sub-links
             <SidebarLink
                 icon="segment" label="All Nodes"
-                on_click=move || {
-                    node_type_filter.set(None);
-                    current_view.set(View::NodeList);
-                    on_nav.run(());
+                on_click={
+                    let n = navigate.get_value();
+                    move || { node_type_filter.set(None); n("/nodes", Default::default()); on_nav.run(()); }
                 }
                 collapsed=collapsed
             />
@@ -102,35 +82,22 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                 if collapsed.get() { return None; }
                 Some(view! {
                     <div class="ml-3 border-l border-stone-200 dark:border-stone-700 pl-2 space-y-0.5">
-                        <TypeFilterLink icon="description" label="Articles" value="article"
-                            node_type_filter=node_type_filter current_view=current_view on_nav=on_nav />
-                        <TypeFilterLink icon="rocket_launch" label="Projects" value="project"
-                            node_type_filter=node_type_filter current_view=current_view on_nav=on_nav />
-                        <TypeFilterLink icon="category" label="Areas" value="area"
-                            node_type_filter=node_type_filter current_view=current_view on_nav=on_nav />
-                        <TypeFilterLink icon="bookmarks" label="Resources" value="resource"
-                            node_type_filter=node_type_filter current_view=current_view on_nav=on_nav />
-                        <TypeFilterLink icon="menu_book" label="References" value="reference"
-                            node_type_filter=node_type_filter current_view=current_view on_nav=on_nav />
+                        <TypeFilterLink icon="description"  label="Articles"   value="article"   node_type_filter=node_type_filter on_nav=on_nav />
+                        <TypeFilterLink icon="rocket_launch" label="Projects"  value="project"   node_type_filter=node_type_filter on_nav=on_nav />
+                        <TypeFilterLink icon="category"     label="Areas"      value="area"      node_type_filter=node_type_filter on_nav=on_nav />
+                        <TypeFilterLink icon="bookmarks"    label="Resources"  value="resource"  node_type_filter=node_type_filter on_nav=on_nav />
+                        <TypeFilterLink icon="menu_book"    label="References" value="reference" node_type_filter=node_type_filter on_nav=on_nav />
                     </div>
                 }.into_any())
             }}
             // Favorites — pinned nodes and external URLs
             <FavoritesSection collapsed=collapsed on_nav=on_nav />
-            // Recent nodes — re-reads localStorage on every view change
+            // Recent nodes — re-reads localStorage on every location change
             <RecentSection collapsed=collapsed on_nav=on_nav />
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             // ── Section 3: Content tools ───────────────────────────────────────
-            <SidebarLink
-                icon="label" label="Tags"
-                on_click=move || { current_view.set(View::TagManager); on_nav.run(()); }
-                collapsed=collapsed
-            />
-            <SidebarLink
-                icon="content_copy" label="Templates"
-                on_click=move || { current_view.set(View::Templates); on_nav.run(()); }
-                collapsed=collapsed
-            />
+            <SidebarLink icon="label"        label="Tags"      on_click=nav!("/tags")      collapsed=collapsed />
+            <SidebarLink icon="content_copy" label="Templates" on_click=nav!("/templates") collapsed=collapsed />
             // ── Section 4: Admin (only visible to admins) ─────────────────────
             {move || {
                 if let AuthStatus::Authenticated(ref u) = auth_state.get()
@@ -139,21 +106,9 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                     Some(view! {
                         <div>
                             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
-                            <SidebarLink
-                                icon="group" label="Users"
-                                on_click=move || { current_view.set(View::Admin); on_nav.run(()); }
-                                collapsed=collapsed
-                            />
-                            <SidebarLink
-                                icon="manage_accounts" label="Permissions"
-                                on_click=move || { current_view.set(View::BulkPermissions); on_nav.run(()); }
-                                collapsed=collapsed
-                            />
-                            <SidebarLink
-                                icon="backup" label="Backup"
-                                on_click=move || { current_view.set(View::Backup); on_nav.run(()); }
-                                collapsed=collapsed
-                            />
+                            <SidebarLink icon="group"          label="Users"       on_click=nav!("/admin/users")       collapsed=collapsed />
+                            <SidebarLink icon="manage_accounts" label="Permissions" on_click=nav!("/admin/permissions") collapsed=collapsed />
+                            <SidebarLink icon="backup"         label="Backup"      on_click=nav!("/admin/backup")      collapsed=collapsed />
                             <SidebarLink
                                 icon="download"
                                 label="Export ZIP"
@@ -180,7 +135,6 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                         .or_else(|| user.email.clone())
                         .unwrap_or_else(|| user.sub.clone());
                     if is_collapsed {
-                        // Collapsed: stack of icon-only buttons with tooltips
                         Some(view! {
                             <div class="flex flex-col gap-1">
                                 <button
@@ -204,7 +158,6 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
                             </div>
                         }.into_any())
                     } else {
-                        // Expanded: username + change-password + logout
                         Some(view! {
                             <div class="space-y-1 px-1">
                                 <span class="block text-xs text-stone-500 dark:text-stone-400 truncate">
@@ -239,7 +192,7 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
             }}
         </div>
 
-        // Change-password modal (portal rendered above everything)
+        // Change-password modal
         {move || show_change_pw.get().then(|| view! {
             <ChangePasswordModal on_close=Callback::new(move |_| show_change_pw.set(false)) />
         })}
@@ -248,16 +201,14 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
 
 // ── Recent nodes ─────────────────────────────────────────────────────────────
 
-/// Sidebar section that lists the last 10 visited nodes, read from
-/// `localStorage`.  Re-reads on every view-signal change so new visits appear
-/// immediately when the user navigates back to the sidebar.
 #[component]
 fn RecentSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    // Re-read on every location change so new visits appear immediately.
+    let location = use_location();
+    let navigate = StoredValue::new(use_navigate());
 
     move || {
-        // Track current_view so this closure re-runs after each navigation.
-        let _view = current_view.get();
+        let _path = location.pathname.get(); // reactive dependency
         let entries = crate::recent::read_recent();
 
         if entries.is_empty() {
@@ -268,7 +219,6 @@ fn RecentSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl Into
 
         Some(view! {
             <div>
-                // Section heading (hidden when collapsed — only icons show)
                 {(!is_collapsed).then(|| view! {
                     <p class="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest
                                text-stone-400 dark:text-stone-500 select-none">
@@ -280,6 +230,7 @@ fn RecentSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl Into
                     let title = entry.title.clone();
                     let icon = entry.icon.clone();
                     let label = entry.title.clone();
+                    let n = navigate.get_value();
                     view! {
                         <button
                             class=move || {
@@ -296,7 +247,7 @@ fn RecentSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl Into
                             }
                             title=title.clone()
                             on:click=move |_| {
-                                current_view.set(View::NodeDetail(NodeId(id)));
+                                n(&format!("/nodes/{id}"), Default::default());
                                 on_nav.run(());
                             }
                         >
@@ -317,16 +268,17 @@ fn RecentSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl Into
     }
 }
 
-/// Compact sub-link for filtering NodeList by a specific node type.
+// ── TypeFilterLink ────────────────────────────────────────────────────────────
+
 #[component]
 fn TypeFilterLink(
     icon: &'static str,
     label: &'static str,
     value: &'static str,
     node_type_filter: RwSignal<Option<String>>,
-    current_view: RwSignal<View>,
     on_nav: Callback<()>,
 ) -> impl IntoView {
+    let navigate = StoredValue::new(use_navigate());
     view! {
         <button
             class=move || {
@@ -344,7 +296,7 @@ fn TypeFilterLink(
             }
             on:click=move |_| {
                 node_type_filter.set(Some(value.to_string()));
-                current_view.set(View::NodeList);
+                navigate.get_value()("/nodes", Default::default());
                 on_nav.run(());
             }
             title=label
@@ -354,6 +306,8 @@ fn TypeFilterLink(
         </button>
     }
 }
+
+// ── SidebarLink ───────────────────────────────────────────────────────────────
 
 #[component]
 fn SidebarLink(

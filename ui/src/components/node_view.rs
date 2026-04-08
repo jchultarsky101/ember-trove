@@ -5,8 +5,8 @@ use common::id::NodeId;
 use common::node::NodeTitleEntry;
 use leptos::{html::Input, prelude::*};
 
-use crate::app::View;
 use crate::components::attachment_panel::AttachmentPanel;
+use leptos_router::hooks::use_navigate;
 use crate::components::modals::delete_confirm::DeleteConfirmModal;
 use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
 use crate::components::activity_panel::ActivityPanel;
@@ -27,7 +27,7 @@ fn build_title_map(entries: &[NodeTitleEntry]) -> HashMap<String, NodeId> {
 
 #[component]
 pub fn NodeView(id: NodeId) -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = StoredValue::new(use_navigate());
     let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
 
     let node = LocalResource::new(move || {
@@ -53,12 +53,13 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
     let duplicating = RwSignal::new(false);
     let do_duplicate = move || {
         duplicating.set(true);
+        let nav = navigate.get_value();
         wasm_bindgen_futures::spawn_local(async move {
             match crate::api::duplicate_node(id).await {
                 Ok(dup) => {
                     push_toast(ToastLevel::Success, "Node duplicated.");
                     refresh.update(|n| *n += 1);
-                    current_view.set(View::NodeDetail(dup.id));
+                    nav(&format!("/nodes/{}", dup.id), Default::default());
                 }
                 Err(e) => {
                     push_toast(ToastLevel::Error, format!("Duplicate failed: {e}"));
@@ -77,7 +78,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                 Ok(_) => {
                     push_toast(ToastLevel::Success, "Node deleted.");
                     refresh.update(|n| *n += 1);
-                    current_view.set(View::NodeList);
+                    navigate.get_value()("/nodes", Default::default());
                 }
                 Err(e) => {
                     push_toast(ToastLevel::Error, format!("Delete failed: {e}"));
@@ -134,6 +135,11 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                 Effect::new(move |_| ctx.set(pinned.get()));
                             }
 
+                            // Get navigate values for each inner closure that needs it.
+                            let nav_wikilink = navigate.get_value();
+                            let nav_back     = navigate.get_value();
+                            let nav_edit     = navigate.get_value();
+
                             // Click delegation: intercept clicks on `.wikilink` anchors and
                             // navigate in-app instead of following the href.
                             let handle_wikilink_click = move |ev: leptos::ev::MouseEvent| {
@@ -147,7 +153,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                     ev.prevent_default();
                                     if let Some(raw) = link.get_attribute("data-node-id")
                                         && let Ok(id) = raw.parse::<uuid::Uuid>() {
-                                        current_view.set(View::NodeDetail(NodeId(id)));
+                                        nav_wikilink(&format!("/nodes/{id}"), Default::default());
                                     }
                                 }
                             };
@@ -158,7 +164,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                         <div class="flex items-center gap-3">
                                             <button
                                                 class="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
-                                                on:click=move |_| current_view.set(View::NodeList)
+                                                on:click=move |_| nav_back("/nodes", Default::default())
                                             >
                                                 <span class="material-symbols-outlined">"arrow_back"</span>
                                             </button>
@@ -229,7 +235,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                                 class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
                                                     dark:hover:text-stone-300 hover:bg-stone-100
                                                     dark:hover:bg-stone-800 transition-colors"
-                                                on:click=move |_| current_view.set(View::NodeEdit(edit_id))
+                                                on:click=move |_| nav_edit(&format!("/nodes/{edit_id}/edit"), Default::default())
                                                 title="Edit"
                                             >
                                                 <span class="material-symbols-outlined">"edit"</span>
@@ -313,7 +319,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
 /// Shows edges (incoming + outgoing) for a node, with ability to add/remove.
 #[component]
 fn EdgePanel(node_id: NodeId) -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = StoredValue::new(use_navigate());
     let open = RwSignal::new(false);
     let refresh_edges = RwSignal::new(0u32);
     let show_add = RwSignal::new(false);
@@ -575,6 +581,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                                 view! {
                                     <div class="space-y-1">
                                         {edge_list.into_iter().map(|edge| {
+                                            let nav = navigate.get_value();
                                             let edge_id = edge.id;
                                             let is_outgoing = edge.source_id == node_id;
                                             let other_id = if is_outgoing { edge.target_id } else { edge.source_id };
@@ -588,7 +595,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                                                     <button
                                                         class="flex items-center gap-2 text-xs text-stone-600 dark:text-stone-400
                                                             hover:text-amber-600 dark:hover:text-amber-400 min-w-0"
-                                                        on:click=move |_| current_view.set(View::NodeDetail(other_id))
+                                                        on:click=move |_| nav(&format!("/nodes/{other_id}"), Default::default())
                                                     >
                                                         <span class="shrink-0">{direction}</span>
                                                         <span class="text-stone-400 dark:text-stone-500 shrink-0">{edge_type_label}</span>
@@ -631,7 +638,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
 /// Shows nodes that link to this node (incoming edges from other nodes).
 #[component]
 fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = StoredValue::new(use_navigate());
     let open = RwSignal::new(false);
 
     let backlinks = LocalResource::new(move || {
@@ -703,6 +710,7 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
                                 Ok(nodes) => view! {
                                     <div class="space-y-1">
                                         {nodes.into_iter().map(|node| {
+                                            let nav = navigate.get_value();
                                             let node_id = node.id;
                                             let title = node.title.clone();
                                             let node_type = format!("{:?}", node.node_type).to_lowercase();
@@ -712,7 +720,7 @@ fn BacklinksPanel(node_id: NodeId) -> impl IntoView {
                                                         text-xs hover:bg-stone-50 dark:hover:bg-stone-800/50
                                                         text-stone-600 dark:text-stone-400
                                                         hover:text-amber-600 dark:hover:text-amber-400"
-                                                    on:click=move |_| current_view.set(View::NodeDetail(node_id))
+                                                    on:click=move |_| nav(&format!("/nodes/{node_id}"), Default::default())
                                                 >
                                                     <span class="material-symbols-outlined text-stone-400 dark:text-stone-600"
                                                         style="font-size: 14px;">"arrow_back"</span>

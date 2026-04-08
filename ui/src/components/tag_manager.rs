@@ -1,8 +1,8 @@
 use common::tag::{CreateTagRequest, Tag, UpdateTagRequest};
 use leptos::prelude::*;
 
-use crate::app::View;
 use crate::components::modals::delete_confirm::DeleteConfirmModal;
+use leptos_router::hooks::use_navigate;
 use crate::components::toast::{ToastLevel, push_toast};
 
 // ── Palette ───────────────────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ fn ColorPicker(
 /// so the browse experience stays front-and-centre.
 #[component]
 pub fn TagManager() -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = StoredValue::new(use_navigate());
     let tag_filter_ctx =
         use_context::<RwSignal<Option<Tag>>>().expect("tag_filter signal must be provided");
 
@@ -401,7 +401,7 @@ pub fn TagManager() -> impl IntoView {
                                                                             class="flex items-center gap-3 flex-1 text-left min-w-0"
                                                                             on:click=move |_| {
                                                                                 tag_filter_ctx.set(Some(browse_tag.clone()));
-                                                                                current_view.set(View::NodeList);
+                                                                                navigate.get_value()("/nodes", Default::default());
                                                                             }
                                                                             title="Browse nodes with this tag"
                                                                         >
