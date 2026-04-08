@@ -1,7 +1,7 @@
 use leptos::prelude::*;
 
-use crate::app::View;
 use crate::markdown::render_markdown_plain;
+use leptos_router::hooks::use_navigate;
 
 /// Mirror of note_panel::PALETTE — full class strings so Tailwind's scanner picks them up.
 const PALETTE: &[(&str, &str)] = &[
@@ -22,7 +22,7 @@ fn palette_card_class(color: &str) -> &'static str {
 
 #[component]
 pub fn NotesView() -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = use_navigate();
 
     let feed_resource = LocalResource::new(move || async move {
         crate::api::fetch_notes_feed().await
@@ -68,6 +68,7 @@ pub fn NotesView() -> impl IntoView {
                         view! {
                             <div class="space-y-4 w-full">
                                 {notes.into_iter().map(|feed_note| {
+                                    let nav = navigate.clone();
                                     let node_id = feed_note.note.node_id;
                                     let node_title = feed_note.node_title.clone();
                                     let body_html = render_markdown_plain(&feed_note.note.body);
@@ -83,7 +84,7 @@ pub fn NotesView() -> impl IntoView {
                                                 class="flex items-center gap-1.5 mb-2 text-xs font-semibold
                                                     text-stone-400 dark:text-stone-500 uppercase tracking-wider
                                                     hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
-                                                on:click=move |_| current_view.set(View::NodeDetail(node_id))
+                                                on:click=move |_| nav(&format!("/nodes/{node_id}"), Default::default())
                                             >
                                                 <span class="material-symbols-outlined" style="font-size: 13px;">
                                                     {"description"}

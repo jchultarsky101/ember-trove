@@ -2,7 +2,8 @@ use chrono::{Datelike, NaiveDate, Weekday};
 use common::task::{MyDayTask, TaskPriority, TaskStatus};
 use leptos::prelude::*;
 
-use crate::app::{TaskRefresh, View};
+use crate::app::TaskRefresh;
+use leptos_router::hooks::use_navigate;
 
 fn priority_color_hex(p: &TaskPriority) -> &'static str {
     match p {
@@ -71,8 +72,7 @@ const MONTH_NAMES: [&str; 12] = [
 
 #[component]
 pub fn CalendarView() -> impl IntoView {
-    let current_view =
-        use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = StoredValue::new(use_navigate());
     let task_refresh = use_context::<TaskRefresh>()
         .expect("TaskRefresh context must be provided")
         .0;
@@ -238,7 +238,7 @@ pub fn CalendarView() -> impl IntoView {
                                                         title=title.clone()
                                                         on:click=move |_| {
                                                             if let Some(nid) = node_id {
-                                                                current_view.set(View::NodeDetail(nid));
+                                                                navigate.get_value()(&format!("/nodes/{nid}"), Default::default());
                                                             }
                                                         }
                                                     >

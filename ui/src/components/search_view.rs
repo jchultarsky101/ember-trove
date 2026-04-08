@@ -4,8 +4,8 @@ use common::{
 };
 use leptos::prelude::*;
 
-use crate::app::View;
 use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
+use leptos_router::hooks::use_navigate;
 
 /// Full-page search results view.
 ///
@@ -17,7 +17,7 @@ use crate::components::node_meta::{status_color, status_icon, status_label, type
 /// sidebar `SearchBar`.
 #[component]
 pub fn SearchView() -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = StoredValue::new(use_navigate());
     let search_query =
         use_context::<RwSignal<String>>().expect("search_query signal must be provided");
     // Initialise from global single-tag context (set by NodeList chip clicks),
@@ -564,7 +564,7 @@ pub fn SearchView() -> impl IntoView {
                                                         dark:border-stone-700 hover:border-amber-300 dark:hover:border-amber-700
                                                         bg-white dark:bg-stone-900 transition-colors"
                                                     on:click=move |_| {
-                                                        current_view.set(View::NodeDetail(node_id));
+                                                        navigate.get_value()(&format!("/nodes/{node_id}"), Default::default());
                                                     }
                                                 >
                                                     // Row 1: type icon · title · status icon · rank

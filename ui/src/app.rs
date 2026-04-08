@@ -1,15 +1,17 @@
-use common::{id::{NodeId, TemplateId}, tag::Tag};
-use leptos::{ev, prelude::*};
+use common::id::TemplateId;
+use common::tag::Tag;
+use leptos::prelude::*;
 use leptos::task::spawn_local;
+use leptos_router::components::Router;
 
 use crate::{
     api::fetch_api_version,
     auth::provide_auth_state,
     components::{
-        dark_mode_toggle::Theme, layout::Layout,
-        modals::shortcuts::ShortcutsModal,
+        dark_mode_toggle::Theme,
+        layout::Layout,
         public_share_view::PublicShareView,
-        toast::{push_toast, ToastLevel, ToastState},
+        toast::ToastState,
     },
 };
 
@@ -32,48 +34,21 @@ pub fn storage_set(key: &str, value: &str) {
 }
 
 // ── App version ────────────────────────────────────────────────────────────
-// Fetched once from /api/health at startup and provided to all descendants.
 
 #[derive(Clone, Copy)]
 pub struct AppVersion(pub RwSignal<String>);
 
 // ── Global task refresh signal ─────────────────────────────────────────────
-// Shared between TaskPanel and MyDayView so toggling a task in either view
-// causes the other to re-fetch. Wrapped in a newtype to avoid collision with
-// the nodes-list `refresh: RwSignal<u32>` already in context.
 
 #[derive(Clone, Copy)]
 pub struct TaskRefresh(pub RwSignal<u32>);
 
 // ── Quick-capture modal visibility ─────────────────────────────────────────
-// Lifted to App root so the global `n` keyboard shortcut and the FAB both
-// drive the same signal. Newtype avoids collision with other RwSignal<bool>.
 
 #[derive(Clone, Copy)]
 pub struct ShowCapture(pub RwSignal<bool>);
 
-// ── Current view ───────────────────────────────────────────────────────────
-
-#[allow(dead_code)]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum View {
-    NodeList,
-    NodeDetail(NodeId),
-    NodeCreate,
-    NodeEdit(NodeId),
-    TagManager,
-    Graph,
-    Search,
-    Admin,
-    ProjectDashboard,
-    MyDay,
-    Calendar,
-    Notes,
-    Backup,
-    Templates,
-    BulkPermissions,
-    Inbox,
-}
+// ── Template prefill ───────────────────────────────────────────────────────
 
 /// Pre-fill data passed from TemplatesView to NodeEditor when "Use" is clicked.
 #[derive(Clone, Debug, PartialEq)]
@@ -102,13 +77,7 @@ pub fn App() -> impl IntoView {
 
     // Persist theme in localStorage
     let initial_theme = storage_get("theme")
-        .map(|s| {
-            if s == "dark" {
-                Theme::Dark
-            } else {
-                Theme::Light
-            }
-        })
+        .map(|s| if s == "dark" { Theme::Dark } else { Theme::Light })
         .unwrap_or(Theme::Light);
 
     let theme = RwSignal::new(initial_theme);
@@ -129,9 +98,6 @@ pub fn App() -> impl IntoView {
             }
         }
     });
-
-    let current_view = RwSignal::new(View::NodeList);
-    provide_context(current_view);
 
     // Refresh trigger — bump to re-fetch nodes list.
     let refresh = RwSignal::new(0u32);
@@ -174,113 +140,14 @@ pub fn App() -> impl IntoView {
     });
 
     // Current node pin state — written by NodeView when a node loads so the
-    // global `p` shortcut can toggle it without an extra API round-trip.
+    // global `p` keyboard shortcut can toggle it without an extra API round-trip.
     let current_node_pinned: RwSignal<bool> = RwSignal::new(false);
     provide_context(current_node_pinned);
 
-    // Keyboard shortcuts help modal visibility.
-    let show_shortcuts = RwSignal::new(false);
-
-    // ── Global keyboard shortcuts ───────────────────────────────────────────
-    // Suppressed when the user is typing in an input, textarea, select, or
-    // any contenteditable element.
-    //
-    // Shortcuts:
-    //   n   → Quick-capture modal (same as FAB)
-    //   g   → Graph view
-    //   /   → Search (also prevents the browser's built-in page-find)
-    //   Esc → Back to node list (from detail / edit / create); close modal
-    //   ?   → Toggle keyboard shortcuts help
-    let handle = window_event_listener(ev::keydown, move |ev: web_sys::KeyboardEvent| {
-        // Ignore if a modifier key is held (Ctrl+n, Cmd+/, etc.).
-        if ev.ctrl_key() || ev.meta_key() || ev.alt_key() {
-            return;
-        }
-
-        // Ignore when focus is inside an editable element.
-        let is_editable = web_sys::window()
-            .and_then(|w| w.document())
-            .and_then(|d| d.active_element())
-            .map(|el| {
-                let tag = el.tag_name().to_uppercase();
-                if matches!(tag.as_str(), "INPUT" | "TEXTAREA" | "SELECT" | "BUTTON") {
-                    return true;
-                }
-                // contenteditable="true" or contenteditable="" (empty = true per spec)
-                el.get_attribute("contenteditable")
-                    .map(|v| v != "false")
-                    .unwrap_or(false)
-            })
-            .unwrap_or(false);
-
-        if is_editable {
-            return;
-        }
-
-        match ev.key().as_str() {
-            "?" => show_shortcuts.update(|v| *v = !*v),
-            "n" => show_capture.0.set(true),
-            "g" => current_view.set(View::Graph),
-            "/" => {
-                ev.prevent_default();
-                current_view.set(View::Search);
-            }
-            "d" => {
-                // Duplicate the currently open node, then navigate to the copy.
-                if let View::NodeDetail(node_id) = current_view.get_untracked() {
-                    wasm_bindgen_futures::spawn_local(async move {
-                        match crate::api::duplicate_node(node_id).await {
-                            Ok(dup) => {
-                                push_toast(ToastLevel::Success, "Node duplicated.");
-                                current_view.set(View::NodeDetail(dup.id));
-                                refresh.update(|n| *n += 1);
-                            }
-                            Err(e) => push_toast(ToastLevel::Error, format!("Duplicate failed: {e}")),
-                        }
-                    });
-                }
-            }
-            "p" => {
-                // Toggle pin on the currently open node.
-                if let View::NodeDetail(node_id) = current_view.get_untracked() {
-                    let new_pinned = !current_node_pinned.get_untracked();
-                    current_node_pinned.set(new_pinned);
-                    wasm_bindgen_futures::spawn_local(async move {
-                        match crate::api::set_node_pinned(node_id, new_pinned).await {
-                            Ok(_) => {
-                                refresh.update(|n| *n += 1);
-                                let msg = if new_pinned { "Node pinned." } else { "Node unpinned." };
-                                push_toast(ToastLevel::Success, msg);
-                            }
-                            Err(e) => {
-                                current_node_pinned.set(!new_pinned); // revert
-                                push_toast(ToastLevel::Error, format!("Pin failed: {e}"));
-                            }
-                        }
-                    });
-                }
-            }
-            "Escape" => {
-                if show_shortcuts.get_untracked() {
-                    show_shortcuts.set(false);
-                } else if matches!(
-                    current_view.get_untracked(),
-                    View::NodeDetail(_) | View::NodeEdit(_) | View::NodeCreate
-                ) {
-                    current_view.set(View::NodeList);
-                }
-            }
-            _ => {}
-        }
-    });
-    on_cleanup(move || handle.remove());
-
     view! {
-        <Layout auth_state=auth_state />
-        <ShortcutsModal
-            show=show_shortcuts.read_only()
-            on_close=Callback::new(move |_| show_shortcuts.set(false))
-        />
+        <Router>
+            <Layout auth_state=auth_state />
+        </Router>
     }
     .into_any()
 }

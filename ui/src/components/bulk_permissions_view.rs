@@ -14,10 +14,8 @@ use common::{
 };
 use leptos::prelude::*;
 
-use crate::{
-    app::View,
-    components::toast::{push_toast, ToastLevel},
-};
+use crate::components::toast::{push_toast, ToastLevel};
+use leptos_router::hooks::use_navigate;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -64,8 +62,6 @@ fn display_name(sub: &str, user_map: &HashMap<String, (String, String)>) -> Stri
 
 #[component]
 pub fn BulkPermissionsView() -> impl IntoView {
-    let current_view =
-        use_context::<RwSignal<View>>().expect("View signal must be provided");
 
     // Refresh counter — bump after any mutation to reload the permissions list.
     let refresh = RwSignal::new(0u32);
@@ -191,7 +187,6 @@ pub fn BulkPermissionsView() -> impl IntoView {
                                     title=title
                                     rows=rows
                                     user_map=user_map.clone()
-                                    current_view=current_view
                                     refresh=refresh
                                 />
                             })
@@ -221,16 +216,15 @@ pub fn BulkPermissionsView() -> impl IntoView {
 
 // ── NodeGroup sub-component ───────────────────────────────────────────────────
 
-#[allow(clippy::too_many_arguments)]
 #[component]
 fn NodeGroup(
     node_id: NodeId,
     title: String,
     rows: Vec<Permission>,
     user_map: HashMap<String, (String, String)>,
-    current_view: RwSignal<View>,
     refresh: RwSignal<u32>,
 ) -> impl IntoView {
+    let navigate = use_navigate();
     view! {
         <div class="rounded-xl border border-stone-200 dark:border-stone-700
                     bg-white dark:bg-stone-900 overflow-hidden">
@@ -245,7 +239,7 @@ fn NodeGroup(
                     class="flex items-center gap-1 text-xs text-stone-400 hover:text-amber-600
                            dark:hover:text-amber-400 transition-colors cursor-pointer flex-shrink-0 ml-2"
                     title="Go to node"
-                    on:click=move |_| current_view.set(View::NodeDetail(node_id))
+                    on:click=move |_| navigate(&format!("/nodes/{node_id}"), Default::default())
                 >
                     <span class="material-symbols-outlined" style="font-size: 16px;">"open_in_new"</span>
                     "Open"

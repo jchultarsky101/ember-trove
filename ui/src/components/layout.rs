@@ -1,19 +1,60 @@
-use leptos::prelude::*;
+use leptos::{ev, prelude::*};
+use leptos_router::components::{Redirect, Route, Routes};
+use leptos_router::hooks::{use_location, use_navigate, use_params_map};
+use leptos_router::path;
 
 use crate::{
-    app::{AppVersion, ShowCapture, View},
+    app::{AppVersion, ShowCapture},
     auth::{AuthState, AuthStatus},
     components::{
-        admin_view::AdminView, backup_view::BackupView,
-        bulk_permissions_view::BulkPermissionsView, calendar_view::CalendarView,
+        admin_view::AdminView,
+        backup_view::BackupView,
+        bulk_permissions_view::BulkPermissionsView,
+        calendar_view::CalendarView,
         dark_mode_toggle::DarkModeToggle,
-        graph_view::GraphView, inbox_view::InboxView, modals::create_node::CreateNodeModal,
-        my_day_view::MyDayView, node_editor::NodeEditor, node_list::NodeList,
-        node_view::NodeView, notes_view::NotesView, project_dashboard::ProjectDashboard,
-        search_view::SearchView, sidebar::Sidebar, tag_manager::TagManager,
-        templates_view::TemplatesView, toast::ToastOverlay,
+        graph_view::GraphView,
+        inbox_view::InboxView,
+        modals::{create_node::CreateNodeModal, shortcuts::ShortcutsModal},
+        my_day_view::MyDayView,
+        node_editor::NodeEditor,
+        node_list::NodeList,
+        node_view::NodeView,
+        notes_view::NotesView,
+        project_dashboard::ProjectDashboard,
+        search_view::SearchView,
+        sidebar::Sidebar,
+        tag_manager::TagManager,
+        templates_view::TemplatesView,
+        toast::ToastOverlay,
     },
 };
+use common::id::NodeId;
+
+// ── Route param wrappers ─────────────────────────────────────────────────────
+
+#[component]
+fn NodeViewRoute() -> impl IntoView {
+    let params = use_params_map();
+    move || {
+        let id = params.with(|p| p.get("id").and_then(|s| s.parse::<NodeId>().ok()));
+        match id {
+            Some(id) => view! { <NodeView id=id /> }.into_any(),
+            None => view! { <p class="p-6 text-red-500">"Invalid node ID"</p> }.into_any(),
+        }
+    }
+}
+
+#[component]
+fn NodeEditRoute() -> impl IntoView {
+    let params = use_params_map();
+    move || {
+        let id = params.with(|p| p.get("id").and_then(|s| s.parse::<NodeId>().ok()));
+        match id {
+            Some(id) => view! { <NodeEditor node=Some(id) /> }.into_any(),
+            None => view! { <p class="p-6 text-red-500">"Invalid node ID"</p> }.into_any(),
+        }
+    }
+}
 
 /// Whether the sidebar is collapsed (icon-only mode, desktop only).
 pub type SidebarCollapsed = RwSignal<bool>;
@@ -22,25 +63,136 @@ pub type SidebarCollapsed = RwSignal<bool>;
 pub fn Layout(auth_state: AuthState) -> impl IntoView {
     let collapsed: SidebarCollapsed = RwSignal::new(false);
     let mobile_open: RwSignal<bool> = RwSignal::new(false);
-    // Driven by the global `n` shortcut and the FAB — both set this context signal.
     let show_capture = use_context::<ShowCapture>()
         .expect("ShowCapture context missing")
         .0;
 
-    // Close mobile sidebar on any view change.
+    let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
+    let current_node_pinned = use_context::<RwSignal<bool>>()
+        .expect("current_node_pinned signal must be provided");
+
     let close_mobile = move || mobile_open.set(false);
+
+    // ── Global keyboard shortcuts ──────────────────────────────────────────
+    // Must live here (inside the Router) so use_navigate() is available.
+    let navigate = use_navigate();
+    let location = use_location();
+    let show_shortcuts = RwSignal::new(false);
+
+    let handle = {
+        let navigate = navigate.clone();
+        window_event_listener(ev::keydown, move |ev: web_sys::KeyboardEvent| {
+            if ev.ctrl_key() || ev.meta_key() || ev.alt_key() {
+                return;
+            }
+            let is_editable = web_sys::window()
+                .and_then(|w| w.document())
+                .and_then(|d| d.active_element())
+                .map(|el| {
+                    let tag = el.tag_name().to_uppercase();
+                    if matches!(tag.as_str(), "INPUT" | "TEXTAREA" | "SELECT" | "BUTTON") {
+                        return true;
+                    }
+                    el.get_attribute("contenteditable")
+                        .map(|v| v != "false")
+                        .unwrap_or(false)
+                })
+                .unwrap_or(false);
+            if is_editable {
+                return;
+            }
+
+            match ev.key().as_str() {
+                "?" => show_shortcuts.update(|v| *v = !*v),
+                "n" => show_capture.set(true),
+                "g" => navigate("/graph", Default::default()),
+                "/" => {
+                    ev.prevent_default();
+                    navigate("/search", Default::default());
+                }
+                "d" => {
+                    // Duplicate the currently open node (only when on /nodes/<uuid>).
+                    let path = location.pathname.get_untracked();
+                    let segs: Vec<&str> = path.trim_matches('/').split('/').collect();
+                    if segs.len() == 2 && segs[0] == "nodes"
+                        && let Ok(node_id) = segs[1].parse::<NodeId>() {
+                        let nav = navigate.clone();
+                        wasm_bindgen_futures::spawn_local(async move {
+                            match crate::api::duplicate_node(node_id).await {
+                                Ok(dup) => {
+                                    crate::components::toast::push_toast(
+                                        crate::components::toast::ToastLevel::Success,
+                                        "Node duplicated.",
+                                    );
+                                    refresh.update(|n| *n += 1);
+                                    nav(&format!("/nodes/{}", dup.id), Default::default());
+                                }
+                                Err(e) => crate::components::toast::push_toast(
+                                    crate::components::toast::ToastLevel::Error,
+                                    format!("Duplicate failed: {e}"),
+                                ),
+                            }
+                        });
+                    }
+                }
+                "p" => {
+                    // Toggle pin on the currently open node.
+                    let path = location.pathname.get_untracked();
+                    let segs: Vec<&str> = path.trim_matches('/').split('/').collect();
+                    if segs.len() == 2 && segs[0] == "nodes"
+                        && let Ok(node_id) = segs[1].parse::<NodeId>() {
+                        let new_pinned = !current_node_pinned.get_untracked();
+                        current_node_pinned.set(new_pinned);
+                        wasm_bindgen_futures::spawn_local(async move {
+                            match crate::api::set_node_pinned(node_id, new_pinned).await {
+                                Ok(_) => {
+                                    refresh.update(|n| *n += 1);
+                                    let msg = if new_pinned {
+                                        "Node pinned."
+                                    } else {
+                                        "Node unpinned."
+                                    };
+                                    crate::components::toast::push_toast(
+                                        crate::components::toast::ToastLevel::Success,
+                                        msg,
+                                    );
+                                }
+                                Err(e) => {
+                                    current_node_pinned.set(!new_pinned);
+                                    crate::components::toast::push_toast(
+                                        crate::components::toast::ToastLevel::Error,
+                                        format!("Pin failed: {e}"),
+                                    );
+                                }
+                            }
+                        });
+                    }
+                }
+                "Escape" => {
+                    if show_shortcuts.get_untracked() {
+                        show_shortcuts.set(false);
+                    } else {
+                        let path = location.pathname.get_untracked();
+                        if path.starts_with("/nodes") {
+                            navigate("/nodes", Default::default());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        })
+    };
+    on_cleanup(move || handle.remove());
 
     view! {
         <AuthGate auth_state=auth_state>
-            // Outer shell — column on mobile (top-bar + content), row on desktop (sidebar + content).
             <div class="flex flex-col md:flex-row h-screen overflow-hidden bg-stone-50 dark:bg-stone-950">
 
-                // ── Mobile top bar (hidden on md+) ──────────────────────────────────────
+                // ── Mobile top bar ──────────────────────────────────────────────────────
                 <header class="md:hidden flex-shrink-0 flex items-center justify-between
                                px-4 py-3 border-b border-stone-200 dark:border-stone-800
                                bg-stone-50 dark:bg-stone-950 z-10">
                     <div class="flex items-center gap-2">
-                        // Flame icon
                         <div class="w-7 h-7 flex-shrink-0">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="w-full h-full">
                                 <defs>
@@ -61,7 +213,6 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                             "Ember Trove"
                         </span>
                     </div>
-                    // Hamburger button
                     <button
                         on:click=move |_| mobile_open.update(|o| *o = !*o)
                         class="p-2 rounded-lg text-stone-500 hover:bg-stone-100
@@ -74,7 +225,7 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                     </button>
                 </header>
 
-                // ── Mobile backdrop ──────────────────────────────────────────────────────
+                // ── Mobile backdrop ────────────────────────────────────────────────────
                 {move || mobile_open.get().then(|| view! {
                     <div
                         class="fixed inset-0 z-30 bg-black/40 md:hidden"
@@ -82,25 +233,16 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                     />
                 })}
 
-                // ── Sidebar ─────────────────────────────────────────────────────────────
-                // Desktop: normal flex child (w-64 or w-16).
-                // Mobile: fixed overlay sliding in from the left.
+                // ── Sidebar ────────────────────────────────────────────────────────────
                 <aside
                     class=move || {
                         let base = "flex flex-col border-r border-stone-200 dark:border-stone-800 \
                                     bg-stone-50 dark:bg-stone-950 transition-all duration-200";
-                        // Mobile: fixed overlay
                         let mobile = if mobile_open.get() {
                             "fixed inset-y-0 left-0 z-40 w-72 translate-x-0"
                         } else {
                             "fixed inset-y-0 left-0 z-40 w-72 -translate-x-full md:translate-x-0"
                         };
-                        // Desktop width (overrides the fixed/translate on md+).
-                        // md:transform-none is required: the mobile translate-x-* classes leave
-                        // a CSS transform on the element even when the value is zero, which creates
-                        // a new stacking context and traps position:fixed children (e.g. modals)
-                        // inside the sidebar bounds. Removing the transform on desktop lets fixed
-                        // overlays escape to the viewport as intended.
                         let desktop = if collapsed.get() {
                             "md:relative md:inset-auto md:w-16 md:flex-shrink-0 md:transform-none"
                         } else {
@@ -112,7 +254,6 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                     <SidebarHeader collapsed=collapsed />
                     <Sidebar auth_state=auth_state collapsed=collapsed on_nav=Callback::new(move |_| close_mobile()) />
 
-                    // Desktop-only floating collapse toggle on the sidebar border
                     <button
                         on:click=move |_| collapsed.update(|c| *c = !*c)
                         class="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20
@@ -135,11 +276,29 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                 </aside>
 
                 <main class="flex-1 overflow-auto flex flex-col min-w-0">
-                    <ViewSwitch />
+                    <Routes fallback=|| view! { <Redirect path="/inbox" /> }>
+                        <Route path=path!("/")          view=|| view! { <Redirect path="/inbox" /> } />
+                        <Route path=path!("/inbox")     view=InboxView />
+                        <Route path=path!("/my-day")    view=MyDayView />
+                        <Route path=path!("/calendar")  view=CalendarView />
+                        <Route path=path!("/dashboard") view=ProjectDashboard />
+                        <Route path=path!("/graph")     view=GraphView />
+                        <Route path=path!("/search")    view=SearchView />
+                        <Route path=path!("/nodes")     view=NodeList />
+                        <Route path=path!("/nodes/new") view=|| view! { <NodeEditor node=None /> } />
+                        <Route path=path!("/nodes/:id")      view=NodeViewRoute />
+                        <Route path=path!("/nodes/:id/edit") view=NodeEditRoute />
+                        <Route path=path!("/tags")           view=TagManager />
+                        <Route path=path!("/notes")          view=NotesView />
+                        <Route path=path!("/templates")      view=TemplatesView />
+                        <Route path=path!("/admin/users")       view=AdminView />
+                        <Route path=path!("/admin/permissions") view=BulkPermissionsView />
+                        <Route path=path!("/admin/backup")      view=BackupView />
+                    </Routes>
                 </main>
             </div>
 
-            // Floating Action Button — always on top, bottom-right
+            // Floating Action Button
             <button
                 class="fixed bottom-6 right-6 z-30
                        w-14 h-14 rounded-full shadow-lg
@@ -162,6 +321,12 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                 on_close=Callback::new(move |_| show_capture.set(false))
             />
 
+            // Keyboard shortcuts modal
+            <ShortcutsModal
+                show=show_shortcuts.read_only()
+                on_close=Callback::new(move |_| show_shortcuts.set(false))
+            />
+
             // Toast notification overlay
             <ToastOverlay />
         </AuthGate>
@@ -169,13 +334,11 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
 }
 
 /// Sidebar header: banner icon + title + dark-mode toggle.
-/// The collapse toggle is now a floating button on the aside border (see Layout).
 #[component]
 fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
     let app_version = use_context::<AppVersion>().expect("AppVersion must be provided");
     view! {
         <div class="flex items-center border-b border-stone-200 dark:border-stone-800 px-3 py-4 gap-2">
-            // Banner icon — inline SVG ember flame
             <div class="flex-shrink-0 w-8 h-8">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" class="w-full h-full">
                     <defs>
@@ -197,8 +360,6 @@ fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
                     <line x1="26" y1="45" x2="38" y2="45" stroke="#ffffff" stroke-width="0.8" opacity="0.5"/>
                 </svg>
             </div>
-
-            // Title + version badge + dark-mode toggle (hidden when collapsed)
             <div
                 class="flex-1 flex items-center justify-between min-w-0 overflow-hidden"
                 class:hidden=move || collapsed.get()
@@ -222,35 +383,7 @@ fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
     }
 }
 
-#[component]
-fn ViewSwitch() -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
-
-    move || match current_view.get() {
-        View::NodeList => view! { <NodeList /> }.into_any(),
-        View::NodeDetail(id) => view! { <NodeView id=id /> }.into_any(),
-        View::NodeCreate => view! { <NodeEditor node=None /> }.into_any(),
-        View::NodeEdit(id) => view! { <NodeEditor node=Some(id) /> }.into_any(),
-        View::TagManager => view! { <TagManager /> }.into_any(),
-        View::Graph => view! { <GraphView /> }.into_any(),
-        View::Search => view! { <SearchView /> }.into_any(),
-        View::Admin => view! { <AdminView /> }.into_any(),
-        View::ProjectDashboard => view! { <ProjectDashboard /> }.into_any(),
-        View::MyDay => view! { <MyDayView /> }.into_any(),
-        View::Calendar => view! { <CalendarView /> }.into_any(),
-        View::Notes => view! { <NotesView /> }.into_any(),
-        View::Backup => view! { <BackupView /> }.into_any(),
-        View::Templates => view! { <TemplatesView /> }.into_any(),
-        View::BulkPermissions => view! { <BulkPermissionsView /> }.into_any(),
-        View::Inbox => view! { <InboxView /> }.into_any(),
-    }
-}
-
 /// Auth gate: spinner → login redirect → render app.
-///
-/// Children are instantiated lazily — only once `AuthStatus::Authenticated`
-/// is confirmed. This prevents unauthenticated API calls (which would trigger
-/// parse_json's 401 → refresh → reload loop) from firing before login.
 #[component]
 fn AuthGate(auth_state: AuthState, children: ChildrenFn) -> impl IntoView {
     move || match auth_state.get() {

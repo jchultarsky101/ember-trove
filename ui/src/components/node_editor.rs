@@ -8,8 +8,9 @@ use common::{
 use leptos::prelude::*;
 use wasm_bindgen::JsCast as _;
 
-use crate::app::{TemplatePrefill, View};
+use crate::app::TemplatePrefill;
 use crate::components::toast::{ToastLevel, push_toast};
+use leptos_router::hooks::use_navigate;
 use crate::markdown::render_markdown;
 use crate::templates::template_for_type;
 
@@ -55,7 +56,9 @@ fn is_wide_viewport() -> bool {
 
 #[component]
 pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = use_navigate();
+    let nav_save  = navigate.clone(); // clone for on_save spawn_local
+    let nav_back1 = navigate.clone(); // clone for back button in header
     let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
 
     let title = RwSignal::new(String::new());
@@ -256,7 +259,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
         }
     };
 
-    let on_save = move |_| {
+    let on_save = move |_: web_sys::MouseEvent| {
         saving.set(true);
         error_msg.set(None);
         let t = title.get_untracked();
@@ -264,6 +267,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
         let nt_str = node_type.get_untracked();
         let st_str = status.get_untracked();
 
+        let nav = nav_save.clone();
         wasm_bindgen_futures::spawn_local(async move {
             let result = if let Some(id) = node {
                 let req = UpdateNodeRequest {
@@ -295,7 +299,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
             match result {
                 Ok(saved_node) => {
                     refresh.update(|n| *n += 1);
-                    current_view.set(View::NodeDetail(saved_node.id));
+                    nav(&format!("/nodes/{}", saved_node.id), Default::default());
                 }
                 Err(e) => {
                     error_msg.set(Some(format!("{e}")));
@@ -362,7 +366,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                 <div class="flex items-center gap-3 flex-1">
                     <button
                         class="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
-                        on:click=move |_| current_view.set(View::NodeList)
+                        on:click=move |_| nav_back1("/nodes", Default::default())
                     >
                         <span class="material-symbols-outlined">"arrow_back"</span>
                     </button>
@@ -479,7 +483,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                     <button
                         class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
                             hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
-                        on:click=move |_| current_view.set(View::NodeList)
+                        on:click=move |_| navigate("/nodes", Default::default())
                         title="Cancel"
                     >
                         <span class="material-symbols-outlined">"close"</span>

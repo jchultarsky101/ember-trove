@@ -2,7 +2,7 @@ use common::id::NodeId;
 use common::tag::{CreateTagRequest, Tag};
 use leptos::prelude::*;
 
-use crate::app::View;
+use leptos_router::hooks::use_navigate;
 
 /// Tag chips for a node — shows attached tags with remove buttons, plus an
 /// inline input for attaching existing or creating new tags.
@@ -10,7 +10,7 @@ use crate::app::View;
 /// and navigates to the NodeList so the user sees all nodes with that tag.
 #[component]
 pub fn TagBar(node_id: NodeId) -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = StoredValue::new(use_navigate());
     let tag_filter =
         use_context::<RwSignal<Option<Tag>>>().unwrap_or_else(|| RwSignal::new(None));
     let refresh_tags = RwSignal::new(0u32);
@@ -102,7 +102,7 @@ pub fn TagBar(node_id: NodeId) -> impl IntoView {
                                                     title="Filter nodes by this tag"
                                                     on:click=move |_| {
                                                         tag_filter.set(Some(tag_for_filter.clone()));
-                                                        current_view.set(View::NodeList);
+                                                        navigate.get_value()("/nodes", Default::default());
                                                     }
                                                 >
                                                     <span class="material-symbols-outlined" style="font-size:11px;">"filter_list"</span>

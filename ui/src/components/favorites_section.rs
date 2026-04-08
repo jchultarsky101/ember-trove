@@ -4,13 +4,13 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     api::{delete_favorite, fetch_favorites, reorder_favorites},
-    app::View,
     components::{
         layout::SidebarCollapsed,
         modals::add_favorite::AddFavoriteModal,
         toast::{ToastLevel, push_toast},
     },
 };
+use leptos_router::hooks::use_navigate;
 
 /// Sidebar section that shows the user's pinned favorites split into two
 /// sub-groups: external Web Links (sky accent) on top, internal Nodes (amber
@@ -19,7 +19,6 @@ use crate::{
 pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl IntoView {
     let favorites: RwSignal<Vec<Favorite>> = RwSignal::new(vec![]);
     let show_modal = RwSignal::new(false);
-    let current_view = use_context::<RwSignal<View>>().expect("View signal");
 
     // Load favorites once on mount.
     Effect::new(move |_| {
@@ -158,7 +157,6 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
                                             on_delete=on_delete
                                             on_move_up=move_up
                                             on_move_down=move_down
-                                            current_view=current_view
                                             on_nav=on_nav
                                         />
                                     }
@@ -201,7 +199,6 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
                                             on_delete=on_delete
                                             on_move_up=move_up
                                             on_move_down=move_down
-                                            current_view=current_view
                                             on_nav=on_nav
                                         />
                                     }
@@ -247,16 +244,16 @@ fn FavoriteRow(
     on_delete: Callback<FavoriteId>,
     on_move_up: Callback<FavoriteId>,
     on_move_down: Callback<FavoriteId>,
-    current_view: RwSignal<View>,
     on_nav: Callback<()>,
 ) -> impl IntoView {
+    let navigate = use_navigate();
     let label2 = label.clone();
     let url2   = url.clone();
     let is_url = url.is_some();
 
     let handle_click = move || {
         if let Some(nid) = node_id {
-            current_view.set(View::NodeDetail(nid));
+            navigate(&format!("/nodes/{nid}"), Default::default());
             on_nav.run(());
         } else if let Some(ref u) = url2
             && let Some(win) = web_sys::window()

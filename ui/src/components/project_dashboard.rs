@@ -1,12 +1,12 @@
 use common::id::NodeId;
 use leptos::prelude::*;
 
-use crate::app::View;
 use crate::components::node_meta::{status_color, status_icon, status_label};
+use leptos_router::hooks::use_navigate;
 
 #[component]
 pub fn ProjectDashboard() -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = StoredValue::new(use_navigate());
 
     let entries = LocalResource::new(|| async move {
         crate::api::fetch_project_dashboard().await
@@ -82,7 +82,7 @@ pub fn ProjectDashboard() -> impl IntoView {
                                             cancelled=counts.cancelled
                                             total=total
                                             done_pct=done_pct
-                                            on_navigate=move || current_view.set(View::NodeDetail(node_id))
+                                            on_navigate=move || navigate.get_value()(&format!("/nodes/{node_id}"), Default::default())
                                         />
                                     }
                                 }).collect_view()}

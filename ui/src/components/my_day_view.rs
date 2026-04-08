@@ -5,7 +5,8 @@ use common::{
 };
 use leptos::prelude::*;
 
-use crate::app::{TaskRefresh, View};
+use crate::app::TaskRefresh;
+use leptos_router::hooks::use_navigate;
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 
@@ -121,7 +122,7 @@ fn sort_tasks(tasks: &mut [Task]) {
 
 #[component]
 pub fn MyDayView() -> impl IntoView {
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = StoredValue::new(use_navigate());
     let refresh = use_context::<TaskRefresh>()
         .expect("TaskRefresh context must be provided")
         .0;
@@ -247,7 +248,7 @@ pub fn MyDayView() -> impl IntoView {
                                             refresh=refresh
                                             on_navigate=move || {
                                                 if let Some(nid) = node_id {
-                                                    current_view.set(View::NodeDetail(nid));
+                                                    navigate.get_value()(&format!("/nodes/{nid}"), Default::default());
                                                 }
                                             }
                                         />
@@ -393,7 +394,7 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
     let status_val   = RwSignal::new(status_value(&task.status).to_string());
     let priority_val = RwSignal::new(priority_value(&task.priority).to_string());
 
-    let current_view = use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = StoredValue::new(use_navigate());
 
     // Edit form state
     let editing         = RwSignal::new(false);
@@ -641,7 +642,7 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                                 } else { "" }
                                 on:click=move |_| {
                                     if let Some(nid) = node_id {
-                                        current_view.set(View::NodeDetail(nid));
+                                        navigate.get_value()(&format!("/nodes/{nid}"), Default::default());
                                     }
                                 }
                                 title="Open parent node"
