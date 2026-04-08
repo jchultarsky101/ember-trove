@@ -4,7 +4,11 @@
 //! inline, and provides the standard toggle/edit/delete/My-Day actions.
 
 use chrono::NaiveDate;
-use common::task::{CreateTaskRequest, RecurrenceRule, Task, TaskPriority, TaskStatus, UpdateTaskRequest};
+use common::{
+    id::NodeId,
+    search::SearchResult,
+    task::{CreateTaskRequest, RecurrenceRule, Task, TaskPriority, TaskStatus, UpdateTaskRequest},
+};
 use leptos::prelude::*;
 
 use crate::app::TaskRefresh;
@@ -85,6 +89,17 @@ fn recurrence_label(r: &RecurrenceRule) -> &'static str {
         RecurrenceRule::Biweekly => "Every 2 weeks",
         RecurrenceRule::Monthly  => "Monthly",
         RecurrenceRule::Yearly   => "Yearly",
+    }
+}
+
+fn node_type_icon(node_type: &str) -> &'static str {
+    match node_type {
+        "article"   => "description",
+        "project"   => "rocket_launch",
+        "area"      => "category",
+        "resource"  => "bookmarks",
+        "reference" => "menu_book",
+        _           => "article",
     }
 }
 
@@ -295,6 +310,47 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
             .map(|r| recurrence_value(r).to_string())
             .unwrap_or_default(),
     );
+
+    // Node-picker state
+    let assigning       = RwSignal::new(false);
+    let picker_query    = RwSignal::new(String::new());
+    let picker_results  = RwSignal::<Vec<SearchResult>>::new(vec![]);
+    let pick_ver        = RwSignal::new(0u32);
+
+    // Debounced search: fires on every picker_query change
+    Effect::new(move |_| {
+        let q = picker_query.get();
+        if q.trim().is_empty() {
+            picker_results.set(vec![]);
+            return;
+        }
+        pick_ver.update(|v| *v += 1);
+        let ver = pick_ver.get_untracked();
+        wasm_bindgen_futures::spawn_local(async move {
+            gloo_timers::future::TimeoutFuture::new(300).await;
+            if pick_ver.get_untracked() != ver { return; }
+            if let Ok(results) = crate::api::node_picker_search(&q).await
+                && pick_ver.get_untracked() == ver
+            {
+                picker_results.set(results);
+            }
+        });
+    });
+
+    let do_assign = move |node_id: NodeId| {
+        assigning.set(false);
+        picker_query.set(String::new());
+        picker_results.set(vec![]);
+        let req = UpdateTaskRequest {
+            title: None, status: None, priority: None,
+            focus_date: None, due_date: None, recurrence: None,
+            node_id: Some(Some(node_id)),
+        };
+        wasm_bindgen_futures::spawn_local(async move {
+            let _ = crate::api::update_task(task_id, &req).await;
+            refresh.update(|n| *n += 1);
+        });
+    };
 
     let has_recurrence  = task.recurrence.is_some();
     let recurrence_tip  = task.recurrence.as_ref().map(|r| recurrence_label(r));
@@ -517,9 +573,86 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                 }}
             </div>
 
+            // Node picker (shown when assigning)
+            {move || assigning.get().then(|| view! {
+                <div class="relative mt-1.5">
+                    <div class="flex items-center gap-1">
+                        <span class="material-symbols-outlined text-stone-400 flex-shrink-0"
+                            style="font-size: 14px;">"link"</span>
+                        <input
+                            type="text"
+                            placeholder="Search nodes…"
+                            autofocus=true
+                            class="flex-1 text-xs rounded border border-amber-400
+                                bg-white dark:bg-stone-800 px-2 py-1
+                                text-stone-900 dark:text-stone-100
+                                focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            prop:value=move || picker_query.get()
+                            on:input=move |ev| picker_query.set(event_target_value(&ev))
+                            on:keydown=move |ev: web_sys::KeyboardEvent| {
+                                if ev.key() == "Escape" {
+                                    assigning.set(false);
+                                    picker_query.set(String::new());
+                                    picker_results.set(vec![]);
+                                }
+                            }
+                        />
+                        <button
+                            class="p-1 rounded text-stone-400 hover:text-stone-600
+                                dark:hover:text-stone-300 transition-colors cursor-pointer"
+                            title="Cancel"
+                            on:click=move |_| {
+                                assigning.set(false);
+                                picker_query.set(String::new());
+                                picker_results.set(vec![]);
+                            }
+                        >
+                            <span class="material-symbols-outlined" style="font-size: 14px;">"close"</span>
+                        </button>
+                    </div>
+                    {move || {
+                        let results = picker_results.get();
+                        (!results.is_empty()).then(|| view! {
+                            <div class="absolute z-20 left-0 right-0 mt-1
+                                bg-white dark:bg-stone-900
+                                border border-stone-200 dark:border-stone-700
+                                rounded-lg shadow-lg overflow-hidden">
+                                {results.into_iter().map(|r| {
+                                    let node_id = r.node_id;
+                                    let title   = r.title.clone();
+                                    let icon    = node_type_icon(&r.node_type);
+                                    view! {
+                                        <button
+                                            class="w-full flex items-center gap-2 px-3 py-2 text-xs
+                                                text-stone-700 dark:text-stone-300
+                                                hover:bg-amber-50 dark:hover:bg-stone-800
+                                                transition-colors cursor-pointer"
+                                            on:click=move |_| do_assign(node_id)
+                                        >
+                                            <span class="material-symbols-outlined text-stone-400 flex-shrink-0"
+                                                style="font-size: 13px;">{icon}</span>
+                                            <span class="truncate text-left">{title}</span>
+                                        </button>
+                                    }
+                                }).collect_view()}
+                            </div>
+                        })
+                    }}
+                </div>
+            })}
+
             // Action buttons (visible on hover)
             <div class="flex-shrink-0 flex items-center gap-0.5
                 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                    class="p-1 rounded text-stone-300 hover:text-blue-500
+                        dark:text-stone-600 dark:hover:text-blue-400
+                        transition-colors cursor-pointer"
+                    title="Assign to node"
+                    on:click=move |_| { assigning.set(true); }
+                >
+                    <span class="material-symbols-outlined" style="font-size: 16px;">"call_merge"</span>
+                </button>
                 <button
                     class="p-1 rounded text-stone-300 hover:text-amber-500
                         dark:text-stone-600 dark:hover:text-amber-400

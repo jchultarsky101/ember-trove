@@ -763,6 +763,18 @@ pub async fn search_nodes(
     parse_json(resp).await
 }
 
+/// Lightweight wrapper for the node picker — returns up to 8 results for `q`.
+/// Returns an empty list when `q` is blank (callers should skip the call in
+/// that case anyway, but this is a safe fallback).
+pub async fn node_picker_search(q: &str) -> Result<Vec<common::search::SearchResult>, UiError> {
+    if q.trim().is_empty() {
+        return Ok(vec![]);
+    }
+    search_nodes(q, false, None, None, &[], "or", Some("title_asc"), None, None, 1, 8)
+        .await
+        .map(|r| r.results)
+}
+
 // ── Admin ────────────────────────────────────────────────────────────────────
 
 pub async fn list_admin_users() -> Result<Vec<AdminUser>, UiError> {
