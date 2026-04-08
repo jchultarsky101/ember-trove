@@ -5,9 +5,10 @@ use common::{
 use leptos::prelude::*;
 
 use crate::{
-    app::{TemplatePrefill, View},
+    app::TemplatePrefill,
     components::toast::{push_toast, ToastLevel},
 };
+use leptos_router::hooks::use_navigate;
 
 fn node_type_label(nt: &NodeType) -> &'static str {
     match nt {
@@ -41,8 +42,7 @@ fn parse_node_type(s: &str) -> NodeType {
 
 #[component]
 pub fn TemplatesView() -> impl IntoView {
-    let current_view =
-        use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = StoredValue::new(use_navigate());
     let prefill = use_context::<RwSignal<Option<TemplatePrefill>>>()
         .expect("TemplatePrefill signal must be provided");
 
@@ -135,7 +135,7 @@ pub fn TemplatesView() -> impl IntoView {
         let body = t.body.clone();
         let tid = t.id;
         prefill.set(Some(TemplatePrefill { node_type: type_str, body, template_id: tid }));
-        current_view.set(View::NodeCreate);
+        navigate.get_value()("/nodes/new", Default::default());
     };
 
     view! {

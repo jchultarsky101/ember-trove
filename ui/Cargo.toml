@@ -9,7 +9,8 @@ dist = false
 
 [dependencies]
 common      = { path = "../common" }
-leptos      = { version = "0.8.16", features = ["csr"] }
+leptos        = { version = "0.8.16", features = ["csr"] }
+leptos_router = { version = "0.8" }
 tracing     = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-web = "0.1"

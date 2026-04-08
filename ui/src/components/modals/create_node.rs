@@ -8,9 +8,9 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     api::create_node,
-    app::View,
     components::toast::{ToastLevel, push_toast},
 };
+use leptos_router::hooks::use_navigate;
 
 /// Quick-capture modal — lightweight node creation without leaving the current view.
 ///
@@ -35,8 +35,7 @@ pub fn CreateNodeModal(
     let error: RwSignal<Option<String>> = RwSignal::new(None);
 
     let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
-    let current_view =
-        use_context::<RwSignal<View>>().expect("View signal must be provided");
+    let navigate = use_navigate();
     // Pre-select the active node-type filter so "Add" respects the current view.
     let node_type_filter: Option<RwSignal<Option<String>>> =
         use_context::<RwSignal<Option<String>>>();
@@ -100,7 +99,12 @@ pub fn CreateNodeModal(
         }
     });
 
-    let handle_submit = move || {
+    // Signal-based submit trigger — set to true from any handler; Effect does the work.
+    let submit_pending = RwSignal::new(false);
+
+    Effect::new(move |_| {
+        if !submit_pending.get() { return; }
+        submit_pending.set(false);
         let t = title.get_untracked();
         if t.trim().is_empty() {
             error.set(Some("Title is required.".to_string()));
@@ -125,13 +129,14 @@ pub fn CreateNodeModal(
         };
         loading.set(true);
         error.set(None);
+        let nav = navigate.clone();
         spawn_local(async move {
             match create_node(&req).await {
                 Ok(node) => {
                     loading.set(false);
                     push_toast(ToastLevel::Success, format!("\"{}\" created.", node.title));
                     refresh.update(|n| *n += 1);
-                    current_view.set(View::NodeDetail(node.id));
+                    nav(&format!("/nodes/{}", node.id), Default::default());
                     on_close.run(());
                 }
                 Err(e) => {
@@ -140,14 +145,14 @@ pub fn CreateNodeModal(
                 }
             }
         });
-    };
+    });
 
     // Keyboard handler: Escape closes, Ctrl+Enter submits.
     let handle_keydown = move |ev: web_sys::KeyboardEvent| {
         if ev.key() == "Escape" {
             on_close.run(());
         } else if ev.key() == "Enter" && (ev.ctrl_key() || ev.meta_key()) {
-            handle_submit();
+            submit_pending.set(true);
         }
     };
 
@@ -328,7 +333,7 @@ pub fn CreateNodeModal(
                                        text-white
                                        disabled:opacity-50 disabled:cursor-not-allowed
                                        transition-colors flex items-center gap-1.5"
-                                on:click=move |_| handle_submit()
+                                on:click=move |_| submit_pending.set(true)
                                 disabled=move || loading.get()
                             >
                                 {move || if loading.get() {
