@@ -261,6 +261,7 @@ async fn project_dashboard(
         subject_id: None,
         page: Some(1),
         per_page: Some(500),
+        include_archived: false,
     };
     let (projects, _) = state.nodes.list(params).await?;
 

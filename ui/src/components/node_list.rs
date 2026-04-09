@@ -106,6 +106,7 @@ pub fn NodeList() -> impl IntoView {
         use_context::<RwSignal<Option<String>>>().unwrap_or_else(|| RwSignal::new(None));
 
     let status_filter: RwSignal<Option<String>> = RwSignal::new(None);
+    let show_archived = RwSignal::new(false);
     let sort_key = RwSignal::new(SortKey::ModifiedDesc);
     let show_sort_menu = RwSignal::new(false);
 
@@ -118,8 +119,14 @@ pub fn NodeList() -> impl IntoView {
         let _ = refresh.get();
         let status = status_filter.get();
         let tag = tag_filter.get();
+        let include_archived = show_archived.get();
         async move {
-            crate::api::fetch_nodes_filtered(status.as_deref(), tag.map(|t| t.id.0)).await
+            crate::api::fetch_nodes_filtered(
+                status.as_deref(),
+                tag.map(|t| t.id.0),
+                include_archived,
+            )
+            .await
         }
     });
 
@@ -223,20 +230,22 @@ pub fn NodeList() -> impl IntoView {
                 </div>
             </div>
 
-            // Status filter pills
-            <div class="flex gap-1 px-6 py-2 border-b border-stone-100 dark:border-stone-800">
+            // Status filter pills + archived toggle
+            <div class="flex items-center gap-1 px-6 py-2 border-b border-stone-100 dark:border-stone-800">
+                // Primary status pills (active statuses only)
                 {[
                     ("All", None),
                     ("Draft", Some("draft")),
                     ("Published", Some("published")),
-                    ("Archived", Some("archived")),
                 ].iter().map(|&(label, value)| {
                     let value_owned: Option<String> = value.map(|s| s.to_string());
                     let value_cmp = value_owned.clone();
                     view! {
                         <button
                             class=move || {
-                                let active = status_filter.get() == value_cmp;
+                                // When showing archived, "All" pill is not the active view.
+                                let archived_on = show_archived.get();
+                                let active = !archived_on && status_filter.get() == value_cmp;
                                 let base = "px-2.5 py-0.5 text-xs rounded-full font-medium transition-colors";
                                 if active {
                                     format!("{base} bg-amber-600 text-white")
@@ -246,13 +255,43 @@ pub fn NodeList() -> impl IntoView {
                             }
                             on:click={
                                 let value_set = value_owned.clone();
-                                move |_| status_filter.set(value_set.clone())
+                                move |_| {
+                                    status_filter.set(value_set.clone());
+                                    show_archived.set(false);
+                                }
                             }
                         >
                             {label}
                         </button>
                     }
                 }).collect::<Vec<_>>()}
+
+                // Spacer pushes the archived toggle to the right
+                <span class="flex-1" />
+
+                // Archived toggle — visually separate from the primary pills
+                <button
+                    class=move || {
+                        let active = show_archived.get();
+                        let base = "flex items-center gap-1 px-2 py-0.5 text-xs rounded-full font-medium transition-colors border";
+                        if active {
+                            format!("{base} bg-stone-600 text-white border-stone-600 dark:bg-stone-500 dark:border-stone-500")
+                        } else {
+                            format!("{base} border-stone-300 dark:border-stone-600 text-stone-400 dark:text-stone-500 hover:text-stone-600 dark:hover:text-stone-300 hover:border-stone-400 dark:hover:border-stone-500")
+                        }
+                    }
+                    on:click=move |_| {
+                        show_archived.update(|v| *v = !*v);
+                        // Clear status pill when toggling archived view
+                        if show_archived.get() {
+                            status_filter.set(None);
+                        }
+                    }
+                    title="Toggle visibility of archived nodes"
+                >
+                    <span class="material-symbols-outlined" style="font-size:11px;">"inventory_2"</span>
+                    {move || if show_archived.get() { "Hide archived" } else { "Show archived" }}
+                </button>
             </div>
 
             // Bulk action bar — shown when ≥1 nodes are selected
