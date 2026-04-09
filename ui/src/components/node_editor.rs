@@ -107,6 +107,10 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     });
     let status = RwSignal::new("draft".to_string());
     let saving = RwSignal::new(false);
+    // True while the initial node fetch is in-flight (edit mode only).
+    // The Save button is disabled until this clears to prevent saving stale
+    // signal values if the user clicks Save before fetch_node completes.
+    let fetching = RwSignal::new(false);
     let error_msg = RwSignal::new(Option::<String>::None);
 
     // Preview visibility — starts visible on wide viewports, hidden on narrow.
@@ -208,6 +212,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
 
     // If editing, fetch existing node data.
     if let Some(id) = node {
+        fetching.set(true);
         wasm_bindgen_futures::spawn_local(async move {
             if let Ok(n) = crate::api::fetch_node(id).await {
                 title.set(n.title);
@@ -215,6 +220,7 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                 node_type.set(format!("{:?}", n.node_type).to_lowercase());
                 status.set(format!("{:?}", n.status).to_lowercase());
             }
+            fetching.set(false);
         });
     }
 
@@ -473,11 +479,11 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
                         class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
                             hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
                         on:click=on_save
-                        disabled=move || saving.get()
-                        title=move || if saving.get() { "Saving\u{2026}" } else { "Save" }
+                        disabled=move || saving.get() || fetching.get()
+                        title=move || if saving.get() { "Saving\u{2026}" } else if fetching.get() { "Loading\u{2026}" } else { "Save" }
                     >
                         <span class="material-symbols-outlined">
-                            {move || if saving.get() { "hourglass_empty" } else { "check" }}
+                            {move || if saving.get() { "hourglass_empty" } else if fetching.get() { "hourglass_top" } else { "check" }}
                         </span>
                     </button>
                     <button
