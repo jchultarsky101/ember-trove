@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use common::{
-    id::NodeId,
+    id::{NodeId, TaskId},
     task::{CreateTaskRequest, RecurrenceRule, Task, TaskPriority, TaskStatus, UpdateTaskRequest},
 };
 use leptos::prelude::*;
@@ -70,24 +70,13 @@ fn parse_priority(s: &str) -> TaskPriority {
     }
 }
 
-fn priority_weight(p: &TaskPriority) -> u8 {
-    match p {
-        TaskPriority::High   => 0,
-        TaskPriority::Medium => 1,
-        TaskPriority::Low    => 2,
-    }
-}
-
 fn sort_tasks(tasks: &mut [Task]) {
+    // Primary: manual sort_order (all default to 0).
+    // Tiebreak: created_at ASC so new tasks appear last.
     tasks.sort_by(|a, b| {
-        priority_weight(&a.priority)
-            .cmp(&priority_weight(&b.priority))
-            .then_with(|| match (a.due_date, b.due_date) {
-                (Some(da), Some(db)) => da.cmp(&db),
-                (Some(_), None)      => std::cmp::Ordering::Less,
-                (None, Some(_))      => std::cmp::Ordering::Greater,
-                (None, None)         => std::cmp::Ordering::Equal,
-            })
+        a.sort_order
+            .cmp(&b.sort_order)
+            .then_with(|| a.created_at.cmp(&b.created_at))
     });
 }
 
@@ -106,6 +95,25 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
 
     // Filter: hide done/cancelled tasks by default; toggled by the user.
     let show_completed = RwSignal::new(false);
+
+    // Drag-to-reorder state — open tasks are kept in a local signal so
+    // optimistic reorders survive the next resource refetch.
+    let open_tasks: RwSignal<Vec<Task>> = RwSignal::new(Vec::new());
+    let done_tasks: RwSignal<Vec<Task>> = RwSignal::new(Vec::new());
+    let drag_src: RwSignal<Option<usize>> = RwSignal::new(None);
+    let drag_over: RwSignal<Option<usize>> = RwSignal::new(None);
+
+    // Sync open/done buckets whenever the resource (re-)loads.
+    Effect::new(move |_| {
+        let all = tasks_resource.get()
+            .and_then(|r| r.ok())
+            .unwrap_or_default();
+        let (mut open, done): (Vec<_>, Vec<_>) =
+            all.into_iter().partition(|t| !status_done(&t.status));
+        sort_tasks(&mut open);
+        open_tasks.set(open);
+        done_tasks.set(done);
+    });
 
     // New task form state
     let new_title      = RwSignal::new(String::new());
@@ -253,81 +261,112 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
                 </div>
             })}
 
-            // Task list (open tasks always shown; completed revealed on demand)
+            // Task list ──────────────────────────────────────────────────────
+            // Empty state
+            {move || (open_tasks.get().is_empty() && done_tasks.get().is_empty()).then(|| view! {
+                <p class="text-sm text-stone-400 dark:text-stone-500 italic">
+                    "No tasks yet."
+                </p>
+            })}
+
+            // Open tasks — draggable for reordering
+            {move || open_tasks.get().into_iter().enumerate().map(|(idx, task)| view! {
+                <div
+                    draggable="true"
+                    style=move || if drag_over.get() == Some(idx) {
+                        "border-top: 2px solid #f59e0b; margin-top: -2px;"
+                    } else { "" }
+                    on:dragstart=move |_| drag_src.set(Some(idx))
+                    on:dragover=move |ev| {
+                        ev.prevent_default();
+                        drag_over.set(Some(idx));
+                    }
+                    on:dragleave=move |_| {
+                        if drag_over.get_untracked() == Some(idx) {
+                            drag_over.set(None);
+                        }
+                    }
+                    on:drop=move |ev| {
+                        ev.prevent_default();
+                        if let Some(src) = drag_src.get_untracked()
+                            && src != idx
+                        {
+                            open_tasks.update(|list| {
+                                let moved = list.remove(src);
+                                let dst = if src < idx { idx - 1 } else { idx };
+                                list.insert(dst.min(list.len()), moved);
+                            });
+                            let updates: Vec<(TaskId, i32)> = open_tasks
+                                .get_untracked()
+                                .iter()
+                                .enumerate()
+                                .map(|(i, t)| (t.id, (i as i32) * 10))
+                                .collect();
+                            wasm_bindgen_futures::spawn_local(async move {
+                                let _ = crate::api::reorder_tasks(&updates).await;
+                            });
+                        }
+                        drag_src.set(None);
+                        drag_over.set(None);
+                    }
+                >
+                    <TaskRow task=task task_refresh=task_refresh />
+                </div>
+            }).collect_view()}
+
+            // Completed tasks (revealed on demand) + disclosure / clear row
             {move || {
-                let all_tasks = tasks_resource.get()
-                    .and_then(|r| r.ok())
-                    .unwrap_or_default();
+                let done = done_tasks.get();
+                let done_count = done.len();
+                if done_count == 0 { return ().into_any(); }
 
-                if all_tasks.is_empty() {
-                    return view! {
-                        <p class="text-sm text-stone-400 dark:text-stone-500 italic">
-                            "No tasks yet."
-                        </p>
-                    }.into_any();
-                }
-
-                let (mut open_tasks, done_tasks): (Vec<_>, Vec<_>) =
-                    all_tasks.into_iter().partition(|t| !status_done(&t.status));
-                sort_tasks(&mut open_tasks);
-
-                let done_count = done_tasks.len();
-                let done_ids: Vec<_> = done_tasks.iter().map(|t| t.id).collect();
                 let showing = show_completed.get();
+                let done_ids: Vec<TaskId> = done.iter().map(|t| t.id).collect();
+                let label = if showing {
+                    "Hide completed".to_string()
+                } else {
+                    format!("{done_count} completed · show")
+                };
+                let icon = if showing { "expand_less" } else { "expand_more" };
+                let ids_for_clear = done_ids.clone();
 
                 view! {
-                    // Open tasks
-                    {open_tasks.into_iter().map(|task| view! {
-                        <TaskRow task=task task_refresh=task_refresh />
-                    }).collect_view()}
-
-                    // Completed tasks (revealed when toggled)
-                    {showing.then(|| done_tasks.into_iter().map(|task| view! {
+                    // Completed rows
+                    {showing.then(|| done.into_iter().map(|task| view! {
                         <TaskRow task=task task_refresh=task_refresh />
                     }).collect_view())}
 
-                    // Disclosure row — shown only when completed tasks exist
-                    {(done_count > 0).then(|| {
-                        let label = if showing {
-                            "Hide completed".to_string()
-                        } else {
-                            format!("{done_count} completed · show")
-                        };
-                        let icon = if showing { "expand_less" } else { "expand_more" };
-                        let ids_for_clear = done_ids.clone();
-                        view! {
-                            <div class="mt-2 flex items-center gap-3">
-                                <button
-                                    class="flex items-center gap-1 text-xs
-                                           text-stone-400 dark:text-stone-500
-                                           hover:text-stone-600 dark:hover:text-stone-300
-                                           transition-colors cursor-pointer"
-                                    on:click=move |_| show_completed.update(|v| *v = !*v)
-                                >
-                                    <span class="material-symbols-outlined"
-                                          style="font-size: 14px;">{icon}</span>
-                                    {label}
-                                </button>
-                                <button
-                                    class="text-xs text-stone-300 dark:text-stone-600
-                                           hover:text-red-500 dark:hover:text-red-400
-                                           transition-colors cursor-pointer"
-                                    title="Delete all completed tasks"
-                                    on:click=move |_| {
-                                        let ids = ids_for_clear.clone();
-                                        wasm_bindgen_futures::spawn_local(async move {
-                                            for id in ids {
-                                                let _ = crate::api::delete_task(id).await;
-                                            }
-                                            task_refresh.update(|n| *n += 1);
-                                        });
+                    // Disclosure + clear-all bar
+                    <div class="mt-2 flex items-center gap-3">
+                        <button
+                            class="flex items-center gap-1 text-xs
+                                   text-stone-400 dark:text-stone-500
+                                   hover:text-stone-600 dark:hover:text-stone-300
+                                   transition-colors cursor-pointer"
+                            on:click=move |_| show_completed.update(|v| *v = !*v)
+                        >
+                            <span class="material-symbols-outlined"
+                                  style="font-size: 14px;">{icon}</span>
+                            {label}
+                        </button>
+                        <button
+                            class="text-xs text-stone-300 dark:text-stone-600
+                                   hover:text-red-500 dark:hover:text-red-400
+                                   transition-colors cursor-pointer"
+                            title="Delete all completed tasks"
+                            on:click=move |_| {
+                                let ids = ids_for_clear.clone();
+                                wasm_bindgen_futures::spawn_local(async move {
+                                    for id in ids {
+                                        let _ = crate::api::delete_task(id).await;
                                     }
-                                >
-                                    "Clear all"
-                                </button>
-                            </div>
-                        }
-                    })}
+                                    task_refresh.update(|n| *n += 1);
+                                });
+                            }
+                        >
+                            "Clear all"
+                        </button>
+                    </div>
                 }.into_any()
             }}
         </div>

@@ -279,19 +279,7 @@ impl TaskRepo for PgTaskRepo {
             SELECT {SELECT_COLS}
             FROM node_tasks
             WHERE node_id = $1
-            ORDER BY
-                CASE status::text
-                    WHEN 'open'        THEN 0
-                    WHEN 'in_progress' THEN 1
-                    WHEN 'done'        THEN 2
-                    WHEN 'cancelled'   THEN 3
-                END,
-                CASE priority::text
-                    WHEN 'high'   THEN 0
-                    WHEN 'medium' THEN 1
-                    WHEN 'low'    THEN 2
-                END,
-                created_at
+            ORDER BY sort_order ASC, created_at ASC
             "#
         ))
         .bind(node_id.0)
