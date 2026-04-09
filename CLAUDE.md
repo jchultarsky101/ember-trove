@@ -4,6 +4,13 @@ Act as a Senior Rust Architect. We follow a **zero-panic, TDD-first** workflow.
 Before finalising any file edit, run `cargo check` and `cargo clippy`.
 Output only complete, idiomatic Rust. Use `thiserror` for all custom error types.
 
+**Self-learning resources** (grep before debugging or writing new patterns):
+- `.claude/ERRORS.md` — known compile/runtime error patterns and fixes
+- `.claude/patterns/` — canonical code patterns (navigate, submit, debounce, double-opt)
+- `.claude/rules/leptos.md` — Leptos-specific rules (auto-loaded for ui/ files)
+- `.claude/rules/api.md` — API/backend rules (auto-loaded for api/ files)
+- `.claude/ROADMAP.md` — current state, backlog, architecture decisions
+
 ---
 
 ## Performance & Personality
@@ -24,18 +31,25 @@ Output only complete, idiomatic Rust. Use `thiserror` for all custom error types
 2. **Green** — Implement the minimal logic to pass the test.
 3. **Refactor** — `cargo clippy -- -D warnings` + `cargo fmt`.
 
-## Post-Edit Command
+## Post-Edit Commands
 
+After any `.rs` edit in `api/` or `common/`:
 ```
 cargo check && cargo clippy -- -D warnings
 ```
 
-For the WASM UI crate:
-
+After any `.rs` edit in `ui/` (WASM):
 ```
 cargo check -p ui --target wasm32-unknown-unknown
 cargo clippy -p ui --target wasm32-unknown-unknown -- -D warnings
 ```
+
+Before any `git commit`:
+```
+cargo test
+```
+
+Run `./scripts/verify.sh` for a full suite (all of the above + git status check).
 
 ---
 
@@ -43,234 +57,119 @@ cargo clippy -p ui --target wasm32-unknown-unknown -- -D warnings
 
 A self-hosted, graph-centric personal knowledge management system.
 
-| Layer    | Technology                         |
-|----------|------------------------------------|
-| Backend  | Rust · Axum 0.8 · Tokio            |
-| Frontend | Leptos 0.8 CSR/WASM · Tailwind v4  |
-| Database | PostgreSQL 16 · sqlx 0.8           |
-| Storage  | S3-compatible (MinIO / AWS S3)     |
-| Auth     | OIDC via Keycloak                  |
-| Markdown | pulldown-cmark · ammonia           |
-| OpenAPI  | utoipa + Swagger UI                |
+| Layer    | Technology                          |
+|----------|-------------------------------------|
+| Backend  | Rust · Axum 0.8 · Tokio             |
+| Frontend | Leptos 0.8 CSR/WASM · Tailwind v4   |
+| Database | PostgreSQL 16 · sqlx 0.8            |
+| Storage  | S3-compatible (MinIO / AWS S3)      |
+| Auth     | OIDC via Cognito (AWS)              |
+| Markdown | pulldown-cmark · ammonia            |
+| OpenAPI  | utoipa + Swagger UI                 |
 
 ```
 ember-trove/
 ├── Cargo.toml       # workspace: members = [api, ui, common]
 ├── common/          # shared DTOs, error types, ID newtypes
-├── api/             # Axum REST backend (port 3000)
+├── api/             # Axum REST backend (port 3003)
 ├── ui/              # Leptos/Trunk WASM frontend
-├── migrations/      # sqlx migrations
+├── migrations/      # sqlx migrations (auto-applied at API startup)
+├── scripts/         # verify.sh, next-version.sh
 └── deploy/          # Dockerfiles, docker-compose, K8s manifests
 ```
 
 ## Git Flow
 
-Follows standard Git Flow. `v1.0.0` is the first production tag on `main`.
+| Branch type | Pattern              | Branched from | Merges into        | Notes                           |
+|-------------|----------------------|---------------|--------------------|---------------------------------|
+| Feature     | `feature/jc/<name>`  | `develop`     | `develop`          | `--no-ff`; worktree per feature |
+| Release     | `release/<version>`  | `develop`     | `main` + `develop` | tag on `main` after merge       |
+| Hotfix      | `hotfix/<name>`      | `main`        | `main` + `develop` | tag patch bump on `main`        |
 
-| Branch type | Pattern              | Branched from | Merges into          | Notes                              |
-|-------------|----------------------|---------------|----------------------|------------------------------------|
-| Feature     | `feature/jc/<name>`  | `develop`     | `develop`            | `--no-ff`; worktree per feature    |
-| Release     | `release/<version>`  | `develop`     | `main` + `develop`   | tag on `main` after merge          |
-| Hotfix      | `hotfix/<name>`      | `main`        | `main` + `develop`   | tag bump on `main` after merge     |
-
-- Persistent branches: `main` (production) and `develop` (integration).
-- Features: `feature/jc/...` branched from `develop`, worked in
-  `.claude/worktrees/<name>/`, merged back with `--no-ff`, worktree + branch
-  deleted after merge.
-- Releases: `release/<semver>` branched from `develop`; after QA, merge into
-  `main` (`--no-ff`), tag (`v<semver>`), merge back into `develop`, delete branch.
-- Hotfixes: `hotfix/<name>` branched from `main`; after fix, merge into `main`
-  (`--no-ff`), tag patch bump, merge back into `develop`, delete branch.
 - **Never commit directly to `main` or `develop`** — all changes via branches.
-- **Current state**: v1.49.1 released. `develop` == `main` at `6b28bff`. CD pipeline active.
+- Use `/release [major|minor|patch]` command for release workflow.
+- Use `./scripts/next-version.sh` to compute the next semver automatically.
 
 ## Environment Quirks
 
-- **Docker PATH**: Binary at `/Applications/Docker.app/Contents/Resources/bin/docker`; always
-  `export PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"` before any `docker` call.
-- **`cargo` PATH**: Not on default shell PATH; always `export PATH="$HOME/.cargo/bin:$PATH"` in
-  Bash tool calls.
-- **`cat` aliased to `bat`**: Heredoc git commit messages (`-m "$(cat <<'EOF'...)"`) silently produce
-  empty messages in this shell. Use plain multi-line `-m "..."` strings for all commits.
-- **Docker build output**: BuildKit output does not stream to the task file in real-time; `tail` of
-  the output file shows only the initial lines while building. Use `/bin/ps aux | grep docker` to
-  confirm the build is still alive.
-- **Stray Docker containers**: Old `docker compose` runs (e.g. `partorbital-*`) leave containers on
-  a different network from `deploy-*`. Run `docker ps` and stop orphans before troubleshooting
-  networking between services.
-- **Keycloak usernames are read-only**: `kcadm.sh update users/<id> -s username=...` →
-  `error-user-attribute-read-only`. Delete and recreate the user to rename.
-- **Keycloak `set-password`**: `--temporary false` flag removed in recent KC — omit it entirely.
-- **Worktree cwd resets**: Bash cwd resets to the session's worktree root between tool calls; always use
-  absolute paths (e.g. `cd /Users/julian/projects/ember-trove && git ...`).
-- **Worktree directory deleted → shell broken**: If the session worktree directory is deleted (e.g. by
-  `rm -rf .claude/worktrees/`), the shell snapshot fails to `cd` there and **every subsequent Bash
-  command silently fails** (exit code non-zero, only the cd error printed). Fix: use the `Write` tool
-  to create a placeholder file at `<worktree-path>/.keep` — this recreates the directory and unblocks
-  the shell immediately. Never delete the current session's worktree directory.
-- **Docker single-service rebuild**: `docker compose -f deploy/docker-compose.yml build <svc> && docker compose -f deploy/docker-compose.yml up -d <svc>` — rebuilds one container without restarting others.
-- **Verify merge state first**: At session start, run `git log --oneline -5` on `develop` to confirm what's already merged before re-doing work in a worktree.
-- **Port conflict: stale Trunk process**: Before testing via Docker stack on port 8003, check
-  `lsof -i :8003` — a leftover `trunk` dev-server process silently intercepts requests and returns
-  404 before Docker can respond. Kill it with `kill <pid>` first.
-- **`docker compose up -d` won't recreate unchanged-config containers**: If only an image was
-  rebuilt (not the compose config), the container stays on the old image. Use
-  `docker compose up -d --force-recreate <svc>` after rebuilding to guarantee the new image runs.
-- **`grep`/`tail`/`head`/`rg` not available in Bash tool**: These standard utilities are missing
-  or aliased away. Use Grep tool for content search; use Read tool with `offset`/`limit` instead
-  of `tail`/`head`; pipe through `python3 -c` for JSON parsing instead of `jq`.
-- **`aws` CLI not in Bash tool PATH**: `aws` command is unavailable. Use `pip3 install boto3` then
-  call AWS APIs via Python: `boto3.client('cognito-idp', region_name='us-east-2')`. Works for
-  Cognito, S3, SES, etc.
+- **Docker PATH**: `export PATH="$PATH:/Applications/Docker.app/Contents/Resources/bin"` before docker.
+- **`cargo` PATH**: `export PATH="$HOME/.cargo/bin:$PATH"` in every Bash tool call.
+- **`cat` aliased to `bat`**: Use plain `-m "..."` for git commit messages (not heredoc).
+- **`grep`/`tail`/`head`/`rg` not available**: Use Grep tool; Read with offset/limit; `python3 -c` for JSON.
+- **`aws` CLI unavailable**: Use `boto3` via `pip3 install boto3` + Python.
+- **Worktree cwd resets**: Always use absolute paths in Bash tool calls.
+- **Worktree dir deleted → shell broken**: `Write` a `.keep` file at `<path>/.keep` to fix, then `git worktree prune`.
+- **Port 8003 conflict**: Check `lsof -i :8003` — stale Trunk process intercepts before Docker.
+- **Docker force-recreate**: After image rebuild, use `docker compose up -d --force-recreate <svc>`.
+- **BuildKit WASM cache**: `--no-cache` unreliable. Use `trunk build --release` + `docker cp` to bust.
 
-## Leptos Patterns
+## Leptos Navigation (v1.83.0+)
 
-- **Static `style=` / `title=` attributes**: `style=expr` and `title=expr` without a closure are
-  evaluated once at component construction and never re-run. To track a signal, use `style=move || ...`
-  and `title=move || ...`. Non-closure attribute values are frozen for the component's lifetime.
-- **`MyDayTask` struct layout**: Task fields (`node_id`, `id`, etc.) live on the nested
-  `task: Task` field (via `#[serde(flatten)]`), not directly on `MyDayTask`. Access as
-  `my_day_task.task.node_id`.
-- **Reactive Effect + async race**: `Effect::new` fires on every signal change (each keystroke).
-  Any `spawn_local` inside must use a monotonic version counter (`RwSignal<u32>`) to discard stale
-  responses, plus `gloo_timers::future::TimeoutFuture::new(300).await` debounce before the API call.
-- **Shared context signals**: Lift `RwSignal<T>` to the App root, `provide_context(sig)` there,
-  `use_context::<RwSignal<T>>()` in children. No prop-drilling. Example: `search_query` written by
-  sidebar `SearchBar`, read by `SearchView`.
-- **SearchBar suppress on Search view**: When `current_view == View::Search`, return early in
-  `trigger_search` to suppress the dropdown — but still call `search_query.set(...)` first so the
-  `SearchView` `Effect` fires and auto-searches.
-- **Context signal type**: Carry full DTOs (e.g. `RwSignal<Option<Tag>>`) in context rather than
-  just IDs — avoids extra fetches and lets any child render name/colour without a lookup.
-- **move closure + String ownership**: In `map()` closures, clone String fields into named
-  variables *before* the `view!` macro (e.g. `let name = tag.name.clone(); let title = format!("…{name}");`).
-  The first use inside `view!` moves the String; a second use (e.g. in `title=`) will fail to compile.
-- **Clippy `too_many_arguments`**: Private helper fns with ≥8 args trigger this. Annotate with
-  `#[allow(clippy::too_many_arguments)]` when a params struct would be excessive.
-- **SVG `attr:` prefix bug**: Leptos 0.8 writes `attr:foo=val` as `setAttribute("attr:foo", val)`
-  (keeps the prefix!) for SVG elements. **Rule**: use `style="foo: val"` for ALL SVG presentation
-  attributes (stroke-width, fill-opacity, text-anchor, font-size, marker-end, paint-order, etc.).
-  Regular named attributes without hyphens (`stroke`, `fill`, `d`, `cx`, `cy`) work fine without `attr:`.
-- **Unknown SVG elements (`<marker>`, `<defs>` content)**: Not in Leptos's element list. Create via
-  `web_sys::Document::create_element_ns(Some("http://www.w3.org/2000/svg"), "marker")` and
-  `set_attribute`. Inject after first render with `spawn_local(async { TimeoutFuture::new(50).await; inject(); })`.
-- **Event delegation: `stop_propagation()` ineffective between Leptos handlers**: All Leptos
-  handlers are registered at the document root. `ev.stop_propagation()` inside a child's handler
-  does NOT prevent a parent's co-registered Leptos handler from firing. **Fix:** use a signal
-  guard in the outer handler that is set by the inner handler (inner handlers fire first in
-  bubbling order). Example: SVG pan guard `if drag_node.get_untracked().is_none()`.
-- **Drag-vs-click disambiguation**: Use `RwSignal<bool> did_drag` — set `true` in `on:mousemove`
-  during drag, check+clear in `on:click` to suppress the post-mouseup click event.
-- **SVG marker re-injection guard**: In `spawn_local` marker injectors, check
-  `svg.query_selector("defs marker").is_ok_and(|m| m.is_none())` before inserting — reactive
-  signals can re-fire and duplicate markers if unguarded.
-- **Tailwind v4 `group-hover` opacity unreliable**: `opacity-0 group-hover:opacity-100`
-  fails silently in Tailwind v4 (scoped to `@media (hover:hover)`). Use always-visible
-  elements with a muted colour instead: e.g. `text-stone-300 hover:text-amber-500`.
-- **SVG z-order = DOM order**: SVG elements paint in the order they appear in the `view!` macro.
-  If element A must appear above element B, render A *after* B. Example: tag dots rendered before
-  the title pill were hidden by it — moving the dot block after `</text>` fixed it.
-- **SVG `pointer-events: none` blocks clicks**: Decorative SVG elements use `pointer-events: none`
-  in this codebase. To make an element clickable, change to `pointer-events: auto; cursor: pointer`
-  and add `on:click`. Also apply the `dot_clicked` guard (see event delegation note above) so the
-  parent `<g>` handler doesn't fire on the child click.
-- **Newtype for shared `RwSignal<bool>` context**: `provide_context(RwSignal<bool>)` collides when
-  multiple bool signals exist. Wrap in a newtype: `#[derive(Clone,Copy)] struct ShowCapture(pub RwSignal<bool>);`
-  then `provide_context(ShowCapture(...))`. Pattern used by `ShowCapture` and `TaskRefresh`.
+All navigation uses `leptos_router` 0.8 — browser back/forward works natively.
 
-## Browser Testing (mcp__Claude_in_Chrome)
+**NavigateFn is Clone, not Copy**. Wrap in `StoredValue` for reactive contexts:
+```rust
+let navigate = StoredValue::new(use_navigate());
+navigate.get_value()("/path", Default::default());
+```
 
-- **Checkbox clicks**: Coordinate-based clicks miss small checkboxes. Use `mcp__Claude_in_Chrome__find`
-  to locate by description, then `left_click` via the returned `ref`.
-- **`<select>` dropdowns**: Coordinate clicks don't open native selects. Use
-  `mcp__Claude_in_Chrome__find` to get the `ref`, then `mcp__Claude_in_Chrome__form_input` with
-  the option's value string to select an option reliably.
-- **API signature grep before changing**: When adding a parameter to a shared API function
-  (e.g. `search_nodes()`), grep all UI source files for the old call-site count before committing —
-  missed callers cause a compile failure on the next check.
-- **Small toolbar buttons**: Coordinate clicks on small icon buttons (pencil, trash) often miss.
-  Use `mcp__Claude_in_Chrome__find` with a natural-language query (e.g. `"edit pencil button"`) and
-  `left_click` via the returned `ref` for reliability.
-- **Tool timeouts (~5 min)**: `computer`, `find`, and `javascript_tool` can time out if the
-  browser extension is busy. Wait for the timeout to resolve then retry — the tab remains valid.
-  Fall back to `open "<url>"` via Bash to navigate if `navigate` also hangs.
+Or clone before each inner `move ||` closure that captures it.
+See `.claude/patterns/navigate-reactive.rs` for all patterns.
+
+**Route paths require `path!()` macro**:
+```rust
+use leptos_router::path;
+<Route path=path!("/inbox") view=InboxView />
+```
+
+**URL mapping**: `/inbox` · `/my-day` · `/calendar` · `/dashboard` · `/graph` · `/search` ·
+`/notes` · `/nodes` · `/nodes/new` · `/nodes/:id` · `/nodes/:id/edit` ·
+`/tags` · `/templates` · `/admin/users` · `/admin/permissions` · `/admin/backup`
+
+## Leptos Patterns (Critical)
+
+- **Static `style=` / `title=`**: Always use closures — `style=move || ...` — for reactive attributes.
+- **Reactive closure FnOnce**: Moving non-Copy values into inner closures breaks reactivity. See `.claude/ERRORS.md`.
+- **Shared submit logic**: Use `RwSignal<bool>` trigger + `Effect::new`. See `.claude/patterns/submit-trigger.rs`.
+- **Debounced search**: Version counter + 300ms timeout. See `.claude/patterns/reactive-effect-debounce.rs`.
+- **Context newtypes**: `#[derive(Clone,Copy)] struct ShowCapture(pub RwSignal<bool>)` prevents collision.
+- **SVG**: z-order = DOM order. Use `style=""` for hyphenated attrs (`stroke-width`, etc.), not `attr:`.
+- **Tailwind v4 group-hover**: Unreliable. Use always-visible muted element + `:hover` color.
+- **Map closures**: Clone signals/navigate before the inner `move ||` in each map iteration.
+- **`MyDayTask` fields**: Accessed via `my_day_task.task.node_id` (nested via `#[serde(flatten)]`).
 
 ## PostgreSQL / Axum Patterns
 
-- **`Query<T>` + `Vec<Uuid>`**: `axum::extract::Query` uses `serde_urlencoded` which cannot
-  deserialize repeated query params into `Vec<T>`. Use `Option<String>` (comma-separated UUIDs)
-  and parse server-side with a helper (`s.split(',').filter_map(|v| v.parse().ok()).collect()`).
-- **`node_type` serde variants are lowercase**: `NodeType` serializes as `"article"`, `"project"`,
-  `"area"`, `"resource"`, `"reference"` — not PascalCase. Use lowercase in curl/test payloads.
-- **Static AND/OR tag SQL**: Avoid dynamic query building by using
-  `array_length($n::uuid[], 1) IS NULL` as a bypass guard (empty array → skip filter) combined
-  with `HAVING (NOT $and_mode) OR COUNT(DISTINCT tag_id) = array_length($n::uuid[], 1)` to
-  switch AND/OR logic — all in a single static parameterised query.
-- **`Option<Option<T>>` in PATCH DTOs**: Without a custom deserialiser, serde maps JSON `null`
-  to the *outer* `None`, so `req.field.is_some()` is always `false` for "clear" payloads — the
-  SQL `CASE WHEN $n` guard never fires. Fix: add
-  `#[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "deser_double_opt")]`
-  where `deser_double_opt` is `Ok(Some(Option::<T>::deserialize(d)?))`.
-  Semantics: absent → `None` (leave unchanged), null → `Some(None)` (clear), value → `Some(Some(v))` (set).
+- **`Query<T>` + `Vec<Uuid>`**: Use `Option<String>` + server-side `.split(',')` parse.
+- **`node_type` serde**: Lowercase variants — `"article"`, `"project"`, `"area"`, etc.
+- **`Option<Option<T>>` PATCH**: Use `deser_double_opt` deserializer. See `.claude/patterns/double-opt-patch.rs`.
+- **Static AND/OR tag SQL**: `array_length($n::uuid[], 1) IS NULL` bypass + `HAVING` clause.
 
-## Admin Permission Model (v1.48.1+)
+## Admin Permission Model
 
-- **`require_role()`** in `api/src/auth/permissions.rs` returns `Ok(())` immediately when
-  `claims.roles.contains("admin")`. Roles come from `cognito:groups` → JWT → `AuthClaims.roles`.
-- **`list_nodes`** skips `params.subject_id` entirely for admins — no `IN (permissions)` SQL filter.
-- **`is_owner` in NodeView** (`ui/src/components/node_view.rs`): `user.sub == n.owner_id || user.roles.contains("admin")`.
-  Controls visibility of: Add Note button, edit-note pencil, PermissionPanel controls, SharePanel, pin button, VersionPanel restore.
-- **`UserInfo.roles: Vec<String>`** is populated from `AuthClaims.roles` in `From<AuthClaims>`. Present in the WASM frontend via `AuthStatus::Authenticated(UserInfo)`.
-- **Admin Cognito sub**: `f1eb2590-0091-70e4-d9b3-24e4a23d24d1` (`julian@chultarsky.com`).
+- **`require_role()`**: Returns `Ok(())` immediately for `claims.roles.contains("admin")`.
+- **`list_nodes`**: Skips `subject_id` filter for admins.
+- **`is_owner`**: `user.sub == n.owner_id || user.roles.contains("admin")`.
+- **Admin sub**: `f1eb2590-0091-70e4-d9b3-24e4a23d24d1` (`julian@chultarsky.com`).
 
 ## Cognito Hosted UI
 
-- **`SetUICustomization` allowlist**: Only documented class names are accepted; unlisted classes
-  (e.g. `.modalCustomizable`) cause `InvalidParameterException`. Allowlisted classes:
-  `.background-customizable`, `.banner-customizable`, `.logo-customizable`, `.label-customizable`,
-  `.inputField-customizable[:focus]`, `.submitButton-customizable[:hover]`,
-  `.idpButton-customizable[:hover]`, `.socialButton-customizable`, `.errorMessage-customizable`,
-  `.textDescription-customizable`, `.idpDescription-customizable`, `.redirect-customizable`,
-  `.legalText-customizable`, `.passwordCheck-valid/notValid-customizable`. Max 3 072 chars.
-- **CSS property chaining trick**: Extra properties (border-radius, box-shadow, font-family) can be
-  injected by appending them after a valid value: `border: 1px solid #ccc; border-radius: 6px;`.
-  Cognito passes the raw string through.
-- **Apply via boto3** (aws CLI unavailable in Bash tool):
-  `boto3.client('cognito-idp').set_ui_customization(UserPoolId=..., ClientId='ALL', CSS=css, ImageFile=logo_bytes)`
-- **Hosted UI URL**: `trove-chultarsky.auth.us-east-2.amazoncognito.com`; app client ID: `eogq2sehdad3uc8nmar7aneol`.
-- **Authoritative CSS source**: `deploy/cognito.css` + `deploy/logo.png` — edit and re-apply via boto3 after changes.
+- `SetUICustomization` allowlist only — unlisted classes cause `InvalidParameterException`.
+- Apply CSS via `boto3.client('cognito-idp').set_ui_customization(...)` (aws CLI unavailable).
+- Authoritative CSS: `deploy/cognito.css` + `deploy/logo.png`.
+- Pool: `us-east-2_4RQfxhKqn` · Client: `eogq2sehdad3uc8nmar7aneol`
 
 ## Production Deployment
 
-- **Production server**: AWS EC2 `ubuntu@18.221.254.95` — SSH key at
-  `/Users/julian/projects/joomla4/ssh/LightsailDefaultKey-us-east-2.pem`.
-  `trove.chultarsky.me` points to this host; `docker compose -f deploy/docker-compose.yml`
-  only updates the local dev stack (port 8003) — it does NOT reach production.
-- **Prod compose file**: `deploy/docker-compose.prod.yml` with `deploy/.env.prod`;
-  always pass `--env-file deploy/.env.prod` or env vars silently default to empty strings.
-- **Full prod deploy sequence**:
-  1. `git push origin main develop --tags`
-  2. SSH to EC2: `nohup docker compose -f deploy/docker-compose.prod.yml build <svc> > /tmp/build.log 2>&1 &`
-     (use nohup — direct SSH drops during long Rust/WASM builds)
-  3. Poll: `ssh ... "ps -p <PID> || tail -5 /tmp/build.log"`
-  4. `docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d --force-recreate <svc>`
-  5. `docker exec deploy-proxy-1 nginx -s reload` (picks up new container IPs after recreate)
-- **DB migrations are automatic**: API runs `sqlx::migrate!()` at startup; `sqlx` binary is
-  not in the container. Check `docker logs deploy-api-1` for "database migrations complete".
-- **Docker BuildKit WASM cache**: `docker compose build --no-cache` does not reliably
-  invalidate BuildKit's content-addressed cache for Rust source changes. If the WASM hash
-  in the built image matches the previous build, stale WASM was served. Workaround:
-  build locally with `trunk build --release` then `docker cp ui/dist/. <container>:/usr/share/nginx/html/`.
+- **Server**: `ubuntu@18.221.254.95` (SSH: `~/.ssh/lightsail-ember-trove.pem`)
+- **CD pipeline**: tag push → GHA builds GHCR images → EC2 pulls + recreates containers.
+- **Prod deploy**: `git push origin main develop --tags` → pipeline handles the rest.
+- **Verify**: `curl https://trove.chultarsky.me/api/health`
+- **Migrations**: Auto-run at API startup via `sqlx::migrate!()`.
+- **Manual override**: `docker compose up -d --force-recreate <svc>` + `nginx -s reload`.
 
-## Implementation Phases
+## Browser Testing (mcp__Claude_in_Chrome)
 
-| Phase | Scope                                    |
-|-------|------------------------------------------|
-| 1     | Workspace skeleton, DTOs, health route, migrations, deploy |
-| 2     | OIDC auth middleware, login/callback/refresh               |
-| 3     | Node CRUD + Markdown editor UI                             |
-| 4     | Knowledge graph: Edges + Tags                              |
-| 5     | Full-text + fuzzy search                                   |
-| 6     | Attachments + S3 integration                               |
-| 7     | Per-node permissions                                       |
-| 8     | Docker multi-stage + K8s deployment                        |
+- **Checkbox/select**: Use `find` by description + `form_input` — coordinate clicks miss small targets.
+- **API signature changes**: Grep all UI call sites before changing shared `api.rs` functions.
+- **Tool timeouts**: Wait and retry — tab remains valid. Fall back to `open "<url>"` for navigation.
