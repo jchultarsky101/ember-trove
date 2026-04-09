@@ -276,8 +276,8 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                 </aside>
 
                 <main class="flex-1 overflow-auto flex flex-col min-w-0">
-                    <Routes fallback=|| view! { <Redirect path="/inbox" /> }>
-                        <Route path=path!("/")          view=|| view! { <Redirect path="/inbox" /> } />
+                    <Routes fallback=|| view! { <Redirect path="/my-day" /> }>
+                        <Route path=path!("/")          view=|| view! { <Redirect path="/my-day" /> } />
                         <Route path=path!("/inbox")     view=InboxView />
                         <Route path=path!("/my-day")    view=MyDayView />
                         <Route path=path!("/calendar")  view=CalendarView />

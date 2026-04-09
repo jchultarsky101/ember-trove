@@ -83,10 +83,17 @@ pub async fn parse_json<T: serde::de::DeserializeOwned>(
                 if let Some(win) = web_sys::window() {
                     let _ = win.location().reload();
                 }
+                // Park this future until the page reload destroys the WASM
+                // runtime. Without this, the Err below propagates to callers
+                // (e.g. on_save in NodeEditor) before the reload fires, causing
+                // the save to silently fail with no user-visible error.
+                std::future::pending::<()>().await;
             } else {
                 // Refresh token also expired (long idle, server restart, etc.).
                 // Redirect to login rather than leaving the user with a blank
                 // screen or a confusing "server error 401" message.
+                // spawn_local avoids a recursive async fn (fetch_login_url calls
+                // parse_json internally).
                 wasm_bindgen_futures::spawn_local(async {
                     if let Ok(url) = fetch_login_url().await
                         && let Some(win) = web_sys::window()
@@ -94,6 +101,9 @@ pub async fn parse_json<T: serde::de::DeserializeOwned>(
                         let _ = win.location().set_href(&url);
                     }
                 });
+                // Park until the navigation destroys the WASM runtime so the
+                // Err does not reach any caller that might clear the UI state.
+                std::future::pending::<()>().await;
             }
         }
         let text = response

@@ -61,8 +61,8 @@ pub fn Sidebar(auth_state: AuthState, collapsed: SidebarCollapsed, on_nav: Callb
             }}
             <div class="border-t border-stone-200 dark:border-stone-700 my-3" />
             // ── Section 1: Daily workflow ──────────────────────────────────────
-            <SidebarLink icon="inbox"          label="Inbox"     on_click=nav!("/inbox")     collapsed=collapsed />
             <SidebarLink icon="wb_sunny"       label="My Day"    on_click=nav!("/my-day")    collapsed=collapsed />
+            <SidebarLink icon="inbox"          label="Inbox"     on_click=nav!("/inbox")     collapsed=collapsed />
             <SidebarLink icon="calendar_month" label="Calendar"  on_click=nav!("/calendar")  collapsed=collapsed />
             <SidebarLink icon="sticky_note_2"  label="Notes"     on_click=nav!("/notes")     collapsed=collapsed />
             <SidebarLink icon="dashboard"      label="Dashboard" on_click=nav!("/dashboard") collapsed=collapsed />
