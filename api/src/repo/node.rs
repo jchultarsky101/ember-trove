@@ -301,6 +301,9 @@ impl NodeRepo for PgNodeRepo {
         if params.status.is_some() {
             conditions.push(format!("n.status = ${param_idx}::node_status"));
             param_idx += 1;
+        } else if !params.include_archived {
+            // Default: hide archived nodes unless the caller explicitly opts in.
+            conditions.push("n.status <> 'archived'::node_status".to_owned());
         }
 
         if params.owner_id.is_some() {

@@ -97,6 +97,10 @@ pub struct NodeListParams {
     pub subject_id: Option<String>,
     pub page: Option<u32>,
     pub per_page: Option<u32>,
+    /// When false (the default) and no explicit `status` filter is set, archived
+    /// nodes are excluded from results.  Pass `include_archived=true` to opt in.
+    #[serde(default)]
+    pub include_archived: bool,
 }
 
 /// Lightweight title entry used for wiki-link autocomplete and resolution.
