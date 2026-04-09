@@ -182,16 +182,20 @@ pub async fn fetch_logout_url() -> Result<String, UiError> {
 
 // ── Nodes ────────────────────────────────────────────────────────────────
 
+/// Fetch all nodes including archived (used by the graph view).
 pub async fn fetch_nodes() -> Result<Vec<Node>, UiError> {
-    fetch_nodes_filtered(None, None).await
+    fetch_nodes_filtered(None, None, true).await
 }
 
 /// Fetch nodes with optional status and tag_id filters.
-/// `status`: one of "draft", "published", "archived" or None for all.
+/// `status`: one of "draft", "published", "archived" or None for active statuses.
 /// `tag_id`: UUID string of a tag to filter by, or None for all.
+/// `include_archived`: when false (default for the node list), archived nodes are excluded
+///   unless `status` is explicitly set to "archived" on the server side.
 pub async fn fetch_nodes_filtered(
     status: Option<&str>,
     tag_id: Option<uuid::Uuid>,
+    include_archived: bool,
 ) -> Result<Vec<Node>, UiError> {
     let mut params: Vec<String> = Vec::new();
     if let Some(s) = status {
@@ -199,6 +203,9 @@ pub async fn fetch_nodes_filtered(
     }
     if let Some(tid) = tag_id {
         params.push(format!("tag_id={tid}"));
+    }
+    if include_archived {
+        params.push("include_archived=true".to_owned());
     }
     let url = if params.is_empty() {
         api_url("/nodes")
