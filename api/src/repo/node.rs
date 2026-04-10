@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use common::{
     EmberTroveError,
     id::{NodeId, TagId},
-    node::{CreateNodeRequest, Node, NodeListParams, NodeStatus, NodeType, NodeTitleEntry, UpdateNodeRequest, SetPinnedRequest},
+    node::{CreateNodeRequest, Node, NodeListParams, NodeStatus, NodeType, NodeTitleEntry, UpdateNodeRequest},
     slug::slugify,
     tag::Tag,
 };
@@ -44,8 +44,6 @@ pub trait NodeRepo: Send + Sync {
     /// Fetch every node across all owners with tags populated — used for full backup.
     async fn list_all(&self) -> Result<Vec<Node>, EmberTroveError>;
 
-    /// Set or clear the pinned flag on a node.
-    async fn set_pinned(&self, id: NodeId, req: SetPinnedRequest) -> Result<Node, EmberTroveError>;
 }
 
 pub struct PgNodeRepo {
@@ -573,22 +571,4 @@ impl NodeRepo for PgNodeRepo {
         Ok(nodes)
     }
 
-    async fn set_pinned(&self, id: NodeId, req: SetPinnedRequest) -> Result<Node, EmberTroveError> {
-        let row = sqlx::query_as::<_, NodeRow>(
-            r#"
-            UPDATE nodes SET pinned = $2
-            WHERE id = $1
-            RETURNING id, owner_id, node_type::text, title, slug, body, metadata,
-                      status::text, pinned, created_at, updated_at
-            "#,
-        )
-        .bind(id.0)
-        .bind(req.pinned)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| EmberTroveError::Internal(format!("set_pinned failed: {e}")))?
-        .ok_or_else(|| EmberTroveError::NotFound(format!("node {id} not found")))?;
-
-        row.into_node()
-    }
 }

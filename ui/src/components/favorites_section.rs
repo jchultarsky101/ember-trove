@@ -4,6 +4,7 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     api::{delete_favorite, fetch_favorites, reorder_favorites},
+    app::FavoritesRefresh,
     components::{
         layout::SidebarCollapsed,
         modals::add_favorite::AddFavoriteModal,
@@ -20,8 +21,11 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
     let favorites: RwSignal<Vec<Favorite>> = RwSignal::new(vec![]);
     let show_modal = RwSignal::new(false);
 
-    // Load favorites once on mount.
+    // Re-fetch whenever NodeView pins/unpins a node (FavoritesRefresh bumped).
+    let fav_refresh = use_context::<FavoritesRefresh>().map(|fr| fr.0);
     Effect::new(move |_| {
+        // Track the refresh counter so this effect re-runs on every bump.
+        if let Some(r) = fav_refresh { let _ = r.get(); }
         spawn_local(async move {
             if let Ok(favs) = fetch_favorites().await {
                 favorites.set(favs);
@@ -31,6 +35,8 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
 
     let on_added = Callback::new(move |fav: Favorite| {
         favorites.update(|list| list.push(fav));
+        // Bump FavoritesRefresh so any open NodeView re-fetches and syncs its pin button.
+        if let Some(r) = fav_refresh { r.update(|n| *n += 1); }
     });
 
     let on_delete = Callback::new(move |id: FavoriteId| {
