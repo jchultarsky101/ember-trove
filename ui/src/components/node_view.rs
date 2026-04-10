@@ -32,6 +32,9 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
     let navigate = StoredValue::new(use_navigate());
     let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
 
+    // Stable reference to FavoritesRefresh so the favorites resource can track it.
+    let fav_refresh_sig = use_context::<FavoritesRefresh>().map(|fr| fr.0);
+
     let node = LocalResource::new(move || {
         let id = id;
         async move { crate::api::fetch_node(id).await }
@@ -39,6 +42,16 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
 
     // Fetch all node titles for wiki-link resolution.
     let titles = LocalResource::new(|| async move { crate::api::fetch_node_titles().await });
+
+    // Favorites resource — created once at the top level (not inside the render closure)
+    // so it survives re-renders.  Re-fetches whenever FavoritesRefresh is bumped so
+    // the pin button stays in sync with sidebar changes.
+    let favorites = LocalResource::new(move || {
+        // Track the refresh counter in the sync portion so Leptos re-runs this
+        // resource whenever it is bumped.
+        if let Some(r) = fav_refresh_sig { let _ = r.get(); }
+        async move { crate::api::fetch_favorites().await }
+    });
 
     let auth_state = use_auth_state();
     let deleting = RwSignal::new(false);
@@ -127,11 +140,8 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                 &node_type,
                             );
 
-                            // Determine if this node is already in Favorites.
-                            // `pinned_fav_id` = Some(FavoriteId) when it is.
-                            let favorites = LocalResource::new(|| async move {
-                                crate::api::fetch_favorites().await
-                            });
+                            // Determine if this node is already in Favorites by reading
+                            // the stable `favorites` resource created at the top of NodeView.
                             let initial_fav_id: Option<FavoriteId> = favorites
                                 .get()
                                 .and_then(|r| r.ok())

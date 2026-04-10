@@ -35,6 +35,8 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
 
     let on_added = Callback::new(move |fav: Favorite| {
         favorites.update(|list| list.push(fav));
+        // Bump FavoritesRefresh so any open NodeView re-fetches and syncs its pin button.
+        if let Some(r) = fav_refresh { r.update(|n| *n += 1); }
     });
 
     let on_delete = Callback::new(move |id: FavoriteId| {
