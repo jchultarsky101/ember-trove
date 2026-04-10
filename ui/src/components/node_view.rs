@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use common::edge::{CreateEdgeRequest, EdgeType, EdgeWithTitles};
-use common::favorite::CreateFavoriteRequest;
-use common::id::{FavoriteId, NodeId};
+use common::id::NodeId;
 use common::node::NodeTitleEntry;
 use leptos::{html::Input, prelude::*};
 
@@ -19,7 +18,6 @@ use crate::auth::{AuthStatus, use_auth_state};
 use crate::components::note_panel::NotePanel;
 use crate::components::task_panel::TaskPanel;
 use crate::components::links_panel::LinksPanel;
-use crate::app::FavoritesRefresh;
 use crate::components::toast::{ToastLevel, push_toast};
 use crate::markdown::render_markdown;
 
@@ -32,9 +30,6 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
     let navigate = StoredValue::new(use_navigate());
     let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
 
-    // Stable reference to FavoritesRefresh so the favorites resource can track it.
-    let fav_refresh_sig = use_context::<FavoritesRefresh>().map(|fr| fr.0);
-
     let node = LocalResource::new(move || {
         let id = id;
         async move { crate::api::fetch_node(id).await }
@@ -42,16 +37,6 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
 
     // Fetch all node titles for wiki-link resolution.
     let titles = LocalResource::new(|| async move { crate::api::fetch_node_titles().await });
-
-    // Favorites resource — created once at the top level (not inside the render closure)
-    // so it survives re-renders.  Re-fetches whenever FavoritesRefresh is bumped so
-    // the pin button stays in sync with sidebar changes.
-    let favorites = LocalResource::new(move || {
-        // Track the refresh counter in the sync portion so Leptos re-runs this
-        // resource whenever it is bumped.
-        if let Some(r) = fav_refresh_sig { let _ = r.get(); }
-        async move { crate::api::fetch_favorites().await }
-    });
 
     let auth_state = use_auth_state();
     let deleting = RwSignal::new(false);
@@ -140,28 +125,6 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                 &node_type,
                             );
 
-                            // Determine if this node is already in Favorites by reading
-                            // the stable `favorites` resource created at the top of NodeView.
-                            let initial_fav_id: Option<FavoriteId> = favorites
-                                .get()
-                                .and_then(|r| r.ok())
-                                .and_then(|favs| {
-                                    favs.into_iter()
-                                        .find(|f| f.node_id == Some(n.id))
-                                        .map(|f| f.id)
-                                });
-                            let pinned_fav_id: RwSignal<Option<FavoriteId>> =
-                                RwSignal::new(initial_fav_id);
-
-                            // Expose to global contexts so Layout's `p` shortcut works.
-                            if let Some(ctx) = use_context::<RwSignal<Option<FavoriteId>>>() {
-                                ctx.set(initial_fav_id);
-                                Effect::new(move |_| ctx.set(pinned_fav_id.get()));
-                            }
-                            if let Some(ctx) = use_context::<RwSignal<String>>() {
-                                ctx.set(n.title.clone());
-                            }
-
                             // Get navigate values for each inner closure that needs it.
                             let nav_wikilink = navigate.get_value();
                             let nav_back     = navigate.get_value();
@@ -217,60 +180,6 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                             </span>
                                         </div>
                                         <div class="flex items-center gap-1">
-                                            // Pin toggle — adds/removes from Favorites
-                                            {is_owner.then(|| {
-                                                let node_title = n.title.clone();
-                                                let fav_refresh = use_context::<FavoritesRefresh>().map(|fr| fr.0);
-                                                view! {
-                                                    <button
-                                                        class=move || {
-                                                            let base = "p-1.5 rounded-lg transition-colors";
-                                                            if pinned_fav_id.get().is_some() {
-                                                                format!("{base} text-amber-500 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20")
-                                                            } else {
-                                                                format!("{base} text-stone-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-stone-100 dark:hover:bg-stone-800")
-                                                            }
-                                                        }
-                                                        title=move || if pinned_fav_id.get().is_some() { "Remove from Favorites" } else { "Add to Favorites" }
-                                                        on:click=move |_| {
-                                                            if let Some(fav_id) = pinned_fav_id.get_untracked() {
-                                                                // Unpin: remove from Favorites.
-                                                                pinned_fav_id.set(None);
-                                                                wasm_bindgen_futures::spawn_local(async move {
-                                                                    if let Err(e) = crate::api::delete_favorite(fav_id).await {
-                                                                        pinned_fav_id.set(Some(fav_id));
-                                                                        push_toast(ToastLevel::Error, format!("Remove from Favorites failed: {e}"));
-                                                                    } else {
-                                                                        if let Some(r) = fav_refresh { r.update(|n| *n += 1); }
-                                                                        push_toast(ToastLevel::Success, "Removed from Favorites.");
-                                                                    }
-                                                                });
-                                                            } else {
-                                                                // Pin: add to Favorites.
-                                                                let req = CreateFavoriteRequest {
-                                                                    node_id: Some(id.0),
-                                                                    url: None,
-                                                                    label: node_title.clone(),
-                                                                };
-                                                                wasm_bindgen_futures::spawn_local(async move {
-                                                                    match crate::api::create_favorite(&req).await {
-                                                                        Ok(fav) => {
-                                                                            pinned_fav_id.set(Some(fav.id));
-                                                                            if let Some(r) = fav_refresh { r.update(|n| *n += 1); }
-                                                                            push_toast(ToastLevel::Success, "Added to Favorites.");
-                                                                        }
-                                                                        Err(e) => {
-                                                                            push_toast(ToastLevel::Error, format!("Add to Favorites failed: {e}"));
-                                                                        }
-                                                                    }
-                                                                });
-                                                            }
-                                                        }
-                                                    >
-                                                        <span class="material-symbols-outlined">"push_pin"</span>
-                                                    </button>
-                                                }
-                                            })}
                                             // Export — opens the markdown download in a new tab.
                                             // Using an <a> with the API URL triggers the browser's
                                             // native file-save dialog without any JS fetch.
