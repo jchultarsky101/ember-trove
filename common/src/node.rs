@@ -41,10 +41,6 @@ pub struct Node {
     pub edge_count: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct SetPinnedRequest {
-    pub pinned: bool,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct CreateNodeRequest {

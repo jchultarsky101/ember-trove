@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use common::edge::{CreateEdgeRequest, EdgeType, EdgeWithTitles};
-use common::id::NodeId;
+use common::favorite::CreateFavoriteRequest;
+use common::id::{FavoriteId, NodeId};
 use common::node::NodeTitleEntry;
 use leptos::{html::Input, prelude::*};
 
@@ -18,6 +19,7 @@ use crate::auth::{AuthStatus, use_auth_state};
 use crate::components::note_panel::NotePanel;
 use crate::components::task_panel::TaskPanel;
 use crate::components::links_panel::LinksPanel;
+use crate::app::FavoritesRefresh;
 use crate::components::toast::{ToastLevel, push_toast};
 use crate::markdown::render_markdown;
 
@@ -125,14 +127,29 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                 &node_type,
                             );
 
-                            // Local pin state — initialised from the loaded node.
-                            let pinned = RwSignal::new(n.pinned);
+                            // Determine if this node is already in Favorites.
+                            // `pinned_fav_id` = Some(FavoriteId) when it is.
+                            let favorites = LocalResource::new(|| async move {
+                                crate::api::fetch_favorites().await
+                            });
+                            let initial_fav_id: Option<FavoriteId> = favorites
+                                .get()
+                                .and_then(|r| r.ok())
+                                .and_then(|favs| {
+                                    favs.into_iter()
+                                        .find(|f| f.node_id == Some(n.id))
+                                        .map(|f| f.id)
+                                });
+                            let pinned_fav_id: RwSignal<Option<FavoriteId>> =
+                                RwSignal::new(initial_fav_id);
 
-                            // Sync into the global context so the `p` keyboard shortcut
-                            // can read and toggle it without an extra API round-trip.
-                            if let Some(ctx) = use_context::<RwSignal<bool>>() {
-                                ctx.set(n.pinned);
-                                Effect::new(move |_| ctx.set(pinned.get()));
+                            // Expose to global contexts so Layout's `p` shortcut works.
+                            if let Some(ctx) = use_context::<RwSignal<Option<FavoriteId>>>() {
+                                ctx.set(initial_fav_id);
+                                Effect::new(move |_| ctx.set(pinned_fav_id.get()));
+                            }
+                            if let Some(ctx) = use_context::<RwSignal<String>>() {
+                                ctx.set(n.title.clone());
                             }
 
                             // Get navigate values for each inner closure that needs it.
@@ -190,33 +207,59 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                             </span>
                                         </div>
                                         <div class="flex items-center gap-1">
-                                            // Pin toggle — editor/owner only
-                                            {is_owner.then(|| view! {
-                                                <button
-                                                    class=move || {
-                                                        let base = "p-1.5 rounded-lg transition-colors";
-                                                        if pinned.get() {
-                                                            format!("{base} text-amber-500 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20")
-                                                        } else {
-                                                            format!("{base} text-stone-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-stone-100 dark:hover:bg-stone-800")
-                                                        }
-                                                    }
-                                                    title=move || if pinned.get() { "Unpin node" } else { "Pin node" }
-                                                    on:click=move |_| {
-                                                        let new_state = !pinned.get_untracked();
-                                                        pinned.set(new_state);
-                                                        wasm_bindgen_futures::spawn_local(async move {
-                                                            if let Err(e) = crate::api::set_node_pinned(id, new_state).await {
-                                                                pinned.set(!new_state); // revert on failure
-                                                                push_toast(ToastLevel::Error, format!("Pin failed: {e}"));
+                                            // Pin toggle — adds/removes from Favorites
+                                            {is_owner.then(|| {
+                                                let node_title = n.title.clone();
+                                                let fav_refresh = use_context::<FavoritesRefresh>().map(|fr| fr.0);
+                                                view! {
+                                                    <button
+                                                        class=move || {
+                                                            let base = "p-1.5 rounded-lg transition-colors";
+                                                            if pinned_fav_id.get().is_some() {
+                                                                format!("{base} text-amber-500 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20")
                                                             } else {
-                                                                refresh.update(|n| *n += 1);
+                                                                format!("{base} text-stone-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-stone-100 dark:hover:bg-stone-800")
                                                             }
-                                                        });
-                                                    }
-                                                >
-                                                    <span class="material-symbols-outlined">"push_pin"</span>
-                                                </button>
+                                                        }
+                                                        title=move || if pinned_fav_id.get().is_some() { "Remove from Favorites" } else { "Add to Favorites" }
+                                                        on:click=move |_| {
+                                                            if let Some(fav_id) = pinned_fav_id.get_untracked() {
+                                                                // Unpin: remove from Favorites.
+                                                                pinned_fav_id.set(None);
+                                                                wasm_bindgen_futures::spawn_local(async move {
+                                                                    if let Err(e) = crate::api::delete_favorite(fav_id).await {
+                                                                        pinned_fav_id.set(Some(fav_id));
+                                                                        push_toast(ToastLevel::Error, format!("Remove from Favorites failed: {e}"));
+                                                                    } else {
+                                                                        if let Some(r) = fav_refresh { r.update(|n| *n += 1); }
+                                                                        push_toast(ToastLevel::Success, "Removed from Favorites.");
+                                                                    }
+                                                                });
+                                                            } else {
+                                                                // Pin: add to Favorites.
+                                                                let req = CreateFavoriteRequest {
+                                                                    node_id: Some(id.0),
+                                                                    url: None,
+                                                                    label: node_title.clone(),
+                                                                };
+                                                                wasm_bindgen_futures::spawn_local(async move {
+                                                                    match crate::api::create_favorite(&req).await {
+                                                                        Ok(fav) => {
+                                                                            pinned_fav_id.set(Some(fav.id));
+                                                                            if let Some(r) = fav_refresh { r.update(|n| *n += 1); }
+                                                                            push_toast(ToastLevel::Success, "Added to Favorites.");
+                                                                        }
+                                                                        Err(e) => {
+                                                                            push_toast(ToastLevel::Error, format!("Add to Favorites failed: {e}"));
+                                                                        }
+                                                                    }
+                                                                });
+                                                            }
+                                                        }
+                                                    >
+                                                        <span class="material-symbols-outlined">"push_pin"</span>
+                                                    </button>
+                                                }
                                             })}
                                             // Export — opens the markdown download in a new tab.
                                             // Using an <a> with the API URL triggers the browser's
