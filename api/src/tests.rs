@@ -32,7 +32,7 @@ use common::{
     graph::NodePosition,
     id::{AttachmentId, EdgeId, FavoriteId, NodeId, PermissionId, ShareTokenId, TagId, TaskId,
          TemplateId},
-    node::{CreateNodeRequest, Node, NodeListParams, NodeTitleEntry, SetPinnedRequest, UpdateNodeRequest},
+    node::{CreateNodeRequest, Node, NodeListParams, NodeTitleEntry, UpdateNodeRequest},
     note::{CreateNoteRequest, FeedNote, Note},
     permission::{GrantPermissionRequest, Permission, PermissionRole},
     id::{NodeLinkId, SearchPresetId},
@@ -80,7 +80,6 @@ impl NodeRepo for StubNodeRepo {
     async fn find_id_by_title(&self, _: &str) -> Result<Option<NodeId>, EmberTroveError> { unimplemented!() }
     async fn list_all_for_owner(&self, _: &str) -> Result<Vec<Node>, EmberTroveError> { unimplemented!() }
     async fn list_all(&self) -> Result<Vec<Node>, EmberTroveError> { unimplemented!() }
-    async fn set_pinned(&self, _: NodeId, _: SetPinnedRequest) -> Result<Node, EmberTroveError> { unimplemented!() }
 }
 
 struct StubEdgeRepo;

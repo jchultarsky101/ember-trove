@@ -1,4 +1,4 @@
-use common::id::TemplateId;
+use common::id::{FavoriteId, TemplateId};
 use common::tag::Tag;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
@@ -42,6 +42,12 @@ pub struct AppVersion(pub RwSignal<String>);
 
 #[derive(Clone, Copy)]
 pub struct TaskRefresh(pub RwSignal<u32>);
+
+// ── Favorites refresh signal ────────────────────────────────────────────────
+
+/// Bump `.0` to trigger a re-fetch in `FavoritesSection`.
+#[derive(Clone, Copy)]
+pub struct FavoritesRefresh(pub RwSignal<u32>);
 
 // ── Quick-capture modal visibility ─────────────────────────────────────────
 
@@ -139,10 +145,20 @@ pub fn App() -> impl IntoView {
         app_version.0.set(v);
     });
 
-    // Current node pin state — written by NodeView when a node loads so the
-    // global `p` keyboard shortcut can toggle it without an extra API round-trip.
-    let current_node_pinned: RwSignal<bool> = RwSignal::new(false);
-    provide_context(current_node_pinned);
+    // Favorites refresh counter — bump to tell FavoritesSection to re-fetch.
+    let favorites_refresh = FavoritesRefresh(RwSignal::new(0u32));
+    provide_context(favorites_refresh);
+
+    // Current node's favorite ID — set by NodeView when a node loads.
+    // Some(id) means this node is in Favorites; None means it isn't.
+    // Used by the `p` keyboard shortcut in Layout.
+    let current_node_fav_id: RwSignal<Option<FavoriteId>> = RwSignal::new(None);
+    provide_context(current_node_fav_id);
+
+    // Current node title — set by NodeView so the `p` shortcut can create a
+    // Favorite with the right label without an extra API round-trip.
+    let current_node_title: RwSignal<String> = RwSignal::new(String::new());
+    provide_context(current_node_title);
 
     view! {
         <Router>

@@ -4,7 +4,7 @@ use leptos_router::hooks::{use_location, use_navigate, use_params_map};
 use leptos_router::path;
 
 use crate::{
-    app::{AppVersion, ShowCapture},
+    app::{AppVersion, FavoritesRefresh, ShowCapture},
     auth::{AuthState, AuthStatus},
     components::{
         admin_view::AdminView,
@@ -28,7 +28,8 @@ use crate::{
         toast::ToastOverlay,
     },
 };
-use common::id::NodeId;
+use common::favorite::CreateFavoriteRequest;
+use common::id::{FavoriteId, NodeId};
 
 // ── Route param wrappers ─────────────────────────────────────────────────────
 
@@ -68,8 +69,12 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
         .0;
 
     let refresh = use_context::<RwSignal<u32>>().expect("refresh signal must be provided");
-    let current_node_pinned = use_context::<RwSignal<bool>>()
-        .expect("current_node_pinned signal must be provided");
+    let current_node_fav_id = use_context::<RwSignal<Option<FavoriteId>>>()
+        .expect("current_node_fav_id context missing");
+    let current_node_title = use_context::<RwSignal<String>>()
+        .expect("current_node_title context missing");
+    let fav_refresh = use_context::<FavoritesRefresh>()
+        .expect("FavoritesRefresh context missing");
 
     let close_mobile = move || mobile_open.set(false);
 
@@ -136,36 +141,64 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                     }
                 }
                 "p" => {
-                    // Toggle pin on the currently open node.
+                    // Toggle Favorites for the currently open node.
                     let path = location.pathname.get_untracked();
                     let segs: Vec<&str> = path.trim_matches('/').split('/').collect();
                     if segs.len() == 2 && segs[0] == "nodes"
-                        && let Ok(node_id) = segs[1].parse::<NodeId>() {
-                        let new_pinned = !current_node_pinned.get_untracked();
-                        current_node_pinned.set(new_pinned);
-                        wasm_bindgen_futures::spawn_local(async move {
-                            match crate::api::set_node_pinned(node_id, new_pinned).await {
-                                Ok(_) => {
-                                    refresh.update(|n| *n += 1);
-                                    let msg = if new_pinned {
-                                        "Node pinned."
-                                    } else {
-                                        "Node unpinned."
-                                    };
-                                    crate::components::toast::push_toast(
-                                        crate::components::toast::ToastLevel::Success,
-                                        msg,
-                                    );
+                        && segs[1].parse::<NodeId>().is_ok()
+                    {
+                        let fav_r = fav_refresh.0;
+                        if let Some(fav_id) = current_node_fav_id.get_untracked() {
+                            // Already in Favorites — remove it.
+                            current_node_fav_id.set(None);
+                            wasm_bindgen_futures::spawn_local(async move {
+                                match crate::api::delete_favorite(fav_id).await {
+                                    Ok(_) => {
+                                        fav_r.update(|n| *n += 1);
+                                        crate::components::toast::push_toast(
+                                            crate::components::toast::ToastLevel::Success,
+                                            "Removed from Favorites.",
+                                        );
+                                    }
+                                    Err(e) => {
+                                        current_node_fav_id.set(Some(fav_id));
+                                        crate::components::toast::push_toast(
+                                            crate::components::toast::ToastLevel::Error,
+                                            format!("Remove from Favorites failed: {e}"),
+                                        );
+                                    }
                                 }
-                                Err(e) => {
-                                    current_node_pinned.set(!new_pinned);
-                                    crate::components::toast::push_toast(
-                                        crate::components::toast::ToastLevel::Error,
-                                        format!("Pin failed: {e}"),
-                                    );
-                                }
+                            });
+                        } else {
+                            // Not in Favorites — add it.
+                            let title = current_node_title.get_untracked();
+                            let node_id = segs[1].parse::<NodeId>().ok();
+                            if let Some(nid) = node_id {
+                                let req = CreateFavoriteRequest {
+                                    node_id: Some(nid.0),
+                                    url: None,
+                                    label: title,
+                                };
+                                wasm_bindgen_futures::spawn_local(async move {
+                                    match crate::api::create_favorite(&req).await {
+                                        Ok(fav) => {
+                                            current_node_fav_id.set(Some(fav.id));
+                                            fav_r.update(|n| *n += 1);
+                                            crate::components::toast::push_toast(
+                                                crate::components::toast::ToastLevel::Success,
+                                                "Added to Favorites.",
+                                            );
+                                        }
+                                        Err(e) => {
+                                            crate::components::toast::push_toast(
+                                                crate::components::toast::ToastLevel::Error,
+                                                format!("Add to Favorites failed: {e}"),
+                                            );
+                                        }
+                                    }
+                                });
                             }
-                        });
+                        }
                     }
                 }
                 "Escape" => {

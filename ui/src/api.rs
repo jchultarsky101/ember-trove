@@ -6,7 +6,7 @@ use common::{
     edge::{CreateEdgeRequest, Edge, EdgeWithTitles},
     favorite::{CreateFavoriteRequest, Favorite, ReorderFavoritesRequest},
     id::{AttachmentId, EdgeId, FavoriteId, NodeId, NodeLinkId, NoteId, TagId, TaskId},
-    node::{CreateNodeRequest, Node, NodeListResponse, NodeTitleEntry, SetPinnedRequest, UpdateNodeRequest},
+    node::{CreateNodeRequest, Node, NodeListResponse, NodeTitleEntry, UpdateNodeRequest},
     node_link::{CreateNodeLinkRequest, NodeLink, UpdateNodeLinkRequest},
     id::SearchPresetId,
     search::{CreateSearchPresetRequest, SearchPreset, SearchResponse},
@@ -273,16 +273,7 @@ pub async fn duplicate_node(id: NodeId) -> Result<Node, UiError> {
     parse_json(resp).await
 }
 
-pub async fn set_node_pinned(id: NodeId, pinned: bool) -> Result<Node, UiError> {
-    let req = SetPinnedRequest { pinned };
-    let resp = Request::put(&api_url(&format!("/nodes/{id}/pin")))
-        .json(&req)
-        .map_err(|e| UiError::Network(e.to_string()))?
-        .send()
-        .await
-        .map_err(|e| UiError::Network(e.to_string()))?;
-    parse_json(resp).await
-}
+
 
 pub async fn fetch_node_titles() -> Result<Vec<NodeTitleEntry>, UiError> {
     let resp = Request::get(&api_url("/nodes/titles"))
