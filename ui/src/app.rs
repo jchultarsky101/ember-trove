@@ -1,4 +1,4 @@
-use common::id::{FavoriteId, TemplateId};
+use common::id::TemplateId;
 use common::tag::Tag;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
@@ -148,17 +148,6 @@ pub fn App() -> impl IntoView {
     // Favorites refresh counter — bump to tell FavoritesSection to re-fetch.
     let favorites_refresh = FavoritesRefresh(RwSignal::new(0u32));
     provide_context(favorites_refresh);
-
-    // Current node's favorite ID — set by NodeView when a node loads.
-    // Some(id) means this node is in Favorites; None means it isn't.
-    // Used by the `p` keyboard shortcut in Layout.
-    let current_node_fav_id: RwSignal<Option<FavoriteId>> = RwSignal::new(None);
-    provide_context(current_node_fav_id);
-
-    // Current node title — set by NodeView so the `p` shortcut can create a
-    // Favorite with the right label without an extra API round-trip.
-    let current_node_title: RwSignal<String> = RwSignal::new(String::new());
-    provide_context(current_node_title);
 
     view! {
         <Router>
