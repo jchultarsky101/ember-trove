@@ -2,6 +2,9 @@
 //!
 //! Shows all tasks where `node_id IS NULL`, lets the user create new ones
 //! inline, and provides the standard toggle/edit/delete/My-Day actions.
+//!
+//! Layout is mobile-first: each task renders as a self-contained card with
+//! an always-visible action bar so controls are reachable without hover.
 
 use chrono::NaiveDate;
 use common::{
@@ -58,6 +61,14 @@ fn priority_dot_color(p: &TaskPriority) -> &'static str {
         TaskPriority::High   => "background:#dc2626;",
         TaskPriority::Medium => "background:#d97706;",
         TaskPriority::Low    => "background:#6b7280;",
+    }
+}
+
+fn priority_label(p: &TaskPriority) -> &'static str {
+    match p {
+        TaskPriority::High   => "High",
+        TaskPriority::Medium => "Medium",
+        TaskPriority::Low    => "Low",
     }
 }
 
@@ -143,7 +154,6 @@ pub fn InboxView() -> impl IntoView {
         });
     };
 
-    // Submit on Enter key in the title input
     let on_key = move |ev: web_sys::KeyboardEvent| {
         if ev.key() == "Enter" { do_add(); }
     };
@@ -155,8 +165,8 @@ pub fn InboxView() -> impl IntoView {
 
     view! {
         <div class="flex flex-col h-full">
-            // Header
-            <div class="flex-shrink-0 px-6 py-5 border-b border-stone-200 dark:border-stone-800">
+            // ── Header ────────────────────────────────────────────────────────
+            <div class="flex-shrink-0 px-4 py-4 border-b border-stone-200 dark:border-stone-800">
                 <div class="flex items-center gap-3">
                     <span class="material-symbols-outlined text-amber-500" style="font-size: 26px;">
                         "inbox"
@@ -166,36 +176,39 @@ pub fn InboxView() -> impl IntoView {
                             "Inbox"
                         </h1>
                         <p class="text-xs text-stone-500 dark:text-stone-400">
-                            "Standalone tasks — not yet linked to a node"
+                            "Capture tasks — link to a node when ready"
                         </p>
                     </div>
                 </div>
             </div>
 
-            // Scrollable content
-            <div class="flex-1 overflow-auto px-6 py-4 space-y-4">
+            // ── Scrollable content ────────────────────────────────────────────
+            <div class="flex-1 overflow-auto px-4 py-4 space-y-4">
 
-                // Add-task form
+                // ── Add-task card ─────────────────────────────────────────────
                 <div class="bg-white dark:bg-stone-900 rounded-xl border border-stone-200
-                    dark:border-stone-700 p-4 shadow-sm space-y-2">
-                    <p class="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                        "Add task"
+                    dark:border-stone-700 p-4 shadow-sm space-y-3">
+                    <p class="text-xs font-semibold text-stone-500 dark:text-stone-400
+                        uppercase tracking-wider">
+                        "New task"
                     </p>
+                    // Title input — full width
                     <input
                         type="text"
-                        placeholder="Task title…"
+                        placeholder="What needs to be done?"
                         class="w-full rounded-lg border border-stone-200 dark:border-stone-700
-                            bg-stone-50 dark:bg-stone-800 px-3 py-2 text-sm
+                            bg-stone-50 dark:bg-stone-800 px-3 py-2.5 text-sm
                             text-stone-900 dark:text-stone-100
                             focus:outline-none focus:ring-2 focus:ring-amber-400"
                         prop:value=move || new_title.get()
                         on:input=move |ev| new_title.set(event_target_value(&ev))
                         on:keydown=on_key
                     />
+                    // Controls row — wraps gracefully on narrow screens
                     <div class="flex items-center gap-2 flex-wrap">
                         <select
                             class="rounded-lg border border-stone-200 dark:border-stone-700
-                                bg-stone-50 dark:bg-stone-800 px-2 py-1.5 text-xs
+                                bg-stone-50 dark:bg-stone-800 px-3 py-2 text-sm
                                 text-stone-700 dark:text-stone-300
                                 focus:outline-none focus:ring-1 focus:ring-amber-400"
                             prop:value=move || new_priority.get()
@@ -207,17 +220,18 @@ pub fn InboxView() -> impl IntoView {
                         </select>
                         <input
                             type="date"
-                            class="rounded-lg border border-stone-200 dark:border-stone-700
-                                bg-stone-50 dark:bg-stone-800 px-2 py-1.5 text-xs
-                                text-stone-700 dark:text-stone-300
+                            class="flex-1 min-w-0 rounded-lg border border-stone-200
+                                dark:border-stone-700 bg-stone-50 dark:bg-stone-800
+                                px-3 py-2 text-sm text-stone-700 dark:text-stone-300
                                 focus:outline-none focus:ring-1 focus:ring-amber-400"
                             prop:value=move || new_due.get()
                             on:input=move |ev| new_due.set(event_target_value(&ev))
                         />
                         <button
-                            class="ml-auto px-3 py-1.5 rounded-lg text-xs font-medium
-                                bg-amber-500 hover:bg-amber-600 text-white
-                                transition-colors cursor-pointer disabled:opacity-50"
+                            class="px-4 py-2 rounded-lg text-sm font-medium
+                                bg-amber-500 hover:bg-amber-600 active:bg-amber-700
+                                text-white transition-colors cursor-pointer
+                                disabled:opacity-50 disabled:cursor-not-allowed"
                             on:click=move |_| do_add()
                             disabled=move || adding.get()
                         >
@@ -226,9 +240,11 @@ pub fn InboxView() -> impl IntoView {
                     </div>
                 </div>
 
-                // Task list
+                // ── Task list ─────────────────────────────────────────────────
                 <Suspense fallback=|| view! {
-                    <p class="text-sm text-stone-400 dark:text-stone-500 text-center py-8">"Loading…"</p>
+                    <p class="text-sm text-stone-400 dark:text-stone-500 text-center py-8">
+                        "Loading…"
+                    </p>
                 }>
                     {move || {
                         let tasks = tasks_res.get()
@@ -237,9 +253,13 @@ pub fn InboxView() -> impl IntoView {
                         if tasks.is_empty() {
                             return view! {
                                 <div class="text-center py-16 space-y-2">
-                                    <span class="material-symbols-outlined text-stone-300 dark:text-stone-600"
-                                        style="font-size: 48px;">"check_circle"</span>
-                                    <p class="text-stone-400 dark:text-stone-500 text-sm">"Inbox zero!"</p>
+                                    <span class="material-symbols-outlined text-stone-300
+                                        dark:text-stone-600" style="font-size: 48px;">
+                                        "check_circle"
+                                    </span>
+                                    <p class="text-stone-400 dark:text-stone-500 text-sm">
+                                        "Inbox zero!"
+                                    </p>
                                 </div>
                             }.into_any();
                         }
@@ -249,18 +269,20 @@ pub fn InboxView() -> impl IntoView {
                         let show_done   = RwSignal::new(false);
                         let done_stored = StoredValue::new(done);
                         view! {
-                            <div class="space-y-0.5">
+                            <div class="space-y-2">
                                 {active.into_iter().map(|task| view! {
                                     <InboxTaskRow task=task refresh=refresh />
                                 }).collect_view()}
+
+                                // Completed section toggle
                                 {(done_count > 0).then(|| view! {
                                     <button
-                                        class="w-full flex items-center gap-1 px-2 py-1.5 mt-2
+                                        class="w-full flex items-center gap-1.5 px-2 py-2 mt-1
                                             text-xs text-stone-400 hover:text-stone-600
                                             dark:hover:text-stone-300 transition-colors cursor-pointer"
                                         on:click=move |_| show_done.update(|v| *v = !*v)
                                     >
-                                        <span class="material-symbols-outlined" style="font-size: 13px;">
+                                        <span class="material-symbols-outlined" style="font-size: 14px;">
                                             {move || if show_done.get() { "expand_more" } else { "chevron_right" }}
                                         </span>
                                         {move || if show_done.get() {
@@ -285,6 +307,17 @@ pub fn InboxView() -> impl IntoView {
 }
 
 // ── InboxTaskRow ──────────────────────────────────────────────────────────────
+//
+// Card layout (mobile-first):
+//
+//   ┌──────────────────────────────────────────┐
+//   │ ☐  Task title, wraps on small screens    │
+//   │    ⚠ Apr 5  ↻ weekly                    │
+//   │ ● Medium          [↗] [☀] [✎] [🗑]     │
+//   └──────────────────────────────────────────┘
+//
+// When `assigning` is active a full-width node-search panel expands below.
+// All action buttons are always visible — no hover required.
 
 #[component]
 fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
@@ -312,12 +345,12 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
     );
 
     // Node-picker state
-    let assigning       = RwSignal::new(false);
-    let picker_query    = RwSignal::new(String::new());
-    let picker_results  = RwSignal::<Vec<SearchResult>>::new(vec![]);
-    let pick_ver        = RwSignal::new(0u32);
+    let assigning      = RwSignal::new(false);
+    let picker_query   = RwSignal::new(String::new());
+    let picker_results = RwSignal::<Vec<SearchResult>>::new(vec![]);
+    let pick_ver       = RwSignal::new(0u32);
 
-    // Debounced search: fires on every picker_query change
+    // Debounced search
     Effect::new(move |_| {
         let q = picker_query.get();
         if q.trim().is_empty() {
@@ -352,17 +385,17 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
         });
     };
 
-    let has_recurrence  = task.recurrence.is_some();
-    let recurrence_tip  = task.recurrence.as_ref().map(|r| recurrence_label(r));
-    let overdue         = task.due_date
+    let has_recurrence = task.recurrence.is_some();
+    let recurrence_tip = task.recurrence.as_ref().map(|r| recurrence_label(r));
+    let overdue        = task.due_date
         .map(|d| !status_done(&task.status) && d < today)
         .unwrap_or(false);
-    let due             = task.due_date;
+    let due = task.due_date;
 
     let do_save = move || {
         let new_title = edit_title.get_untracked().trim().to_string();
         if new_title.is_empty() { return; }
-        let new_priority  = parse_priority(&edit_priority.get_untracked());
+        let new_priority   = parse_priority(&edit_priority.get_untracked());
         let new_recurrence = parse_recurrence_opt(&edit_recurrence.get_untracked());
         let new_due: Option<Option<NaiveDate>> =
             Some(edit_due.get_untracked().trim().parse::<NaiveDate>().ok());
@@ -389,7 +422,8 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
         let next    = if current == "done" { "open" } else { "done" };
         let req = UpdateTaskRequest {
             title: None, status: Some(parse_status(next)),
-            priority: None, focus_date: None, due_date: None, recurrence: None, node_id: None,
+            priority: None, focus_date: None, due_date: None,
+            recurrence: None, node_id: None,
         };
         status_val.set(next.to_string());
         wasm_bindgen_futures::spawn_local(async move {
@@ -399,10 +433,10 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
     };
 
     let on_add_to_my_day = move |_| {
-        let focus = Some(today);
         let req = UpdateTaskRequest {
             title: None, status: None, priority: None,
-            focus_date: Some(focus), due_date: None, recurrence: None, node_id: None,
+            focus_date: Some(Some(today)), due_date: None,
+            recurrence: None, node_id: None,
         };
         wasm_bindgen_futures::spawn_local(async move {
             let _ = crate::api::update_task(task_id, &req).await;
@@ -418,173 +452,276 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
     };
 
     view! {
-        <div class="group flex items-start gap-2 py-2 px-3 rounded-lg
-            hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors">
+        <div class="bg-white dark:bg-stone-900 rounded-xl
+            border border-stone-100 dark:border-stone-800
+            shadow-sm overflow-hidden">
 
-            // Priority dot
-            {move || {
-                let p = parse_priority(&priority_val.get());
-                view! {
-                    <div
-                        class="flex-shrink-0 mt-1.5 w-2 h-2 rounded-full"
-                        style=priority_dot_color(&p)
-                        title=format!("{} priority", priority_value(&p))
-                    />
-                }
-            }}
+            // ── Main content area ─────────────────────────────────────────────
+            <div class="px-3 pt-3 pb-2 space-y-2">
 
-            // Checkbox
-            <button
-                class="flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 border-stone-300
-                    dark:border-stone-600 flex items-center justify-center
-                    hover:border-amber-500 transition-colors cursor-pointer"
-                on:click=on_toggle
-            >
-                {move || (status_val.get() == "done").then(|| view! {
-                    <span class="material-symbols-outlined text-amber-500"
-                        style="font-size: 14px; font-variation-settings: 'FILL' 1;">
-                        "check"
-                    </span>
-                })}
-            </button>
-
-            // Body
-            <div class="flex-1 min-w-0 space-y-1">
-                {move || if editing.get() {
-                    view! {
-                        <div class="space-y-1.5">
-                            <input
-                                type="text"
-                                class="w-full text-sm rounded-lg border border-amber-400
-                                    bg-white dark:bg-stone-800 px-2 py-1
-                                    text-stone-900 dark:text-stone-100
-                                    focus:outline-none focus:ring-1 focus:ring-amber-400"
-                                prop:value=move || edit_title.get()
-                                on:input=move |ev| edit_title.set(event_target_value(&ev))
-                                on:keydown=move |ev: web_sys::KeyboardEvent| {
-                                    if ev.key() == "Enter" { do_save(); }
-                                    if ev.key() == "Escape" {
-                                        editing.set(false);
-                                        edit_title.set(orig_title.get_untracked());
-                                    }
-                                }
-                            />
-                            <div class="flex items-center gap-2 flex-wrap">
-                                <select
-                                    class="rounded border border-stone-200 dark:border-stone-700
-                                        bg-stone-50 dark:bg-stone-800 px-1.5 py-1 text-xs
-                                        text-stone-700 dark:text-stone-300
-                                        focus:outline-none focus:ring-1 focus:ring-amber-400"
-                                    prop:value=move || edit_priority.get()
-                                    on:change=move |ev| edit_priority.set(event_target_value(&ev))
-                                >
-                                    <option value="high">"High"</option>
-                                    <option value="medium">"Medium"</option>
-                                    <option value="low">"Low"</option>
-                                </select>
-                                <input
-                                    type="date"
-                                    class="rounded border border-stone-200 dark:border-stone-700
-                                        bg-stone-50 dark:bg-stone-800 px-1.5 py-1 text-xs
-                                        text-stone-700 dark:text-stone-300
-                                        focus:outline-none focus:ring-1 focus:ring-amber-400"
-                                    prop:value=move || edit_due.get()
-                                    on:input=move |ev| edit_due.set(event_target_value(&ev))
-                                />
-                                <select
-                                    class="rounded border border-stone-200 dark:border-stone-700
-                                        bg-stone-50 dark:bg-stone-800 px-1.5 py-1 text-xs
-                                        text-stone-700 dark:text-stone-300
-                                        focus:outline-none focus:ring-1 focus:ring-amber-400"
-                                    prop:value=move || edit_recurrence.get()
-                                    on:change=move |ev| edit_recurrence.set(event_target_value(&ev))
-                                >
-                                    <option value="">"No repeat"</option>
-                                    <option value="daily">"Daily"</option>
-                                    <option value="weekly">"Weekly"</option>
-                                    <option value="biweekly">"Biweekly"</option>
-                                    <option value="monthly">"Monthly"</option>
-                                    <option value="yearly">"Yearly"</option>
-                                </select>
-                                <button
-                                    class="p-1 rounded text-stone-400 hover:text-green-600
-                                        dark:hover:text-green-400 transition-colors cursor-pointer"
-                                    title="Save"
-                                    on:click=move |_| do_save()
-                                >
-                                    <span class="material-symbols-outlined">"check"</span>
-                                </button>
-                                <button
-                                    class="p-1 rounded text-stone-400 hover:text-stone-600
-                                        dark:hover:text-stone-300 transition-colors cursor-pointer"
-                                    title="Cancel"
-                                    on:click=move |_| {
-                                        editing.set(false);
-                                        edit_title.set(orig_title.get_untracked());
-                                    }
-                                >
-                                    <span class="material-symbols-outlined">"close"</span>
-                                </button>
-                            </div>
-                        </div>
-                    }.into_any()
-                } else {
-                    view! {
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <span
-                                class="flex-1 min-w-0 text-sm text-stone-800 dark:text-stone-200
-                                    truncate"
-                                style=move || {
-                                    let mut s = String::new();
-                                    if status_val.get() == "done" {
-                                        s.push_str("text-decoration:line-through;opacity:0.45;");
-                                    }
-                                    if overdue { s.push_str("color:#ef4444;") }
-                                    s
-                                }
-                            >
-                                {move || orig_title.get()}
+                // Row 1: checkbox + title (+ badges in read mode)
+                <div class="flex items-start gap-2.5">
+                    // Checkbox — larger tap target on mobile
+                    <button
+                        class="flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 border-stone-300
+                            dark:border-stone-600 flex items-center justify-center
+                            hover:border-amber-500 active:border-amber-600
+                            transition-colors cursor-pointer"
+                        on:click=on_toggle
+                    >
+                        {move || (status_val.get() == "done").then(|| view! {
+                            <span class="material-symbols-outlined text-amber-500"
+                                style="font-size: 14px; font-variation-settings: 'FILL' 1;">
+                                "check"
                             </span>
+                        })}
+                    </button>
 
-                            // Due badge
-                            {due.map(|d| {
-                                let label = d.format("%b %-d").to_string();
-                                let style  = if overdue { "color:#ef4444;" } else { "color:#6b7280;" };
-                                view! {
-                                    <span class="text-xs flex-shrink-0" style=style>
-                                        {if overdue { format!("⚠ {label}") } else { label }}
-                                    </span>
-                                }
-                            })}
+                    // Title area
+                    <div class="flex-1 min-w-0">
+                        {move || if editing.get() {
+                            // ── Edit form ──────────────────────────────────────
+                            view! {
+                                <div class="space-y-2">
+                                    <input
+                                        type="text"
+                                        class="w-full text-sm rounded-lg border border-amber-400
+                                            bg-white dark:bg-stone-800 px-3 py-2
+                                            text-stone-900 dark:text-stone-100
+                                            focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                        prop:value=move || edit_title.get()
+                                        on:input=move |ev| edit_title.set(event_target_value(&ev))
+                                        on:keydown=move |ev: web_sys::KeyboardEvent| {
+                                            if ev.key() == "Enter"  { do_save(); }
+                                            if ev.key() == "Escape" {
+                                                editing.set(false);
+                                                edit_title.set(orig_title.get_untracked());
+                                            }
+                                        }
+                                    />
+                                    // Edit controls — wrap on mobile
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <select
+                                            class="rounded-lg border border-stone-200
+                                                dark:border-stone-700 bg-stone-50
+                                                dark:bg-stone-800 px-2 py-1.5 text-xs
+                                                text-stone-700 dark:text-stone-300
+                                                focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                            prop:value=move || edit_priority.get()
+                                            on:change=move |ev| edit_priority.set(event_target_value(&ev))
+                                        >
+                                            <option value="high">"High"</option>
+                                            <option value="medium">"Medium"</option>
+                                            <option value="low">"Low"</option>
+                                        </select>
+                                        <input
+                                            type="date"
+                                            class="flex-1 min-w-0 rounded-lg border
+                                                border-stone-200 dark:border-stone-700
+                                                bg-stone-50 dark:bg-stone-800
+                                                px-2 py-1.5 text-xs
+                                                text-stone-700 dark:text-stone-300
+                                                focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                            prop:value=move || edit_due.get()
+                                            on:input=move |ev| edit_due.set(event_target_value(&ev))
+                                        />
+                                        <select
+                                            class="rounded-lg border border-stone-200
+                                                dark:border-stone-700 bg-stone-50
+                                                dark:bg-stone-800 px-2 py-1.5 text-xs
+                                                text-stone-700 dark:text-stone-300
+                                                focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                            prop:value=move || edit_recurrence.get()
+                                            on:change=move |ev| edit_recurrence.set(event_target_value(&ev))
+                                        >
+                                            <option value="">"No repeat"</option>
+                                            <option value="daily">"Daily"</option>
+                                            <option value="weekly">"Weekly"</option>
+                                            <option value="biweekly">"Biweekly"</option>
+                                            <option value="monthly">"Monthly"</option>
+                                            <option value="yearly">"Yearly"</option>
+                                        </select>
+                                    </div>
+                                    // Save / cancel
+                                    <div class="flex items-center gap-2">
+                                        <button
+                                            class="flex items-center gap-1 px-3 py-1.5 rounded-lg
+                                                text-xs font-medium bg-amber-500 hover:bg-amber-600
+                                                active:bg-amber-700 text-white
+                                                transition-colors cursor-pointer"
+                                            on:click=move |_| do_save()
+                                        >
+                                            <span class="material-symbols-outlined"
+                                                style="font-size: 14px;">"check"</span>
+                                            "Save"
+                                        </button>
+                                        <button
+                                            class="flex items-center gap-1 px-3 py-1.5 rounded-lg
+                                                text-xs text-stone-500 hover:text-stone-700
+                                                dark:hover:text-stone-300
+                                                transition-colors cursor-pointer"
+                                            on:click=move |_| {
+                                                editing.set(false);
+                                                edit_title.set(orig_title.get_untracked());
+                                            }
+                                        >
+                                            <span class="material-symbols-outlined"
+                                                style="font-size: 14px;">"close"</span>
+                                            "Cancel"
+                                        </button>
+                                    </div>
+                                </div>
+                            }.into_any()
+                        } else {
+                            // ── Read mode ──────────────────────────────────────
+                            view! {
+                                <div class="space-y-1">
+                                    // Title — wraps naturally; no truncation on mobile
+                                    <p
+                                        class="text-sm leading-snug text-stone-800
+                                            dark:text-stone-200"
+                                        style=move || {
+                                            let mut s = String::new();
+                                            if status_val.get() == "done" {
+                                                s.push_str("text-decoration:line-through;\
+                                                             opacity:0.45;");
+                                            }
+                                            if overdue { s.push_str("color:#ef4444;") }
+                                            s
+                                        }
+                                    >
+                                        {move || orig_title.get()}
+                                    </p>
+                                    // Badges row (due + recurrence)
+                                    {(due.is_some() || has_recurrence).then(|| {
+                                        let tip = recurrence_tip.unwrap_or("");
+                                        view! {
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                {due.map(|d| {
+                                                    let label = d.format("%b %-d").to_string();
+                                                    let style = if overdue {
+                                                        "color:#ef4444;"
+                                                    } else {
+                                                        "color:#6b7280;"
+                                                    };
+                                                    view! {
+                                                        <span class="text-xs flex-shrink-0"
+                                                            style=style>
+                                                            {if overdue {
+                                                                format!("⚠ {label}")
+                                                            } else {
+                                                                label
+                                                            }}
+                                                        </span>
+                                                    }
+                                                })}
+                                                {has_recurrence.then(|| view! {
+                                                    <span
+                                                        class="flex items-center gap-0.5 text-xs
+                                                            text-stone-400 dark:text-stone-500"
+                                                        title=format!("Repeats: {tip}")
+                                                    >
+                                                        <span class="material-symbols-outlined"
+                                                            style="font-size: 13px;">"repeat"</span>
+                                                        <span>{tip}</span>
+                                                    </span>
+                                                })}
+                                            </div>
+                                        }
+                                    })}
+                                </div>
+                            }.into_any()
+                        }}
+                    </div>
+                </div>
 
-                            // Recurrence badge
-                            {has_recurrence.then(|| {
-                                let tip = recurrence_tip.unwrap_or("");
-                                view! {
-                                    <span class="flex-shrink-0 text-stone-400 dark:text-stone-500"
-                                        title=format!("Repeats: {tip}")>
-                                        <span class="material-symbols-outlined"
-                                            style="font-size:13px;">"repeat"</span>
+                // ── Action bar — always visible, never hover-gated ────────────
+                {move || (!editing.get()).then(|| view! {
+                    <div class="flex items-center gap-0.5 pt-1
+                        border-t border-stone-50 dark:border-stone-800">
+                        // Priority pill (left side)
+                        {move || {
+                            let p = parse_priority(&priority_val.get());
+                            view! {
+                                <div class="flex items-center gap-1.5 flex-1">
+                                    <div
+                                        class="w-2 h-2 rounded-full flex-shrink-0"
+                                        style=priority_dot_color(&p)
+                                    />
+                                    <span class="text-xs text-stone-400 dark:text-stone-500">
+                                        {priority_label(&p)}
                                     </span>
-                                }
-                            })}
-                        </div>
-                    }.into_any()
-                }}
+                                </div>
+                            }
+                        }}
+
+                        // Action buttons (right side) — p-2 for ≥ 40 px tap target
+                        <button
+                            class="p-2 rounded-lg text-stone-400 hover:text-blue-500
+                                dark:text-stone-500 dark:hover:text-blue-400
+                                active:bg-stone-100 dark:active:bg-stone-800
+                                transition-colors cursor-pointer"
+                            title="Assign to node"
+                            on:click=move |_| assigning.set(true)
+                        >
+                            <span class="material-symbols-outlined" style="font-size: 18px;">
+                                "call_merge"
+                            </span>
+                        </button>
+                        <button
+                            class="p-2 rounded-lg text-stone-400 hover:text-amber-500
+                                dark:text-stone-500 dark:hover:text-amber-400
+                                active:bg-stone-100 dark:active:bg-stone-800
+                                transition-colors cursor-pointer"
+                            title="Add to My Day"
+                            on:click=on_add_to_my_day
+                        >
+                            <span class="material-symbols-outlined" style="font-size: 18px;">
+                                "wb_sunny"
+                            </span>
+                        </button>
+                        <button
+                            class="p-2 rounded-lg text-stone-400 hover:text-stone-600
+                                dark:text-stone-500 dark:hover:text-stone-300
+                                active:bg-stone-100 dark:active:bg-stone-800
+                                transition-colors cursor-pointer"
+                            title="Edit"
+                            on:click=move |_| editing.set(true)
+                        >
+                            <span class="material-symbols-outlined" style="font-size: 18px;">
+                                "edit"
+                            </span>
+                        </button>
+                        <button
+                            class="p-2 rounded-lg text-stone-400 hover:text-red-500
+                                dark:text-stone-500 dark:hover:text-red-400
+                                active:bg-stone-100 dark:active:bg-stone-800
+                                transition-colors cursor-pointer"
+                            title="Delete"
+                            on:click=on_delete
+                        >
+                            <span class="material-symbols-outlined" style="font-size: 18px;">
+                                "delete"
+                            </span>
+                        </button>
+                    </div>
+                })}
             </div>
 
-            // Node picker (shown when assigning)
+            // ── Node picker — full-width expansion below the card ─────────────
             {move || assigning.get().then(|| view! {
-                <div class="relative mt-1.5">
-                    <div class="flex items-center gap-1">
+                <div class="border-t border-stone-100 dark:border-stone-800 px-3 py-3 space-y-2
+                    bg-stone-50 dark:bg-stone-800/50">
+                    // Search input row
+                    <div class="flex items-center gap-2">
                         <span class="material-symbols-outlined text-stone-400 flex-shrink-0"
-                            style="font-size: 14px;">"link"</span>
+                            style="font-size: 16px;">"link"</span>
                         <input
                             type="text"
                             placeholder="Search nodes…"
                             autofocus=true
-                            class="flex-1 text-xs rounded border border-amber-400
-                                bg-white dark:bg-stone-800 px-2 py-1
+                            class="flex-1 min-w-0 text-sm rounded-lg border border-amber-400
+                                bg-white dark:bg-stone-900 px-3 py-2
                                 text-stone-900 dark:text-stone-100
                                 focus:outline-none focus:ring-1 focus:ring-amber-400"
                             prop:value=move || picker_query.get()
@@ -598,8 +735,9 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                             }
                         />
                         <button
-                            class="p-1 rounded text-stone-400 hover:text-stone-600
-                                dark:hover:text-stone-300 transition-colors cursor-pointer"
+                            class="p-2 rounded-lg text-stone-400 hover:text-stone-600
+                                dark:hover:text-stone-300 flex-shrink-0
+                                transition-colors cursor-pointer"
                             title="Cancel"
                             on:click=move |_| {
                                 assigning.set(false);
@@ -607,30 +745,36 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                                 picker_results.set(vec![]);
                             }
                         >
-                            <span class="material-symbols-outlined" style="font-size: 14px;">"close"</span>
+                            <span class="material-symbols-outlined" style="font-size: 18px;">
+                                "close"
+                            </span>
                         </button>
                     </div>
+                    // Results list (not absolutely positioned — flows in-document)
                     {move || {
                         let results = picker_results.get();
                         (!results.is_empty()).then(|| view! {
-                            <div class="absolute z-20 left-0 right-0 mt-1
-                                bg-white dark:bg-stone-900
+                            <div class="bg-white dark:bg-stone-900
                                 border border-stone-200 dark:border-stone-700
-                                rounded-lg shadow-lg overflow-hidden">
+                                rounded-xl shadow-md overflow-hidden">
                                 {results.into_iter().map(|r| {
                                     let node_id = r.node_id;
                                     let title   = r.title.clone();
                                     let icon    = node_type_icon(&r.node_type);
                                     view! {
                                         <button
-                                            class="w-full flex items-center gap-2 px-3 py-2 text-xs
-                                                text-stone-700 dark:text-stone-300
+                                            class="w-full flex items-center gap-2.5 px-3 py-2.5
+                                                text-sm text-stone-700 dark:text-stone-300
                                                 hover:bg-amber-50 dark:hover:bg-stone-800
-                                                transition-colors cursor-pointer"
+                                                active:bg-amber-100 dark:active:bg-stone-700
+                                                border-b border-stone-50 dark:border-stone-800
+                                                last:border-b-0 transition-colors cursor-pointer"
                                             on:click=move |_| do_assign(node_id)
                                         >
-                                            <span class="material-symbols-outlined text-stone-400 flex-shrink-0"
-                                                style="font-size: 13px;">{icon}</span>
+                                            <span class="material-symbols-outlined text-stone-400
+                                                flex-shrink-0" style="font-size: 16px;">
+                                                {icon}
+                                            </span>
                                             <span class="truncate text-left">{title}</span>
                                         </button>
                                     }
@@ -640,47 +784,6 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                     }}
                 </div>
             })}
-
-            // Action buttons (visible on hover)
-            <div class="flex-shrink-0 flex items-center gap-0.5
-                opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                    class="p-1 rounded text-stone-300 hover:text-blue-500
-                        dark:text-stone-600 dark:hover:text-blue-400
-                        transition-colors cursor-pointer"
-                    title="Assign to node"
-                    on:click=move |_| { assigning.set(true); }
-                >
-                    <span class="material-symbols-outlined" style="font-size: 16px;">"call_merge"</span>
-                </button>
-                <button
-                    class="p-1 rounded text-stone-300 hover:text-amber-500
-                        dark:text-stone-600 dark:hover:text-amber-400
-                        transition-colors cursor-pointer"
-                    title="Add to My Day"
-                    on:click=on_add_to_my_day
-                >
-                    <span class="material-symbols-outlined" style="font-size: 16px;">"wb_sunny"</span>
-                </button>
-                <button
-                    class="p-1 rounded text-stone-300 hover:text-stone-600
-                        dark:text-stone-600 dark:hover:text-stone-300
-                        transition-colors cursor-pointer"
-                    title="Edit"
-                    on:click=move |_| editing.set(true)
-                >
-                    <span class="material-symbols-outlined" style="font-size: 16px;">"edit"</span>
-                </button>
-                <button
-                    class="p-1 rounded text-stone-300 hover:text-red-500
-                        dark:text-stone-600 dark:hover:text-red-400
-                        transition-colors cursor-pointer"
-                    title="Delete"
-                    on:click=on_delete
-                >
-                    <span class="material-symbols-outlined" style="font-size: 16px;">"delete"</span>
-                </button>
-            </div>
         </div>
     }
 }
