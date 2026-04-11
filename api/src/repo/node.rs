@@ -217,6 +217,14 @@ impl NodeRepo for PgNodeRepo {
             sqlx::Error::Database(db_err) if db_err.constraint() == Some("nodes_slug_key") => {
                 EmberTroveError::AlreadyExists(format!("slug already exists: {slug}"))
             }
+            sqlx::Error::Database(db_err)
+                if db_err.constraint() == Some("nodes_owner_title_unique") =>
+            {
+                EmberTroveError::AlreadyExists(format!(
+                    "a node named \"{}\" already exists",
+                    req.title
+                ))
+            }
             _ => EmberTroveError::Internal(format!("create node failed: {e}")),
         })?;
 
@@ -415,7 +423,17 @@ impl NodeRepo for PgNodeRepo {
         .bind(status_str)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| EmberTroveError::Internal(format!("update node failed: {e}")))?
+        .map_err(|e| match &e {
+            sqlx::Error::Database(db_err)
+                if db_err.constraint() == Some("nodes_owner_title_unique") =>
+            {
+                EmberTroveError::AlreadyExists(format!(
+                    "a node named \"{}\" already exists",
+                    req.title.as_deref().unwrap_or("")
+                ))
+            }
+            _ => EmberTroveError::Internal(format!("update node failed: {e}")),
+        })?
         .ok_or_else(|| EmberTroveError::NotFound(format!("node {id} not found")))?;
 
         row.into_node()
