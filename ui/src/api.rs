@@ -110,7 +110,14 @@ pub async fn parse_json<T: serde::de::DeserializeOwned>(
             .text()
             .await
             .unwrap_or_else(|_| "unknown error".to_string());
-        Err(UiError::api(status, text))
+        // Extract the `error` field if the body is a JSON object like
+        // `{"error": "..."}`, so the message shown in the UI is human-readable
+        // rather than a raw JSON string.
+        let message = serde_json::from_str::<serde_json::Value>(&text)
+            .ok()
+            .and_then(|v| v.get("error").and_then(|e| e.as_str()).map(str::to_owned))
+            .unwrap_or(text);
+        Err(UiError::api(status, message))
     }
 }
 
