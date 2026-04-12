@@ -4,20 +4,7 @@ use common::id::NodeId;
 use leptos::prelude::*;
 
 use crate::api;
-
-/// Format a UTC timestamp as a concise local date-time string using JS's
-/// `Intl.DateTimeFormat` (avoids a full `chrono-tz` / `time` WASM dependency).
-fn format_timestamp(ts: &chrono::DateTime<chrono::Utc>) -> String {
-    let iso = ts.to_rfc3339();
-    // Ask JS to format: "Mar 25, 2026, 14:32"
-    let js = format!(
-        "new Intl.DateTimeFormat(undefined, {{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}}).format(new Date('{iso}'))"
-    );
-    js_sys::eval(&js)
-        .ok()
-        .and_then(|v| v.as_string())
-        .unwrap_or_else(|| iso[..16].replace('T', " "))
-}
+use crate::components::format_helpers::format_timestamp;
 
 /// Returns actor name from metadata, falling back to `subject_id`.
 fn actor_display(entry: &ActivityEntry) -> String {

@@ -10,109 +10,15 @@ use chrono::NaiveDate;
 use common::{
     id::NodeId,
     search::SearchResult,
-    task::{CreateTaskRequest, RecurrenceRule, Task, TaskPriority, TaskStatus, UpdateTaskRequest},
+    task::{CreateTaskRequest, Task, UpdateTaskRequest},
 };
 use leptos::prelude::*;
 
 use crate::app::TaskRefresh;
-
-// ── Helpers (local copies — same as task_panel / my_day_view) ─────────────────
-
-fn status_done(s: &TaskStatus) -> bool {
-    matches!(s, TaskStatus::Done | TaskStatus::Cancelled)
-}
-
-fn parse_status(s: &str) -> TaskStatus {
-    match s {
-        "in_progress" => TaskStatus::InProgress,
-        "done"        => TaskStatus::Done,
-        "cancelled"   => TaskStatus::Cancelled,
-        _             => TaskStatus::Open,
-    }
-}
-
-fn status_value(s: &TaskStatus) -> &'static str {
-    match s {
-        TaskStatus::Open       => "open",
-        TaskStatus::InProgress => "in_progress",
-        TaskStatus::Done       => "done",
-        TaskStatus::Cancelled  => "cancelled",
-    }
-}
-
-fn parse_priority(s: &str) -> TaskPriority {
-    match s {
-        "high" => TaskPriority::High,
-        "low"  => TaskPriority::Low,
-        _      => TaskPriority::Medium,
-    }
-}
-
-fn priority_value(p: &TaskPriority) -> &'static str {
-    match p {
-        TaskPriority::High   => "high",
-        TaskPriority::Medium => "medium",
-        TaskPriority::Low    => "low",
-    }
-}
-
-fn priority_dot_color(p: &TaskPriority) -> &'static str {
-    match p {
-        TaskPriority::High   => "background:#dc2626;",
-        TaskPriority::Medium => "background:#d97706;",
-        TaskPriority::Low    => "background:#6b7280;",
-    }
-}
-
-fn priority_label(p: &TaskPriority) -> &'static str {
-    match p {
-        TaskPriority::High   => "High",
-        TaskPriority::Medium => "Medium",
-        TaskPriority::Low    => "Low",
-    }
-}
-
-fn parse_recurrence_opt(s: &str) -> Option<RecurrenceRule> {
-    match s {
-        "daily"    => Some(RecurrenceRule::Daily),
-        "weekly"   => Some(RecurrenceRule::Weekly),
-        "biweekly" => Some(RecurrenceRule::Biweekly),
-        "monthly"  => Some(RecurrenceRule::Monthly),
-        "yearly"   => Some(RecurrenceRule::Yearly),
-        _          => None,
-    }
-}
-
-fn recurrence_value(r: &RecurrenceRule) -> &'static str {
-    match r {
-        RecurrenceRule::Daily    => "daily",
-        RecurrenceRule::Weekly   => "weekly",
-        RecurrenceRule::Biweekly => "biweekly",
-        RecurrenceRule::Monthly  => "monthly",
-        RecurrenceRule::Yearly   => "yearly",
-    }
-}
-
-fn recurrence_label(r: &RecurrenceRule) -> &'static str {
-    match r {
-        RecurrenceRule::Daily    => "Daily",
-        RecurrenceRule::Weekly   => "Weekly",
-        RecurrenceRule::Biweekly => "Every 2 weeks",
-        RecurrenceRule::Monthly  => "Monthly",
-        RecurrenceRule::Yearly   => "Yearly",
-    }
-}
-
-fn node_type_icon(node_type: &str) -> &'static str {
-    match node_type {
-        "article"   => "description",
-        "project"   => "rocket_launch",
-        "area"      => "category",
-        "resource"  => "bookmarks",
-        "reference" => "menu_book",
-        _           => "article",
-    }
-}
+use crate::components::task_common::{
+    node_type_icon, parse_priority, parse_recurrence_opt, parse_status, priority_dot_color,
+    priority_label, priority_value, recurrence_label, recurrence_value, status_done, status_value,
+};
 
 // ── InboxView ─────────────────────────────────────────────────────────────────
 
@@ -307,17 +213,6 @@ pub fn InboxView() -> impl IntoView {
 }
 
 // ── InboxTaskRow ──────────────────────────────────────────────────────────────
-//
-// Card layout (mobile-first):
-//
-//   ┌──────────────────────────────────────────┐
-//   │ ☐  Task title, wraps on small screens    │
-//   │    ⚠ Apr 5  ↻ weekly                    │
-//   │ ● Medium          [↗] [☀] [✎] [🗑]     │
-//   └──────────────────────────────────────────┘
-//
-// When `assigning` is active a full-width node-search panel expands below.
-// All action buttons are always visible — no hover required.
 
 #[component]
 fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
@@ -461,7 +356,7 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
 
                 // Row 1: checkbox + title (+ badges in read mode)
                 <div class="flex items-start gap-2.5">
-                    // Checkbox — larger tap target on mobile
+                    // Checkbox
                     <button
                         class="flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 border-stone-300
                             dark:border-stone-600 flex items-center justify-center
@@ -655,7 +550,7 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                             }
                         }}
 
-                        // Action buttons (right side) — p-2 for ≥ 40 px tap target
+                        // Action buttons (right side)
                         <button
                             class="p-2 rounded-lg text-stone-400 hover:text-blue-500
                                 dark:text-stone-500 dark:hover:text-blue-400
@@ -750,7 +645,7 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                             </span>
                         </button>
                     </div>
-                    // Results list (not absolutely positioned — flows in-document)
+                    // Results list
                     {move || {
                         let results = picker_results.get();
                         (!results.is_empty()).then(|| view! {
