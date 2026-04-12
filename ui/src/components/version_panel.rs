@@ -4,20 +4,8 @@ use common::id::NodeId;
 use leptos::prelude::*;
 
 use crate::api;
+use crate::components::format_helpers::format_timestamp;
 use crate::components::toast::{ToastLevel, push_toast};
-
-/// Format a UTC timestamp as a concise local string via JS Intl.
-fn format_ts(ts: &chrono::DateTime<chrono::Utc>) -> String {
-    let iso = ts.to_rfc3339();
-    let js = format!(
-        "new Intl.DateTimeFormat(undefined, {{year:'numeric',month:'short',day:'numeric',\
-         hour:'2-digit',minute:'2-digit'}}).format(new Date('{iso}'))"
-    );
-    js_sys::eval(&js)
-        .ok()
-        .and_then(|v| v.as_string())
-        .unwrap_or_else(|| iso[..16].replace('T', " "))
-}
 
 #[component]
 pub fn VersionPanel(
@@ -96,7 +84,7 @@ pub fn VersionPanel(
                                 <ol class="relative border-l border-stone-200 dark:border-stone-700 ml-2 space-y-4 py-1">
                                     {list.into_iter().enumerate().map(|(i, ver)| {
                                         let vid = ver.id.0;
-                                        let ts = format_ts(&ver.created_at);
+                                        let ts = format_timestamp(&ver.created_at);
                                         let is_latest = i == 0;
                                         let busy = move || restoring.get() == Some(vid);
                                         view! {

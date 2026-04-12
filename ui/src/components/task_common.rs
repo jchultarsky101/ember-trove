@@ -1,0 +1,198 @@
+//! Shared task helpers — pure functions used by `task_panel`, `inbox_view`,
+//! `my_day_view`, and the reusable `TaskRowInner` component.
+//!
+//! Centralises status / priority / recurrence parsing, formatting, and
+//! comparison so that every task-related view speaks the same language.
+
+use common::task::{RecurrenceRule, TaskPriority, TaskStatus};
+
+// ── Status ──────────────────────────────────────────────────────────────────
+
+/// Returns `true` for terminal statuses (Done, Cancelled).
+pub fn status_done(s: &TaskStatus) -> bool {
+    matches!(s, TaskStatus::Done | TaskStatus::Cancelled)
+}
+
+pub fn parse_status(s: &str) -> TaskStatus {
+    match s {
+        "in_progress" => TaskStatus::InProgress,
+        "done"        => TaskStatus::Done,
+        "cancelled"   => TaskStatus::Cancelled,
+        _             => TaskStatus::Open,
+    }
+}
+
+pub fn status_value(s: &TaskStatus) -> &'static str {
+    match s {
+        TaskStatus::Open       => "open",
+        TaskStatus::InProgress => "in_progress",
+        TaskStatus::Done       => "done",
+        TaskStatus::Cancelled  => "cancelled",
+    }
+}
+
+pub fn status_label(s: &TaskStatus) -> &'static str {
+    match s {
+        TaskStatus::Open       => "Open",
+        TaskStatus::InProgress => "In Progress",
+        TaskStatus::Done       => "Done",
+        TaskStatus::Cancelled  => "Cancelled",
+    }
+}
+
+// ── Priority ────────────────────────────────────────────────────────────────
+
+pub fn parse_priority(s: &str) -> TaskPriority {
+    match s {
+        "high" => TaskPriority::High,
+        "low"  => TaskPriority::Low,
+        _      => TaskPriority::Medium,
+    }
+}
+
+pub fn priority_value(p: &TaskPriority) -> &'static str {
+    match p {
+        TaskPriority::High   => "high",
+        TaskPriority::Medium => "medium",
+        TaskPriority::Low    => "low",
+    }
+}
+
+pub fn priority_label(p: &TaskPriority) -> &'static str {
+    match p {
+        TaskPriority::High   => "High",
+        TaskPriority::Medium => "Medium",
+        TaskPriority::Low    => "Low",
+    }
+}
+
+/// Raw hex colour string for a priority level (e.g. `"#dc2626"`).
+pub fn priority_color_hex(p: &TaskPriority) -> &'static str {
+    match p {
+        TaskPriority::High   => "#dc2626",
+        TaskPriority::Medium => "#d97706",
+        TaskPriority::Low    => "#6b7280",
+    }
+}
+
+/// Inline CSS for a small filled circle used as a priority indicator.
+pub fn priority_dot_color(p: &TaskPriority) -> &'static str {
+    match p {
+        TaskPriority::High   => "background:#dc2626;",
+        TaskPriority::Medium => "background:#d97706;",
+        TaskPriority::Low    => "background:#6b7280;",
+    }
+}
+
+/// Material Symbols icon name for the priority level.
+pub fn priority_icon(p: &TaskPriority) -> &'static str {
+    match p {
+        TaskPriority::High   => "keyboard_double_arrow_up",
+        TaskPriority::Medium => "drag_handle",
+        TaskPriority::Low    => "keyboard_double_arrow_down",
+    }
+}
+
+/// Inline CSS colour for the priority icon / label text.
+pub fn priority_color(p: &TaskPriority) -> &'static str {
+    match p {
+        TaskPriority::High   => "color: #dc2626;",
+        TaskPriority::Medium => "color: #d97706;",
+        TaskPriority::Low    => "color: #6b7280;",
+    }
+}
+
+/// Numeric weight for sorting — lower = higher priority.
+pub fn priority_weight(p: &TaskPriority) -> u8 {
+    match p {
+        TaskPriority::High   => 0,
+        TaskPriority::Medium => 1,
+        TaskPriority::Low    => 2,
+    }
+}
+
+// ── Recurrence ──────────────────────────────────────────────────────────────
+
+pub fn parse_recurrence_opt(s: &str) -> Option<RecurrenceRule> {
+    match s {
+        "daily"    => Some(RecurrenceRule::Daily),
+        "weekly"   => Some(RecurrenceRule::Weekly),
+        "biweekly" => Some(RecurrenceRule::Biweekly),
+        "monthly"  => Some(RecurrenceRule::Monthly),
+        "yearly"   => Some(RecurrenceRule::Yearly),
+        _          => None,
+    }
+}
+
+pub fn recurrence_value(r: &RecurrenceRule) -> &'static str {
+    match r {
+        RecurrenceRule::Daily    => "daily",
+        RecurrenceRule::Weekly   => "weekly",
+        RecurrenceRule::Biweekly => "biweekly",
+        RecurrenceRule::Monthly  => "monthly",
+        RecurrenceRule::Yearly   => "yearly",
+    }
+}
+
+pub fn recurrence_label(r: &RecurrenceRule) -> &'static str {
+    match r {
+        RecurrenceRule::Daily    => "Daily",
+        RecurrenceRule::Weekly   => "Weekly",
+        RecurrenceRule::Biweekly => "Every 2 weeks",
+        RecurrenceRule::Monthly  => "Monthly",
+        RecurrenceRule::Yearly   => "Yearly",
+    }
+}
+
+// ── Node type ───────────────────────────────────────────────────────────────
+
+/// Material Symbols icon name for a node type string (used in the inbox
+/// node-picker and elsewhere).
+pub fn node_type_icon(node_type: &str) -> &'static str {
+    match node_type {
+        "article"   => "description",
+        "project"   => "rocket_launch",
+        "area"      => "category",
+        "resource"  => "bookmarks",
+        "reference" => "menu_book",
+        _           => "article",
+    }
+}
+
+// ── Sorting ─────────────────────────────────────────────────────────────────
+
+/// Sort tasks by `sort_order` first, then `created_at` as a tiebreak.
+/// Used by TaskPanel (node-scoped task list).
+pub fn sort_tasks_by_order(tasks: &mut [common::task::Task]) {
+    tasks.sort_by(|a, b| {
+        a.sort_order
+            .cmp(&b.sort_order)
+            .then_with(|| a.created_at.cmp(&b.created_at))
+    });
+}
+
+/// Richer sort: `sort_order` first, then incomplete before done, then
+/// priority (high→low), then due date (soonest first).
+/// Used by MyDayView.
+pub fn sort_tasks_full(tasks: &mut [common::task::Task]) {
+    tasks.sort_by(|a, b| {
+        let so = a.sort_order.cmp(&b.sort_order);
+        if so != std::cmp::Ordering::Equal { return so; }
+        let a_done = status_done(&a.status);
+        let b_done = status_done(&b.status);
+        match (a_done, b_done) {
+            (true, false) => std::cmp::Ordering::Greater,
+            (false, true) => std::cmp::Ordering::Less,
+            _ => {
+                let pw = priority_weight(&a.priority).cmp(&priority_weight(&b.priority));
+                if pw != std::cmp::Ordering::Equal { return pw; }
+                match (a.due_date, b.due_date) {
+                    (Some(ad), Some(bd)) => ad.cmp(&bd),
+                    (Some(_), None)      => std::cmp::Ordering::Less,
+                    (None, Some(_))      => std::cmp::Ordering::Greater,
+                    (None, None)         => std::cmp::Ordering::Equal,
+                }
+            }
+        }
+    });
+}
