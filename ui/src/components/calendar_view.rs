@@ -1,21 +1,10 @@
 use chrono::{Datelike, NaiveDate, Weekday};
-use common::task::{MyDayTask, TaskPriority, TaskStatus};
+use common::task::MyDayTask;
 use leptos::prelude::*;
 
 use crate::app::TaskRefresh;
+use crate::components::task_common::{priority_color_hex, status_done};
 use leptos_router::hooks::use_navigate;
-
-fn priority_color_hex(p: &TaskPriority) -> &'static str {
-    match p {
-        TaskPriority::High => "#dc2626",
-        TaskPriority::Medium => "#d97706",
-        TaskPriority::Low => "#6b7280",
-    }
-}
-
-fn status_done(s: &TaskStatus) -> bool {
-    matches!(s, TaskStatus::Done | TaskStatus::Cancelled)
-}
 
 fn next_month(year: i32, month: u32) -> (i32, u32) {
     if month == 12 {

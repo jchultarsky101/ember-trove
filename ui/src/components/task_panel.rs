@@ -1,84 +1,15 @@
 use chrono::NaiveDate;
 use common::{
     id::{NodeId, TaskId},
-    task::{CreateTaskRequest, RecurrenceRule, Task, TaskPriority, TaskStatus, UpdateTaskRequest},
+    task::{CreateTaskRequest, Task, TaskStatus, UpdateTaskRequest},
 };
 use leptos::prelude::*;
 
 use crate::app::TaskRefresh;
-
-fn priority_icon(p: &TaskPriority) -> &'static str {
-    match p {
-        TaskPriority::High => "keyboard_double_arrow_up",
-        TaskPriority::Medium => "drag_handle",
-        TaskPriority::Low => "keyboard_double_arrow_down",
-    }
-}
-
-fn priority_color(p: &TaskPriority) -> &'static str {
-    match p {
-        TaskPriority::High => "color: #dc2626;",
-        TaskPriority::Medium => "color: #d97706;",
-        TaskPriority::Low => "color: #6b7280;",
-    }
-}
-
-fn priority_label(p: &TaskPriority) -> &'static str {
-    match p {
-        TaskPriority::High => "High",
-        TaskPriority::Medium => "Medium",
-        TaskPriority::Low => "Low",
-    }
-}
-
-fn status_done(s: &TaskStatus) -> bool {
-    matches!(s, TaskStatus::Done | TaskStatus::Cancelled)
-}
-
-fn status_label(s: &TaskStatus) -> &'static str {
-    match s {
-        TaskStatus::Open => "Open",
-        TaskStatus::InProgress => "In Progress",
-        TaskStatus::Done => "Done",
-        TaskStatus::Cancelled => "Cancelled",
-    }
-}
-
-fn status_value(s: &TaskStatus) -> &'static str {
-    match s {
-        TaskStatus::Open => "open",
-        TaskStatus::InProgress => "in_progress",
-        TaskStatus::Done => "done",
-        TaskStatus::Cancelled => "cancelled",
-    }
-}
-
-fn parse_status(s: &str) -> TaskStatus {
-    match s {
-        "in_progress" => TaskStatus::InProgress,
-        "done" => TaskStatus::Done,
-        "cancelled" => TaskStatus::Cancelled,
-        _ => TaskStatus::Open,
-    }
-}
-
-fn parse_priority(s: &str) -> TaskPriority {
-    match s {
-        "high" => TaskPriority::High,
-        "low" => TaskPriority::Low,
-        _ => TaskPriority::Medium,
-    }
-}
-
-fn sort_tasks(tasks: &mut [Task]) {
-    // Primary: manual sort_order (all default to 0).
-    // Tiebreak: created_at ASC so new tasks appear last.
-    tasks.sort_by(|a, b| {
-        a.sort_order
-            .cmp(&b.sort_order)
-            .then_with(|| a.created_at.cmp(&b.created_at))
-    });
-}
+use crate::components::task_common::{
+    parse_priority, parse_recurrence_opt, parse_status, priority_color, priority_icon,
+    priority_label, priority_value, sort_tasks_by_order, status_done, status_label, status_value,
+};
 
 // ── TaskPanel ─────────────────────────────────────────────────────────────────
 
@@ -110,7 +41,7 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
             .unwrap_or_default();
         let (mut open, done): (Vec<_>, Vec<_>) =
             all.into_iter().partition(|t| !status_done(&t.status));
-        sort_tasks(&mut open);
+        sort_tasks_by_order(&mut open);
         open_tasks.set(open);
         done_tasks.set(done);
     });
@@ -136,14 +67,7 @@ pub fn TaskPanel(node_id: NodeId) -> impl IntoView {
             .trim()
             .parse::<NaiveDate>()
             .ok();
-        let recurrence = match new_recurrence.get_untracked().as_str() {
-            "daily"    => Some(RecurrenceRule::Daily),
-            "weekly"   => Some(RecurrenceRule::Weekly),
-            "biweekly" => Some(RecurrenceRule::Biweekly),
-            "monthly"  => Some(RecurrenceRule::Monthly),
-            "yearly"   => Some(RecurrenceRule::Yearly),
-            _          => None,
-        };
+        let recurrence = parse_recurrence_opt(&new_recurrence.get_untracked());
         adding.set(true);
         add_error.set(None);
         wasm_bindgen_futures::spawn_local(async move {
@@ -381,11 +305,6 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
     let is_done = status_done(&task.status);
     let status_val = status_value(&task.status).to_string();
     let priority = task.priority.clone();
-    let priority_str = match priority {
-        TaskPriority::High   => "high",
-        TaskPriority::Medium => "medium",
-        TaskPriority::Low    => "low",
-    };
     let p_icon = priority_icon(&task.priority);
     let p_color = priority_color(&task.priority);
     let p_label = priority_label(&task.priority);
@@ -402,7 +321,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
     let editing_title  = RwSignal::new(false);
     let edit_title     = RwSignal::new(task.title.clone());
     let orig_title     = RwSignal::new(task.title.clone());
-    let edit_priority  = RwSignal::new(priority_str.to_string());
+    let edit_priority  = RwSignal::new(priority_value(&priority).to_string());
     let edit_due       = RwSignal::new(
         due.map(|d| d.format("%Y-%m-%d").to_string())
             .unwrap_or_default(),
@@ -623,7 +542,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
                 </div>
             </div>
 
-            // Actions — always visible (group-hover:opacity is @media(hover:hover) only, invisible on touch)
+            // Actions — always visible
             <div class="flex items-center gap-1 flex-shrink-0">
                 // Edit task
                 <button

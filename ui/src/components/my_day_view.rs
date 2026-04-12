@@ -1,122 +1,16 @@
 use chrono::NaiveDate;
 use common::{
     id::TaskId,
-    task::{MyDayTask, RecurrenceRule, Task, TaskPriority, TaskStatus, UpdateTaskRequest},
+    task::{MyDayTask, Task, UpdateTaskRequest},
 };
 use leptos::prelude::*;
 
 use crate::app::TaskRefresh;
+use crate::components::task_common::{
+    parse_priority, parse_recurrence_opt, parse_status, priority_value,
+    recurrence_label, recurrence_value, sort_tasks_full, status_done, status_value,
+};
 use leptos_router::hooks::use_navigate;
-
-// ── Status helpers ────────────────────────────────────────────────────────────
-
-fn status_done(s: &TaskStatus) -> bool {
-    matches!(s, TaskStatus::Done | TaskStatus::Cancelled)
-}
-
-fn parse_status(s: &str) -> TaskStatus {
-    match s {
-        "in_progress" => TaskStatus::InProgress,
-        "done"        => TaskStatus::Done,
-        "cancelled"   => TaskStatus::Cancelled,
-        _             => TaskStatus::Open,
-    }
-}
-
-fn status_value(s: &TaskStatus) -> &'static str {
-    match s {
-        TaskStatus::Open       => "open",
-        TaskStatus::InProgress => "in_progress",
-        TaskStatus::Done       => "done",
-        TaskStatus::Cancelled  => "cancelled",
-    }
-}
-
-// ── Priority helpers ──────────────────────────────────────────────────────────
-
-fn priority_weight(p: &TaskPriority) -> u8 {
-    match p {
-        TaskPriority::High   => 0,
-        TaskPriority::Medium => 1,
-        TaskPriority::Low    => 2,
-    }
-}
-
-fn priority_value(p: &TaskPriority) -> &'static str {
-    match p {
-        TaskPriority::High   => "high",
-        TaskPriority::Medium => "medium",
-        TaskPriority::Low    => "low",
-    }
-}
-
-fn parse_priority(s: &str) -> TaskPriority {
-    match s {
-        "high" => TaskPriority::High,
-        "low"  => TaskPriority::Low,
-        _      => TaskPriority::Medium,
-    }
-}
-
-// ── Recurrence helpers ────────────────────────────────────────────────────────
-
-fn recurrence_value(r: &RecurrenceRule) -> &'static str {
-    match r {
-        RecurrenceRule::Daily    => "daily",
-        RecurrenceRule::Weekly   => "weekly",
-        RecurrenceRule::Biweekly => "biweekly",
-        RecurrenceRule::Monthly  => "monthly",
-        RecurrenceRule::Yearly   => "yearly",
-    }
-}
-
-fn recurrence_label(r: &RecurrenceRule) -> &'static str {
-    match r {
-        RecurrenceRule::Daily    => "Daily",
-        RecurrenceRule::Weekly   => "Weekly",
-        RecurrenceRule::Biweekly => "Every 2 weeks",
-        RecurrenceRule::Monthly  => "Monthly",
-        RecurrenceRule::Yearly   => "Yearly",
-    }
-}
-
-fn parse_recurrence_opt(s: &str) -> Option<RecurrenceRule> {
-    match s {
-        "daily"    => Some(RecurrenceRule::Daily),
-        "weekly"   => Some(RecurrenceRule::Weekly),
-        "biweekly" => Some(RecurrenceRule::Biweekly),
-        "monthly"  => Some(RecurrenceRule::Monthly),
-        "yearly"   => Some(RecurrenceRule::Yearly),
-        _          => None,
-    }
-}
-
-// ── Sort: honour sort_order first, then incomplete/done, then priority/due ────
-
-fn sort_tasks(tasks: &mut [Task]) {
-    tasks.sort_by(|a, b| {
-        // Primary: manual sort_order
-        let so = a.sort_order.cmp(&b.sort_order);
-        if so != std::cmp::Ordering::Equal { return so; }
-        // Secondary: incomplete before done
-        let a_done = status_done(&a.status);
-        let b_done = status_done(&b.status);
-        match (a_done, b_done) {
-            (true,  false) => std::cmp::Ordering::Greater,
-            (false, true)  => std::cmp::Ordering::Less,
-            _ => {
-                let pw = priority_weight(&a.priority).cmp(&priority_weight(&b.priority));
-                if pw != std::cmp::Ordering::Equal { return pw; }
-                match (a.due_date, b.due_date) {
-                    (Some(ad), Some(bd)) => ad.cmp(&bd),
-                    (Some(_),  None)     => std::cmp::Ordering::Less,
-                    (None,     Some(_))  => std::cmp::Ordering::Greater,
-                    (None,     None)     => std::cmp::Ordering::Equal,
-                }
-            }
-        }
-    });
-}
 
 // ── MyDayView ─────────────────────────────────────────────────────────────────
 
@@ -233,7 +127,7 @@ pub fn MyDayView() -> impl IntoView {
                             }
                         }
                         for (_, _, tasks) in grouped.iter_mut() {
-                            sort_tasks(tasks);
+                            sort_tasks_full(tasks);
                         }
 
                         view! {
@@ -501,21 +395,21 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
 
             // Priority dot — High=red, Medium=amber, Low=hidden
             {move || match parse_priority(&priority_val.get()) {
-                TaskPriority::High => Some(view! {
+                common::task::TaskPriority::High => Some(view! {
                     <span
                         class="flex-shrink-0 mt-1.5"
                         style="color:#ef4444;font-size:8px;line-height:1;"
                         title="High priority"
                     >{"●"}</span>
                 }),
-                TaskPriority::Medium => Some(view! {
+                common::task::TaskPriority::Medium => Some(view! {
                     <span
                         class="flex-shrink-0 mt-1.5"
                         style="color:#f59e0b;font-size:8px;line-height:1;"
                         title="Medium priority"
                     >{"●"}</span>
                 }),
-                TaskPriority::Low => None,
+                common::task::TaskPriority::Low => None,
             }}
 
             // Body
@@ -693,7 +587,7 @@ fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                                 }
                             })}
 
-                            // Actions — muted until hover
+                            // Actions — always visible
                             <div class="flex items-center gap-0.5 flex-shrink-0">
                                 <button
                                     class="p-1 rounded text-stone-300 dark:text-stone-600
