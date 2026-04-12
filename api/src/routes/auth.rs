@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 use axum::{
     Extension, Json, Router,
     extract::{Query, State},
+    http::header,
     response::Html,
     routing::{get, post},
 };
@@ -53,7 +54,7 @@ struct RedirectResponse {
 async fn login(
     State(state): State<AppState>,
     jar: PrivateCookieJar,
-) -> Result<(PrivateCookieJar, Json<RedirectResponse>), ApiError> {
+) -> Result<(PrivateCookieJar, [(header::HeaderName, &'static str); 1], Json<RedirectResponse>), ApiError> {
     let oidc = state.oidc.as_ref()
         .ok_or_else(|| ApiError::Internal("OIDC not configured — auth is disabled".to_string()))?;
 
@@ -90,7 +91,11 @@ async fn login(
         oauth_state,
     );
 
-    Ok((jar, Json(RedirectResponse { redirect_url: url })))
+    Ok((
+        jar,
+        [(header::CACHE_CONTROL, "no-store")],
+        Json(RedirectResponse { redirect_url: url }),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -104,7 +109,7 @@ async fn callback(
     State(app_state): State<AppState>,
     jar: PrivateCookieJar,
     Query(params): Query<CallbackQuery>,
-) -> Result<(PrivateCookieJar, Html<String>), ApiError> {
+) -> Result<(PrivateCookieJar, [(header::HeaderName, &'static str); 1], Html<String>), ApiError> {
     let oidc = app_state.oidc.as_ref()
         .ok_or_else(|| ApiError::Internal("OIDC not configured — auth is disabled".to_string()))?;
 
@@ -167,7 +172,11 @@ async fn callback(
 </html>"#
     );
 
-    Ok((updated_jar, Html(html)))
+    Ok((
+        updated_jar,
+        [(header::CACHE_CONTROL, "no-store")],
+        Html(html),
+    ))
 }
 
 async fn refresh(
