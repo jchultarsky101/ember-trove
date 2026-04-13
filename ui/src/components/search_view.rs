@@ -4,8 +4,47 @@ use common::{
 };
 use leptos::prelude::*;
 
+use crate::app::{storage_get, storage_set};
 use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
 use leptos_router::hooks::use_navigate;
+
+// ── Search history (localStorage) ────────────────────────────────────────────
+
+const HISTORY_KEY: &str = "ember_trove_search_history";
+const HISTORY_MAX: usize = 20;
+
+fn load_history() -> Vec<String> {
+    storage_get(HISTORY_KEY)
+        .map(|raw| raw.split('\n')
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect())
+        .unwrap_or_default()
+}
+
+fn save_history(items: &[String]) {
+    storage_set(HISTORY_KEY, &items.join("\n"));
+}
+
+fn push_history(query: &str) {
+    let q = query.trim().to_string();
+    if q.is_empty() { return; }
+    let mut items = load_history();
+    items.retain(|s| s != &q);
+    items.insert(0, q);
+    items.truncate(HISTORY_MAX);
+    save_history(&items);
+}
+
+fn remove_history(query: &str) {
+    let mut items = load_history();
+    items.retain(|s| s != query);
+    save_history(&items);
+}
+
+fn clear_history() {
+    save_history(&[]);
+}
 
 /// Full-page search results view.
 ///
@@ -41,6 +80,7 @@ pub fn SearchView() -> impl IntoView {
     let results: RwSignal<Option<SearchResponse>> = RwSignal::new(None);
     let loading = RwSignal::new(false);
     let search_version = RwSignal::new(0u32);
+    let history: RwSignal<Vec<String>> = RwSignal::new(load_history());
 
     // Fetch all tags once for the picker.
     let all_tags: LocalResource<Vec<Tag>> = LocalResource::new(|| async {
@@ -102,6 +142,10 @@ pub fn SearchView() -> impl IntoView {
             {
                 Ok(resp) => {
                     if search_version.get_untracked() == version {
+                        if resp.total > 0 {
+                            push_history(&q);
+                            history.set(load_history());
+                        }
                         results.set(Some(resp));
                     }
                 }
@@ -665,6 +709,74 @@ pub fn SearchView() -> impl IntoView {
                                 }.into_any()
                             }}
                         }
+                    })
+                }}
+
+                // ── Recent search history ─────────────────────────────────
+                {move || {
+                    let q = search_query.get();
+                    let items = history.get();
+                    if !q.trim().is_empty() || items.is_empty() { return None; }
+                    Some(view! {
+                        <div class="mb-6">
+                            <div class="flex items-center justify-between mb-3">
+                                <h2 class="text-sm font-medium text-stone-500 dark:text-stone-400">
+                                    "Recent searches"
+                                </h2>
+                                <button
+                                    class="text-xs text-stone-400 dark:text-stone-500
+                                           hover:text-stone-600 dark:hover:text-stone-300
+                                           transition-colors cursor-pointer"
+                                    on:click=move |_| {
+                                        clear_history();
+                                        history.set(Vec::new());
+                                    }
+                                >
+                                    "Clear all"
+                                </button>
+                            </div>
+                            <div class="space-y-1">
+                                {items.into_iter().map(|item| {
+                                    let item_click = item.clone();
+                                    let item_remove = item.clone();
+                                    let item_display = item.clone();
+                                    view! {
+                                        <div class="flex items-center gap-2 px-3 py-2 rounded-lg
+                                                    hover:bg-stone-100 dark:hover:bg-stone-800
+                                                    transition-colors group">
+                                            <span class="material-symbols-outlined text-stone-400
+                                                         dark:text-stone-500"
+                                                  style="font-size: 16px;">
+                                                "history"
+                                            </span>
+                                            <button
+                                                class="flex-1 text-left text-sm text-stone-700
+                                                       dark:text-stone-300 truncate cursor-pointer"
+                                                on:click=move |_| {
+                                                    search_query.set(item_click.clone());
+                                                }
+                                            >
+                                                {item_display}
+                                            </button>
+                                            <button
+                                                class="p-0.5 rounded text-stone-300 dark:text-stone-600
+                                                       hover:text-stone-500 dark:hover:text-stone-400
+                                                       opacity-0 group-hover:opacity-100
+                                                       transition-all cursor-pointer"
+                                                title="Remove"
+                                                on:click=move |_| {
+                                                    remove_history(&item_remove);
+                                                    history.set(load_history());
+                                                }
+                                            >
+                                                <span class="material-symbols-outlined"
+                                                      style="font-size: 14px;">"close"</span>
+                                            </button>
+                                        </div>
+                                    }
+                                }).collect::<Vec<_>>()}
+                            </div>
+                        </div>
                     })
                 }}
 
