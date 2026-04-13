@@ -239,6 +239,9 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
             .unwrap_or_default(),
     );
 
+    // My Day toggle
+    let in_my_day = RwSignal::new(task.focus_date == Some(today));
+
     // Node-picker state
     let assigning      = RwSignal::new(false);
     let picker_query   = RwSignal::new(String::new());
@@ -327,10 +330,13 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
         });
     };
 
-    let on_add_to_my_day = move |_| {
+    let on_toggle_my_day = move |_| {
+        let currently_in = in_my_day.get_untracked();
+        let new_focus = if currently_in { Some(None) } else { Some(Some(today)) };
+        in_my_day.set(!currently_in);
         let req = UpdateTaskRequest {
             title: None, status: None, priority: None,
-            focus_date: Some(Some(today)), due_date: None,
+            focus_date: new_focus, due_date: None,
             recurrence: None, node_id: None,
         };
         wasm_bindgen_futures::spawn_local(async move {
@@ -564,14 +570,28 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                             </span>
                         </button>
                         <button
-                            class="p-2 rounded-lg text-stone-400 hover:text-amber-500
-                                dark:text-stone-500 dark:hover:text-amber-400
-                                active:bg-stone-100 dark:active:bg-stone-800
-                                transition-colors cursor-pointer"
-                            title="Add to My Day"
-                            on:click=on_add_to_my_day
+                            class=move || if in_my_day.get() {
+                                "p-2 rounded-lg text-amber-500 bg-amber-50 \
+                                 dark:text-amber-400 dark:bg-amber-900/30 \
+                                 hover:text-amber-600 dark:hover:text-amber-300 \
+                                 transition-colors cursor-pointer"
+                            } else {
+                                "p-2 rounded-lg text-stone-400 hover:text-amber-500 \
+                                 dark:text-stone-500 dark:hover:text-amber-400 \
+                                 active:bg-stone-100 dark:active:bg-stone-800 \
+                                 transition-colors cursor-pointer"
+                            }
+                            title=move || if in_my_day.get() { "Remove from My Day" } else { "Add to My Day" }
+                            on:click=on_toggle_my_day
                         >
-                            <span class="material-symbols-outlined" style="font-size: 18px;">
+                            <span
+                                class="material-symbols-outlined"
+                                style=move || if in_my_day.get() {
+                                    "font-size: 18px; font-variation-settings: 'FILL' 1;"
+                                } else {
+                                    "font-size: 18px;"
+                                }
+                            >
                                 "wb_sunny"
                             </span>
                         </button>
