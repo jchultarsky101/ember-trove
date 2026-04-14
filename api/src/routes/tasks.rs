@@ -19,7 +19,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
-    auth::permissions::{require_editor, require_viewer},
+    auth::permissions::{is_admin, require_editor, require_viewer},
     error::ApiError,
     state::AppState,
 };
@@ -151,9 +151,7 @@ async fn update_task(
 ) -> Result<Json<Task>, ApiError> {
     // Fetch the task to verify ownership / node permission.
     let existing = state.tasks.get(TaskId(id)).await?;
-    if existing.owner_id != claims.sub
-        && !claims.roles.contains(&"admin".to_string())
-    {
+    if existing.owner_id != claims.sub && !is_admin(&claims) {
         // Not the owner — check node-level permission if attached to a node.
         if let Some(nid) = existing.node_id {
             require_editor(state.permissions.as_ref(), &claims, nid).await?;
@@ -212,9 +210,7 @@ async fn delete_task(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     let existing = state.tasks.get(TaskId(id)).await?;
-    if existing.owner_id != claims.sub
-        && !claims.roles.contains(&"admin".to_string())
-    {
+    if existing.owner_id != claims.sub && !is_admin(&claims) {
         if let Some(nid) = existing.node_id {
             require_editor(state.permissions.as_ref(), &claims, nid).await?;
         } else {

@@ -18,6 +18,7 @@ use garde::Validate;
 
 use crate::{
     admin::CognitoAdminClient,
+    auth::permissions::require_admin,
     error::ApiError,
     state::AppState,
 };
@@ -31,15 +32,6 @@ pub fn router() -> Router<AppState> {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/// Require the caller to have the `admin` group/role.
-fn require_admin_role(claims: &AuthClaims) -> Result<(), ApiError> {
-    if claims.roles.contains(&"admin".to_string()) {
-        Ok(())
-    } else {
-        Err(ApiError::Forbidden("admin role required".to_string()))
-    }
-}
 
 /// Unwrap the Cognito admin client or return 503.
 fn cognito_client(state: &AppState) -> Result<Arc<CognitoAdminClient>, ApiError> {
@@ -57,7 +49,7 @@ async fn list_users(
     State(state): State<AppState>,
     Extension(claims): Extension<AuthClaims>,
 ) -> Result<Json<Vec<AdminUser>>, ApiError> {
-    require_admin_role(&claims)?;
+    require_admin(&claims)?;
     let users = cognito_client(&state)?.list_users().await?;
     Ok(Json(users))
 }
@@ -68,7 +60,7 @@ async fn create_user(
     Extension(claims): Extension<AuthClaims>,
     Json(req): Json<CreateAdminUserRequest>,
 ) -> Result<(StatusCode, Json<AdminUser>), ApiError> {
-    require_admin_role(&claims)?;
+    require_admin(&claims)?;
     req.validate()
         .map_err(|e| ApiError::Validation(e.to_string()))?;
     let user = cognito_client(&state)?.create_user(&req).await?;
@@ -81,7 +73,7 @@ async fn delete_user(
     Extension(claims): Extension<AuthClaims>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    require_admin_role(&claims)?;
+    require_admin(&claims)?;
     cognito_client(&state)?.delete_user(&id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -91,7 +83,7 @@ async fn list_roles(
     State(state): State<AppState>,
     Extension(claims): Extension<AuthClaims>,
 ) -> Result<Json<Vec<String>>, ApiError> {
-    require_admin_role(&claims)?;
+    require_admin(&claims)?;
     let groups = cognito_client(&state)?.list_groups().await?;
     Ok(Json(groups))
 }
@@ -103,7 +95,7 @@ async fn set_user_roles(
     Path(id): Path<String>,
     Json(req): Json<UpdateUserRolesRequest>,
 ) -> Result<StatusCode, ApiError> {
-    require_admin_role(&claims)?;
+    require_admin(&claims)?;
     cognito_client(&state)?
         .set_user_groups(&id, &req.roles)
         .await?;

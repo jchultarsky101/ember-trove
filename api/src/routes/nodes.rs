@@ -22,7 +22,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
-    auth::permissions::{require_editor, require_owner, require_viewer},
+    auth::permissions::{is_admin, require_editor, require_owner, require_viewer},
     error::ApiError,
     notify::maybe_notify_invite,
     state::AppState,
@@ -69,7 +69,7 @@ async fn list_nodes(
     // permission row for.  The client-supplied owner_id filter is ignored.
     // Admins bypass the permission filter and can see all nodes.
     params.owner_id = None;
-    if !claims.roles.contains(&"admin".to_string()) {
+    if !is_admin(&claims) {
         params.subject_id = Some(claims.sub.clone());
     }
 

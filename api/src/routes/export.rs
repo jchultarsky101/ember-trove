@@ -17,7 +17,7 @@ use chrono::Utc;
 use common::auth::AuthClaims;
 use std::io::Write;
 
-use crate::{error::ApiError, state::AppState};
+use crate::{auth::permissions::is_admin, error::ApiError, state::AppState};
 
 pub fn router() -> Router<AppState> {
     Router::new().route("/", get(export_all))
@@ -29,7 +29,7 @@ async fn export_all(
 ) -> Result<impl IntoResponse, ApiError> {
     // Fetch all nodes visible to this user.
     // Admins get everything; regular users get only nodes they own or can see.
-    let nodes = if claims.roles.contains(&"admin".to_string()) {
+    let nodes = if is_admin(&claims) {
         state.nodes.list_all().await.map_err(ApiError::from)?
     } else {
         state.nodes.list_all_for_owner(&claims.sub).await.map_err(ApiError::from)?

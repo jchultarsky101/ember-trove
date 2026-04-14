@@ -13,7 +13,7 @@ use garde::Validate;
 use uuid::Uuid;
 
 use crate::{
-    auth::permissions::{require_editor, require_viewer},
+    auth::permissions::{is_admin, require_editor, require_viewer},
     error::ApiError,
     state::AppState,
 };
@@ -81,7 +81,7 @@ async fn note_feed(
     State(state): State<AppState>,
     Extension(claims): Extension<AuthClaims>,
 ) -> Result<Json<Vec<FeedNote>>, ApiError> {
-    let feed = if claims.roles.contains(&"admin".to_string()) {
+    let feed = if is_admin(&claims) {
         state.notes.feed_all().await?
     } else {
         state.notes.feed_for_owner(&claims.sub).await?
