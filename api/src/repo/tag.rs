@@ -11,6 +11,7 @@ use uuid::Uuid;
 #[async_trait]
 pub trait TagRepo: Send + Sync {
     async fn create(&self, owner_id: &str, req: CreateTagRequest) -> Result<Tag, EmberTroveError>;
+    async fn get(&self, id: TagId) -> Result<Tag, EmberTroveError>;
     async fn list(&self, owner_id: &str) -> Result<Vec<Tag>, EmberTroveError>;
     /// All tags across all owners — used for full backup.
     async fn list_all(&self) -> Result<Vec<Tag>, EmberTroveError>;
@@ -76,6 +77,23 @@ impl TagRepo for PgTagRepo {
             }
             _ => EmberTroveError::Internal(format!("create tag failed: {e}")),
         })?;
+
+        Ok(row.into_tag())
+    }
+
+    async fn get(&self, id: TagId) -> Result<Tag, EmberTroveError> {
+        let row = sqlx::query_as::<_, TagRow>(
+            r#"
+            SELECT id, owner_id, name, color, created_at
+            FROM tags
+            WHERE id = $1
+            "#,
+        )
+        .bind(id.0)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("get tag failed: {e}")))?
+        .ok_or_else(|| EmberTroveError::NotFound(format!("tag {} not found", id.0)))?;
 
         Ok(row.into_tag())
     }

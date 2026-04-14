@@ -99,6 +99,7 @@ struct StubTagRepo;
 #[async_trait]
 impl TagRepo for StubTagRepo {
     async fn create(&self, _: &str, _: CreateTagRequest) -> Result<Tag, EmberTroveError> { unimplemented!() }
+    async fn get(&self, _: TagId) -> Result<Tag, EmberTroveError> { unimplemented!() }
     async fn list(&self, _: &str) -> Result<Vec<Tag>, EmberTroveError> { unimplemented!() }
     async fn list_all(&self) -> Result<Vec<Tag>, EmberTroveError> { unimplemented!() }
     async fn update(&self, _: TagId, _: UpdateTagRequest) -> Result<Tag, EmberTroveError> { unimplemented!() }

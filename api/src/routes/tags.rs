@@ -22,10 +22,14 @@ pub fn router() -> Router<AppState> {
 
 async fn list_tags(
     State(state): State<AppState>,
-    Extension(_claims): Extension<AuthClaims>,
+    Extension(claims): Extension<AuthClaims>,
 ) -> Result<Json<Vec<Tag>>, ApiError> {
-    // Single-user mode: return all tags regardless of who created them.
-    let tags = state.tags.list_all().await?;
+    // Admins see all tags; regular users see only their own.
+    let tags = if claims.roles.contains(&"admin".to_string()) {
+        state.tags.list_all().await?
+    } else {
+        state.tags.list(&claims.sub).await?
+    };
     Ok(Json(tags))
 }
 
@@ -42,19 +46,28 @@ async fn create_tag(
 
 async fn update_tag(
     State(state): State<AppState>,
-    Extension(_claims): Extension<AuthClaims>,
+    Extension(claims): Extension<AuthClaims>,
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateTagRequest>,
 ) -> Result<Json<Tag>, ApiError> {
+    // Only the tag owner or an admin may update.
+    let existing = state.tags.get(TagId(id)).await?;
+    if existing.owner_id != claims.sub && !claims.roles.contains(&"admin".to_string()) {
+        return Err(ApiError::Forbidden("access denied".to_string()));
+    }
     let tag = state.tags.update(TagId(id), req).await?;
     Ok(Json(tag))
 }
 
 async fn delete_tag(
     State(state): State<AppState>,
-    Extension(_claims): Extension<AuthClaims>,
+    Extension(claims): Extension<AuthClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
+    let existing = state.tags.get(TagId(id)).await?;
+    if existing.owner_id != claims.sub && !claims.roles.contains(&"admin".to_string()) {
+        return Err(ApiError::Forbidden("access denied".to_string()));
+    }
     state.tags.delete(TagId(id)).await?;
     Ok(StatusCode::NO_CONTENT)
 }
