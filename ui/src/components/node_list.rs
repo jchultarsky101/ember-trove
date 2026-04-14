@@ -8,6 +8,7 @@ use common::{
 use leptos::prelude::*;
 use uuid::Uuid;
 
+use crate::components::modals::delete_confirm::DeleteConfirmModal;
 use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
 use leptos_router::hooks::use_navigate;
 use crate::components::toast::{ToastLevel, push_toast};
@@ -114,6 +115,7 @@ pub fn NodeList() -> impl IntoView {
     let selected_ids: RwSignal<HashSet<Uuid>> = RwSignal::new(HashSet::new());
     let show_apply_menu  = RwSignal::new(false);
     let show_remove_menu = RwSignal::new(false);
+    let confirm_bulk_delete = RwSignal::new(false);
 
     let nodes = LocalResource::new(move || {
         let _ = refresh.get();
@@ -450,6 +452,33 @@ pub fn NodeList() -> impl IntoView {
                                 }
                             })}
                         </div>
+                        // Bulk delete
+                        <button
+                            class="flex items-center gap-1 px-2 py-1 text-xs rounded-lg
+                                bg-red-50 dark:bg-red-900/20
+                                text-red-600 dark:text-red-400
+                                hover:bg-red-100 dark:hover:bg-red-900/40
+                                border border-red-200 dark:border-red-800
+                                transition-colors"
+                            on:click=move |_| confirm_bulk_delete.set(true)
+                        >
+                            <span class="material-symbols-outlined" style="font-size:13px;">"delete"</span>
+                            "Delete"
+                        </button>
+                        // Bulk export (uses existing full-export endpoint)
+                        <a
+                            href="/api/export"
+                            target="_blank"
+                            class="flex items-center gap-1 px-2 py-1 text-xs rounded-lg
+                                bg-stone-100 dark:bg-stone-800
+                                text-stone-600 dark:text-stone-400
+                                hover:bg-stone-200 dark:hover:bg-stone-700
+                                border border-stone-300 dark:border-stone-600
+                                transition-colors no-underline"
+                        >
+                            <span class="material-symbols-outlined" style="font-size:13px;">"download"</span>
+                            "Export ZIP"
+                        </a>
                         <span class="flex-1"/>
                         // Clear selection
                         <button
@@ -554,6 +583,35 @@ pub fn NodeList() -> impl IntoView {
                     }}
                 </Suspense>
             </div>
+
+            // Bulk delete confirmation modal
+            <DeleteConfirmModal
+                show=Signal::derive(move || confirm_bulk_delete.get())
+                item_name=Signal::derive(move || {
+                    let n = selected_ids.get().len();
+                    format!("{n} selected node{}", if n == 1 { "" } else { "s" })
+                })
+                on_confirm=Callback::new(move |()| {
+                    confirm_bulk_delete.set(false);
+                    let ids: Vec<NodeId> = selected_ids
+                        .get_untracked()
+                        .iter()
+                        .map(|&u| NodeId(u))
+                        .collect();
+                    leptos::task::spawn_local(async move {
+                        let mut ok = 0usize;
+                        for nid in &ids {
+                            if crate::api::delete_node(*nid).await.is_ok() {
+                                ok += 1;
+                            }
+                        }
+                        push_toast(ToastLevel::Success, format!("Deleted {ok} node(s)."));
+                        selected_ids.set(HashSet::new());
+                        refresh.update(|n| *n += 1);
+                    });
+                })
+                on_cancel=Callback::new(move |()| confirm_bulk_delete.set(false))
+            />
         </div>
     }
 }

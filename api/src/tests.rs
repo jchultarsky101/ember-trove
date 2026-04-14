@@ -35,8 +35,9 @@ use common::{
     node::{CreateNodeRequest, Node, NodeListParams, NodeTitleEntry, UpdateNodeRequest},
     note::{CreateNoteRequest, FeedNote, Note},
     permission::{GrantPermissionRequest, Permission, PermissionRole},
-    id::{NodeLinkId, SearchPresetId},
+    id::{NodeLinkId, SearchPresetId, WebhookId},
     node_link::{CreateNodeLinkRequest, NodeLink, UpdateNodeLinkRequest},
+    webhook::{CreateWebhookRequest, UpdateWebhookRequest, Webhook},
     search::{CreateSearchPresetRequest, SearchPreset, SearchQuery, SearchResponse},
     tag::{CreateTagRequest, Tag, UpdateTagRequest},
     task::{CreateTaskRequest, MyDayTask, Task, TaskCounts, UpdateTaskRequest},
@@ -55,7 +56,7 @@ use crate::{
         favorite::FavoriteRepo, graph::GraphRepo, node::NodeRepo, node_version::NodeVersionRepo,
         note::NoteRepo, permission::PermissionRepo, search::SearchRepo,
         search_presets::SearchPresetRepo, share_token::ShareTokenRepo, tag::TagRepo,
-        node_link::NodeLinkRepo, task::TaskRepo, template::TemplateRepo,
+        node_link::NodeLinkRepo, task::TaskRepo, template::TemplateRepo, webhook::WebhookRepo,
     },
     routes::build_router,
     state::AppState,
@@ -242,6 +243,16 @@ impl SearchPresetRepo for StubSearchPresetRepo {
     async fn delete(&self, _: SearchPresetId, _: &str) -> Result<(), EmberTroveError> { unimplemented!() }
 }
 
+struct StubWebhookRepo;
+#[async_trait]
+impl WebhookRepo for StubWebhookRepo {
+    async fn list(&self, _: &str) -> Result<Vec<Webhook>, EmberTroveError> { unimplemented!() }
+    async fn list_active_for_event(&self, _: &str) -> Result<Vec<Webhook>, EmberTroveError> { unimplemented!() }
+    async fn create(&self, _: &str, _: CreateWebhookRequest) -> Result<Webhook, EmberTroveError> { unimplemented!() }
+    async fn update(&self, _: WebhookId, _: &str, _: UpdateWebhookRequest) -> Result<Webhook, EmberTroveError> { unimplemented!() }
+    async fn delete(&self, _: WebhookId, _: &str) -> Result<(), EmberTroveError> { unimplemented!() }
+}
+
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
 fn test_state() -> AppState {
@@ -271,6 +282,7 @@ fn test_state() -> AppState {
         templates:       Arc::new(StubTemplateRepo),
         search_presets:  Arc::new(StubSearchPresetRepo),
         node_links:      Arc::new(StubNodeLinkRepo),
+        webhooks:        Arc::new(StubWebhookRepo),
         object_store: Arc::new(NullObjectStore),
         oidc:          None,
         cognito_admin: None,

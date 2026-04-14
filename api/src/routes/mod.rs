@@ -17,6 +17,7 @@ pub mod tags;
 pub mod tasks;
 pub mod templates;
 pub mod node_links;
+pub mod webhooks;
 
 use axum::{extract::State, middleware, routing::get, Json, Router};
 use axum::http::{header, Method, StatusCode};
@@ -109,6 +110,7 @@ pub fn build_router(state: AppState) -> anyhow::Result<Router> {
         .nest("/templates", templates::router())
         .nest("/search-presets", search_presets::router())
         .nest("/nodes/{node_id}/links", node_links::router())
+        .nest("/webhooks", webhooks::router())
         .nest("/export", export::router())
         .nest("/admin", admin::router())
         .nest("/admin/backups", backup::router())
