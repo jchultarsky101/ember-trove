@@ -10,6 +10,8 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait ShareTokenRepo: Send + Sync {
+    async fn list_all(&self) -> Result<Vec<ShareToken>, EmberTroveError>;
+
     async fn create(
         &self,
         node_id: NodeId,
@@ -60,6 +62,18 @@ impl ShareTokenRow {
 
 #[async_trait]
 impl ShareTokenRepo for PgShareTokenRepo {
+    async fn list_all(&self) -> Result<Vec<ShareToken>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, ShareTokenRow>(
+            "SELECT id, node_id, token, created_by, created_at, expires_at
+             FROM share_tokens ORDER BY created_at ASC",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list_all share_tokens failed: {e}")))?;
+
+        Ok(rows.into_iter().map(|r| r.into_share_token()).collect())
+    }
+
     async fn create(
         &self,
         node_id: NodeId,

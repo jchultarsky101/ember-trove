@@ -6,8 +6,14 @@ use uuid::Uuid;
 use crate::{
     attachment::Attachment,
     edge::Edge,
-    note::Note,
+    favorite::Favorite,
+    graph::NodePosition,
     node::Node,
+    node_link::NodeLink,
+    node_version::NodeVersion,
+    note::Note,
+    permission::Permission,
+    share_token::ShareToken,
     tag::Tag,
     task::Task,
 };
@@ -62,6 +68,25 @@ pub struct BackupData {
     pub tasks: Vec<Task>,
     /// Attachment metadata only; raw bytes are stored as separate entries in the archive.
     pub attachments: Vec<Attachment>,
+    // ── Added in schema_version 2 ─────────────────────────────────────────
+    /// External links attached to nodes.
+    #[serde(default)]
+    pub node_links: Vec<NodeLink>,
+    /// Sidebar favorites (both node-pinned and URL bookmarks).
+    #[serde(default)]
+    pub favorites: Vec<Favorite>,
+    /// Sharing permissions.
+    #[serde(default)]
+    pub permissions: Vec<Permission>,
+    /// Public share tokens.
+    #[serde(default)]
+    pub share_tokens: Vec<ShareToken>,
+    /// Node body version history.
+    #[serde(default)]
+    pub node_versions: Vec<NodeVersion>,
+    /// Graph canvas positions.
+    #[serde(default)]
+    pub node_positions: Vec<NodePosition>,
 }
 
 /// Returned by the preview endpoint before a restore is confirmed.
