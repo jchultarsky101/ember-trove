@@ -8,6 +8,17 @@ use crate::app::{storage_get, storage_set};
 use crate::components::node_meta::{status_color, status_icon, status_label, type_icon, type_label};
 use leptos_router::hooks::use_navigate;
 
+/// Sanitize `ts_headline` output to allow only `<b>` tags (search highlights).
+/// Prevents XSS from user-controlled node titles/bodies injected via `inner_html`.
+fn sanitize_highlight(html: &str) -> String {
+    let mut tags = std::collections::HashSet::new();
+    tags.insert("b");
+    ammonia::Builder::new()
+        .tags(tags)
+        .clean(html)
+        .to_string()
+}
+
 // ── Search history (localStorage) ────────────────────────────────────────────
 
 const HISTORY_KEY: &str = "ember_trove_search_history";
@@ -598,9 +609,9 @@ pub fn SearchView() -> impl IntoView {
                                             let s_label = status_label(&st);
                                             let s_color = status_color(&st);
                                             let match_src = result.match_source.clone();
-                                            let snippet = result.snippet.clone();
+                                            let snippet = result.snippet.as_deref().map(sanitize_highlight);
                                             let plain_title = result.title.clone();
-                                            let hl_title = result.highlighted_title.clone();
+                                            let hl_title = result.highlighted_title.as_deref().map(sanitize_highlight);
 
                                             view! {
                                                 <button

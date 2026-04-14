@@ -87,6 +87,7 @@ struct StubEdgeRepo;
 #[async_trait]
 impl EdgeRepo for StubEdgeRepo {
     async fn create(&self, _: CreateEdgeRequest) -> Result<Edge, EmberTroveError> { unimplemented!() }
+    async fn get(&self, _: EdgeId) -> Result<Edge, EmberTroveError> { unimplemented!() }
     async fn delete(&self, _: EdgeId) -> Result<(), EmberTroveError> { unimplemented!() }
     async fn list_for_node(&self, _: NodeId) -> Result<Vec<Edge>, EmberTroveError> { unimplemented!() }
     async fn list_for_node_with_titles(&self, _: NodeId) -> Result<Vec<EdgeWithTitles>, EmberTroveError> { unimplemented!() }

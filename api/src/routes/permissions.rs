@@ -12,7 +12,7 @@ use axum::{
 use common::{
     auth::AuthClaims,
     id::PermissionId,
-    permission::{Permission, PermissionListParams, UpdatePermissionRequest},
+    permission::{Permission, PermissionListParams, PermissionRole, UpdatePermissionRequest},
 };
 use garde::Validate;
 use uuid::Uuid;
@@ -27,17 +27,40 @@ pub fn router() -> Router<AppState> {
 
 /// `GET /permissions[?node_id=<uuid>]`
 ///
-/// Returns all permissions visible to the caller, optionally filtered to a
-/// single node.
+/// Returns permissions visible to the caller: only rows where the caller is
+/// the subject or has Owner role on the associated node.  Admins see all.
 async fn list_permissions(
     State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
     Query(params): Query<PermissionListParams>,
 ) -> Result<Json<Vec<Permission>>, ApiError> {
     let node_id = params
         .node_id
         .map(common::id::NodeId);
-    let perms = state.permissions.list_all(node_id).await?;
-    Ok(Json(perms))
+    let all_perms = state.permissions.list_all(node_id).await?;
+
+    // Admins see everything.
+    if claims.roles.contains(&"admin".to_string()) {
+        return Ok(Json(all_perms));
+    }
+
+    // Non-admin: only rows where the caller is the subject, the granter,
+    // or holds Owner role on the same node.
+    let owned_nodes: std::collections::HashSet<common::id::NodeId> = all_perms
+        .iter()
+        .filter(|p| {
+            p.subject_id == claims.sub
+                && matches!(p.role, PermissionRole::Owner)
+        })
+        .map(|p| p.node_id)
+        .collect();
+
+    let filtered: Vec<Permission> = all_perms
+        .into_iter()
+        .filter(|p| p.subject_id == claims.sub || owned_nodes.contains(&p.node_id))
+        .collect();
+
+    Ok(Json(filtered))
 }
 
 /// `PUT /permissions/{id}`

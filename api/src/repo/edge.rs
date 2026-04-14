@@ -12,6 +12,7 @@ use std::collections::HashSet;
 #[async_trait]
 pub trait EdgeRepo: Send + Sync {
     async fn create(&self, req: CreateEdgeRequest) -> Result<Edge, EmberTroveError>;
+    async fn get(&self, id: EdgeId) -> Result<Edge, EmberTroveError>;
     async fn delete(&self, id: EdgeId) -> Result<(), EmberTroveError>;
     async fn list_for_node(&self, node_id: NodeId) -> Result<Vec<Edge>, EmberTroveError>;
     async fn list_for_node_with_titles(
@@ -116,6 +117,23 @@ fn edge_type_to_str(t: &EdgeType) -> &'static str {
 
 #[async_trait]
 impl EdgeRepo for PgEdgeRepo {
+    async fn get(&self, id: EdgeId) -> Result<Edge, EmberTroveError> {
+        let row = sqlx::query_as::<_, EdgeRow>(
+            r#"
+            SELECT id, source_id, target_id, edge_type::text, label, created_at
+            FROM edges
+            WHERE id = $1
+            "#,
+        )
+        .bind(id.0)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("get edge failed: {e}")))?
+        .ok_or_else(|| EmberTroveError::NotFound(format!("edge {} not found", id.0)))?;
+
+        row.into_edge()
+    }
+
     async fn create(&self, req: CreateEdgeRequest) -> Result<Edge, EmberTroveError> {
         if req.source_id == req.target_id {
             return Err(EmberTroveError::Validation(
