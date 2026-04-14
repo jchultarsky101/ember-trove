@@ -62,6 +62,14 @@ pub async fn create_backup(
         attachments.append(&mut node_attachments);
     }
 
+    // Collect additional entity types (schema v2).
+    let node_links = state.node_links.list_all().await.map_err(ApiError::from)?;
+    let favorites = state.favorites.list_all().await.map_err(ApiError::from)?;
+    let permissions = state.permissions.list_all(None).await.map_err(ApiError::from)?;
+    let share_tokens = state.share_tokens.list_all().await.map_err(ApiError::from)?;
+    let node_versions = state.node_versions.list_all().await.map_err(ApiError::from)?;
+    let node_positions = state.graph.list_positions().await.map_err(ApiError::from)?;
+
     let entity_counts = EntityCounts {
         nodes: nodes.len() as u32,
         edges: edges.len() as u32,
@@ -75,7 +83,7 @@ pub async fn create_backup(
     let job_id = Uuid::new_v4();
 
     let manifest = BackupManifest {
-        schema_version: 1,
+        schema_version: 2,
         created_at: now,
         created_by: owner_id.to_string(),
         entity_counts: entity_counts.clone(),
@@ -88,6 +96,12 @@ pub async fn create_backup(
         notes,
         tasks,
         attachments: attachments.clone(),
+        node_links,
+        favorites,
+        permissions,
+        share_tokens,
+        node_versions,
+        node_positions,
     };
 
     // Build the tar.gz archive in memory.
@@ -238,9 +252,9 @@ pub async fn execute_restore(
 
     let (manifest, data, attachment_files) = extract_full(&archive_bytes)?;
 
-    if manifest.schema_version != 1 {
+    if manifest.schema_version > 2 {
         return Err(ApiError::Internal(format!(
-            "unsupported backup schema version: {}",
+            "unsupported backup schema version: {} (max supported: 2)",
             manifest.schema_version
         )));
     }
@@ -263,6 +277,12 @@ pub async fn execute_restore(
         .execute(&mut *tx)
         .await
         .map_err(|e| ApiError::Internal(format!("delete tags failed: {e}")))?;
+
+    // Delete user favorites (both node-based and URL-based — we'll restore all).
+    sqlx::query("DELETE FROM user_favorites")
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(format!("delete favorites failed: {e}")))?;
 
     // Insert tags first (nodes may reference them via node_tags).
     for tag in &data.tags {
@@ -292,14 +312,15 @@ pub async fn execute_restore(
         sqlx::query(
             r#"
             INSERT INTO nodes
-                (id, owner_id, node_type, title, slug, body, metadata, status, created_at, updated_at)
-            VALUES ($1, $2, $3::node_type, $4, $5, $6, $7, $8::node_status, $9, $10)
+                (id, owner_id, node_type, title, slug, body, metadata, status, pinned, created_at, updated_at)
+            VALUES ($1, $2, $3::node_type, $4, $5, $6, $7, $8::node_status, $9, $10, $11)
             ON CONFLICT (id) DO UPDATE
                 SET title = EXCLUDED.title,
                     body  = EXCLUDED.body,
                     slug  = EXCLUDED.slug,
                     metadata = EXCLUDED.metadata,
-                    status = EXCLUDED.status
+                    status = EXCLUDED.status,
+                    pinned = EXCLUDED.pinned
             "#,
         )
         .bind(node.id.0)
@@ -310,6 +331,7 @@ pub async fn execute_restore(
         .bind(&node.body)
         .bind(&node.metadata)
         .bind(status_str)
+        .bind(node.pinned)
         .bind(node.created_at)
         .bind(node.updated_at)
         .execute(&mut *tx)
@@ -373,12 +395,14 @@ pub async fn execute_restore(
     for task in &data.tasks {
         let status_str = task_status_to_str(&task.status);
         let priority_str = task_priority_to_str(&task.priority);
+        let recurrence_str = task.recurrence.as_ref().map(recurrence_rule_to_str);
         sqlx::query(
             r#"
             INSERT INTO node_tasks
                 (id, node_id, owner_id, title, status, priority, focus_date, due_date,
-                 created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5::task_status, $6::task_priority, $7, $8, $9, $10)
+                 recurrence, sort_order, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5::task_status, $6::task_priority, $7, $8,
+                    $9, $10, $11, $12)
             ON CONFLICT (id) DO NOTHING
             "#,
         )
@@ -390,6 +414,8 @@ pub async fn execute_restore(
         .bind(priority_str)
         .bind(task.focus_date)
         .bind(task.due_date)
+        .bind(recurrence_str)
+        .bind(task.sort_order)
         .bind(task.created_at)
         .bind(task.updated_at)
         .execute(&mut *tx)
@@ -417,6 +443,125 @@ pub async fn execute_restore(
         .execute(&mut *tx)
         .await
         .map_err(|e| ApiError::Internal(format!("insert attachment metadata failed: {e}")))?;
+    }
+
+    // ── Schema v2 entities ──────────────────────────────────────────────────
+
+    // Insert node links.
+    for link in &data.node_links {
+        sqlx::query(
+            r#"
+            INSERT INTO node_links (id, node_id, name, url, created_at)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (id) DO NOTHING
+            "#,
+        )
+        .bind(link.id.0)
+        .bind(link.node_id.0)
+        .bind(&link.name)
+        .bind(&link.url)
+        .bind(link.created_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(format!("insert node_link failed: {e}")))?;
+    }
+
+    // Insert favorites.
+    for fav in &data.favorites {
+        sqlx::query(
+            r#"
+            INSERT INTO user_favorites (id, owner_id, node_id, url, label, position, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (id) DO NOTHING
+            "#,
+        )
+        .bind(fav.id.0)
+        .bind(&fav.owner_id)
+        .bind(fav.node_id.map(|n| n.0))
+        .bind(&fav.url)
+        .bind(&fav.label)
+        .bind(fav.position)
+        .bind(fav.created_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(format!("insert favorite failed: {e}")))?;
+    }
+
+    // Insert permissions.
+    for perm in &data.permissions {
+        let role_str = permission_role_to_str(&perm.role);
+        sqlx::query(
+            r#"
+            INSERT INTO permissions (id, node_id, subject_id, role, granted_by, created_at)
+            VALUES ($1, $2, $3, $4::permission_role, $5, $6)
+            ON CONFLICT (id) DO NOTHING
+            "#,
+        )
+        .bind(perm.id.0)
+        .bind(perm.node_id.0)
+        .bind(&perm.subject_id)
+        .bind(role_str)
+        .bind(&perm.granted_by)
+        .bind(perm.created_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(format!("insert permission failed: {e}")))?;
+    }
+
+    // Insert share tokens.
+    for token in &data.share_tokens {
+        sqlx::query(
+            r#"
+            INSERT INTO share_tokens (id, node_id, token, created_by, created_at, expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (id) DO NOTHING
+            "#,
+        )
+        .bind(token.id.0)
+        .bind(token.node_id.0)
+        .bind(token.token)
+        .bind(&token.created_by)
+        .bind(token.created_at)
+        .bind(token.expires_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(format!("insert share_token failed: {e}")))?;
+    }
+
+    // Insert node versions.
+    for ver in &data.node_versions {
+        sqlx::query(
+            r#"
+            INSERT INTO node_versions (id, node_id, body, created_by, created_at)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (id) DO NOTHING
+            "#,
+        )
+        .bind(ver.id.0)
+        .bind(ver.node_id.0)
+        .bind(&ver.body)
+        .bind(&ver.created_by)
+        .bind(ver.created_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(format!("insert node_version failed: {e}")))?;
+    }
+
+    // Insert graph positions.
+    for pos in &data.node_positions {
+        sqlx::query(
+            r#"
+            INSERT INTO node_positions (node_id, x, y)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (node_id) DO UPDATE SET x = EXCLUDED.x, y = EXCLUDED.y
+            "#,
+        )
+        .bind(pos.node_id.0)
+        .bind(pos.x)
+        .bind(pos.y)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| ApiError::Internal(format!("insert node_position failed: {e}")))?;
     }
 
     tx.commit()
@@ -597,6 +742,24 @@ fn task_priority_to_str(p: &common::task::TaskPriority) -> &'static str {
         common::task::TaskPriority::Low => "low",
         common::task::TaskPriority::Medium => "medium",
         common::task::TaskPriority::High => "high",
+    }
+}
+
+fn permission_role_to_str(r: &common::permission::PermissionRole) -> &'static str {
+    match r {
+        common::permission::PermissionRole::Owner => "owner",
+        common::permission::PermissionRole::Editor => "editor",
+        common::permission::PermissionRole::Viewer => "viewer",
+    }
+}
+
+fn recurrence_rule_to_str(r: &common::task::RecurrenceRule) -> &'static str {
+    match r {
+        common::task::RecurrenceRule::Daily => "daily",
+        common::task::RecurrenceRule::Weekly => "weekly",
+        common::task::RecurrenceRule::Biweekly => "biweekly",
+        common::task::RecurrenceRule::Monthly => "monthly",
+        common::task::RecurrenceRule::Yearly => "yearly",
     }
 }
 

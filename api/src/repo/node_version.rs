@@ -10,6 +10,9 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait NodeVersionRepo: Send + Sync + 'static {
+    /// All versions across all nodes, for backup purposes.
+    async fn list_all(&self) -> Result<Vec<NodeVersion>, EmberTroveError>;
+
     /// Record a snapshot of `body` for `node_id`, attributed to `created_by`.
     async fn record(
         &self,
@@ -66,6 +69,18 @@ impl PgNodeVersionRepo {
 
 #[async_trait]
 impl NodeVersionRepo for PgNodeVersionRepo {
+    async fn list_all(&self) -> Result<Vec<NodeVersion>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, NodeVersionRow>(
+            "SELECT id, node_id, body, created_by, created_at
+             FROM node_versions ORDER BY created_at ASC",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list_all node_versions failed: {e}")))?;
+
+        Ok(rows.into_iter().map(NodeVersionRow::into_version).collect())
+    }
+
     async fn record(
         &self,
         node_id: NodeId,

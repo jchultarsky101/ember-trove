@@ -12,6 +12,9 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait FavoriteRepo: Send + Sync {
+    /// All favorites across all users, for backup purposes.
+    async fn list_all(&self) -> Result<Vec<Favorite>, EmberTroveError>;
+
     /// All favorites for `owner_id`, ordered by position ascending.
     async fn list(&self, owner_id: &str) -> Result<Vec<Favorite>, EmberTroveError>;
 
@@ -74,6 +77,22 @@ impl From<FavoriteRow> for Favorite {
 
 #[async_trait]
 impl FavoriteRepo for PgFavoriteRepo {
+    async fn list_all(&self) -> Result<Vec<Favorite>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, FavoriteRow>(
+            r#"
+            SELECT f.id, f.owner_id, f.node_id, f.url, f.label,
+                   f.position, f.created_at
+            FROM user_favorites f
+            ORDER BY f.owner_id, f.position ASC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list_all favorites failed: {e}")))?;
+
+        Ok(rows.into_iter().map(Favorite::from).collect())
+    }
+
     async fn list(&self, owner_id: &str) -> Result<Vec<Favorite>, EmberTroveError> {
         // COALESCE(n.title, f.label): node favorites show the node's live title;
         // URL favorites fall back to the stored label.

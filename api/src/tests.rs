@@ -187,6 +187,7 @@ impl BackupRepo for StubBackupRepo {
 struct StubFavoriteRepo;
 #[async_trait]
 impl FavoriteRepo for StubFavoriteRepo {
+    async fn list_all(&self) -> Result<Vec<Favorite>, EmberTroveError> { unimplemented!() }
     async fn list(&self, _: &str) -> Result<Vec<Favorite>, EmberTroveError> { unimplemented!() }
     async fn create(&self, _: &str, _: CreateFavoriteRequest) -> Result<Favorite, EmberTroveError> { unimplemented!() }
     async fn delete(&self, _: FavoriteId, _: &str) -> Result<(), EmberTroveError> { unimplemented!() }
@@ -196,6 +197,7 @@ impl FavoriteRepo for StubFavoriteRepo {
 struct StubShareTokenRepo;
 #[async_trait]
 impl ShareTokenRepo for StubShareTokenRepo {
+    async fn list_all(&self) -> Result<Vec<common::share_token::ShareToken>, EmberTroveError> { unimplemented!() }
     async fn create(&self, _: NodeId, _: &str, _: &common::share_token::CreateShareTokenRequest) -> Result<common::share_token::ShareToken, EmberTroveError> { unimplemented!() }
     async fn list(&self, _: NodeId) -> Result<Vec<common::share_token::ShareToken>, EmberTroveError> { unimplemented!() }
     async fn find_by_token(&self, _: Uuid) -> Result<Option<common::share_token::ShareToken>, EmberTroveError> { unimplemented!() }
@@ -212,6 +214,7 @@ impl ActivityRepo for StubActivityRepo {
 struct StubNodeVersionRepo;
 #[async_trait]
 impl NodeVersionRepo for StubNodeVersionRepo {
+    async fn list_all(&self) -> Result<Vec<common::node_version::NodeVersion>, EmberTroveError> { unimplemented!() }
     async fn record(&self, _: NodeId, _: &str, _: &str) -> Result<(), EmberTroveError> { Ok(()) }
     async fn list(&self, _: NodeId, _: i64) -> Result<Vec<common::node_version::NodeVersion>, EmberTroveError> { unimplemented!() }
     async fn get(&self, _: common::id::NodeVersionId) -> Result<common::node_version::NodeVersion, EmberTroveError> { unimplemented!() }
@@ -231,6 +234,7 @@ impl TemplateRepo for StubTemplateRepo {
 struct StubNodeLinkRepo;
 #[async_trait]
 impl NodeLinkRepo for StubNodeLinkRepo {
+    async fn list_all(&self) -> Result<Vec<NodeLink>, EmberTroveError> { unimplemented!() }
     async fn list(&self, _: NodeId) -> Result<Vec<NodeLink>, EmberTroveError> { unimplemented!() }
     async fn create(&self, _: NodeId, _: CreateNodeLinkRequest) -> Result<NodeLink, EmberTroveError> { unimplemented!() }
     async fn update(&self, _: NodeLinkId, _: UpdateNodeLinkRequest) -> Result<NodeLink, EmberTroveError> { unimplemented!() }
