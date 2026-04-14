@@ -58,6 +58,23 @@ async fn create_backup_handler(
     Extension(claims): Extension<AuthClaims>,
 ) -> Result<(StatusCode, Json<common::backup::BackupJob>), ApiError> {
     require_admin(&claims)?;
+
+    // Rate limit: at most one backup per hour per user.
+    let existing = state
+        .backup
+        .list_for_owner(&claims.sub)
+        .await
+        .map_err(ApiError::from)?;
+    if let Some(latest) = existing.first() {
+        let age = chrono::Utc::now() - latest.created_at;
+        if age < chrono::Duration::hours(1) {
+            let mins_left = 60 - age.num_minutes();
+            return Err(ApiError::Validation(format!(
+                "backup rate limit: try again in {mins_left} minute(s)"
+            )));
+        }
+    }
+
     let job = svc::create_backup(&state, &claims.sub).await?;
     Ok((StatusCode::CREATED, Json(job)))
 }
