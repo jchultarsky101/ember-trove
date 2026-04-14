@@ -68,6 +68,15 @@ fn ColorPicker(selected: RwSignal<String>) -> impl IntoView {
     }
 }
 
+/// Pre-defined note structures — (label, Material Symbol icon name, markdown body).
+const NOTE_TEMPLATES: &[(&str, &str, &str)] = &[
+    ("meeting", "groups", "## Meeting Notes\n\n**Date:** \n**Attendees:** \n\n## Agenda\n\n1. \n\n## Decisions\n\n- \n\n## Action Items\n\n- [ ] "),
+    ("decision", "gavel", "## Decision Record\n\n**Status:** Proposed\n**Date:** \n\n## Context\n\n\n\n## Decision\n\n\n\n## Consequences\n\n- "),
+    ("status", "trending_up", "## Status Update\n\n**Period:** \n\n## Progress\n\n- \n\n## Blockers\n\n- \n\n## Next Steps\n\n- "),
+    ("checklist", "checklist", "## Checklist\n\n- [ ] \n- [ ] \n- [ ] "),
+    ("idea", "lightbulb", "## Idea\n\n**Problem:** \n\n**Proposed Solution:** \n\n**Open Questions:** \n\n- "),
+];
+
 // ── NotePanel ─────────────────────────────────────────────────────────────────
 
 #[component]
@@ -169,7 +178,33 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                                 on:input=move |ev| body.set(event_target_value(&ev))
                                 on:keydown=on_keydown
                             />
-                            <div class="flex items-center justify-between mt-2">
+                            // ── Template picker ───────────────────
+                            <div class="flex flex-wrap items-center gap-1.5 mt-2 mb-2">
+                                <span class="text-[10px] uppercase tracking-wider text-stone-400
+                                    dark:text-stone-500 mr-0.5">"Template"</span>
+                                {NOTE_TEMPLATES.iter().map(|(label, icon, tmpl)| {
+                                    let tmpl = *tmpl;
+                                    let label = *label;
+                                    let icon = *icon;
+                                    view! {
+                                        <button
+                                            type="button"
+                                            title=label
+                                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px]
+                                                text-stone-500 dark:text-stone-400 bg-stone-100 dark:bg-stone-800
+                                                hover:bg-amber-100 dark:hover:bg-amber-900/40
+                                                hover:text-amber-700 dark:hover:text-amber-300
+                                                transition-colors cursor-pointer"
+                                            on:click=move |_| body.set(tmpl.to_string())
+                                        >
+                                            <span class="material-symbols-outlined" style="font-size: 14px;">{icon}</span>
+                                            {label}
+                                        </button>
+                                    }
+                                }).collect_view()}
+                            </div>
+
+                            <div class="flex items-center justify-between">
                                 <ColorPicker selected=new_color />
                                 <button
                                     class="p-1.5 rounded-lg text-stone-400 hover:text-green-600 dark:hover:text-green-400
