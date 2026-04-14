@@ -50,10 +50,14 @@ async fn create_template(
 
 async fn update_template(
     State(state): State<AppState>,
-    Extension(_claims): Extension<AuthClaims>,
+    Extension(claims): Extension<AuthClaims>,
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateTemplateRequest>,
 ) -> Result<Json<NodeTemplate>, ApiError> {
+    let existing = state.templates.get(TemplateId(id)).await?;
+    if existing.created_by != claims.sub && !claims.roles.contains(&"admin".to_string()) {
+        return Err(ApiError::Forbidden("access denied".to_string()));
+    }
     req.validate().map_err(|e| ApiError::Validation(e.to_string()))?;
     let template = state.templates.update(TemplateId(id), req).await?;
     Ok(Json(template))
@@ -61,9 +65,13 @@ async fn update_template(
 
 async fn delete_template(
     State(state): State<AppState>,
-    Extension(_claims): Extension<AuthClaims>,
+    Extension(claims): Extension<AuthClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
+    let existing = state.templates.get(TemplateId(id)).await?;
+    if existing.created_by != claims.sub && !claims.roles.contains(&"admin".to_string()) {
+        return Err(ApiError::Forbidden("access denied".to_string()));
+    }
     state.templates.delete(TemplateId(id)).await?;
     Ok(StatusCode::NO_CONTENT)
 }
