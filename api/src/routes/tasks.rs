@@ -18,7 +18,11 @@ use garde::Validate;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::{error::ApiError, state::AppState};
+use crate::{
+    auth::permissions::{require_editor, require_viewer},
+    error::ApiError,
+    state::AppState,
+};
 
 /// Mounts under `/nodes/:node_id/tasks` and `/tasks`.
 pub fn node_task_router() -> Router<AppState> {
@@ -89,6 +93,7 @@ async fn list_tasks(
     Extension(claims): Extension<AuthClaims>,
     Path(node_id): Path<Uuid>,
 ) -> Result<Json<Vec<Task>>, ApiError> {
+    require_viewer(state.permissions.as_ref(), &claims, NodeId(node_id)).await?;
     let tasks = state
         .tasks
         .list_for_node(NodeId(node_id), &claims.sub)
@@ -102,6 +107,7 @@ async fn create_task(
     Path(node_id): Path<Uuid>,
     Json(req): Json<CreateTaskRequest>,
 ) -> Result<(StatusCode, Json<Task>), ApiError> {
+    require_editor(state.permissions.as_ref(), &claims, NodeId(node_id)).await?;
     req.validate()
         .map_err(|e| ApiError::Validation(e.to_string()))?;
     let task = state
@@ -119,7 +125,10 @@ async fn create_standalone_task(
 ) -> Result<(StatusCode, Json<Task>), ApiError> {
     req.validate()
         .map_err(|e| ApiError::Validation(e.to_string()))?;
-    // `node_id` from the body (if provided) is used; otherwise task is standalone.
+    // If a parent node is specified, verify the caller has editor access.
+    if let Some(nid) = req.node_id {
+        require_editor(state.permissions.as_ref(), &claims, nid).await?;
+    }
     let node_id = req.node_id;
     let task = state.tasks.create(node_id, &claims.sub, req).await?;
     Ok((StatusCode::CREATED, Json(task)))
@@ -140,15 +149,28 @@ async fn update_task(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateTaskRequest>,
 ) -> Result<Json<Task>, ApiError> {
+    // Fetch the task to verify ownership / node permission.
+    let existing = state.tasks.get(TaskId(id)).await?;
+    if existing.owner_id != claims.sub
+        && !claims.roles.contains(&"admin".to_string())
+    {
+        // Not the owner — check node-level permission if attached to a node.
+        if let Some(nid) = existing.node_id {
+            require_editor(state.permissions.as_ref(), &claims, nid).await?;
+        } else {
+            return Err(ApiError::Forbidden("access denied".to_string()));
+        }
+    }
+
     // Check if this update transitions to Done — needed for recurrence.
     let becoming_done = req
         .status
         .as_ref()
         .is_some_and(|s| matches!(s, TaskStatus::Done));
 
-    // Fetch pre-update state only when we might need to create a recurrence.
-    let pre = if becoming_done {
-        state.tasks.get(TaskId(id)).await.ok()
+    // Use the already-fetched task for recurrence check.
+    let pre = if becoming_done && !status_is_done(&existing.status) {
+        Some(existing)
     } else {
         None
     };
@@ -186,9 +208,19 @@ async fn update_task(
 
 async fn delete_task(
     State(state): State<AppState>,
-    Extension(_claims): Extension<AuthClaims>,
+    Extension(claims): Extension<AuthClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
+    let existing = state.tasks.get(TaskId(id)).await?;
+    if existing.owner_id != claims.sub
+        && !claims.roles.contains(&"admin".to_string())
+    {
+        if let Some(nid) = existing.node_id {
+            require_editor(state.permissions.as_ref(), &claims, nid).await?;
+        } else {
+            return Err(ApiError::Forbidden("access denied".to_string()));
+        }
+    }
     state.tasks.delete(TaskId(id)).await?;
     Ok(StatusCode::NO_CONTENT)
 }
