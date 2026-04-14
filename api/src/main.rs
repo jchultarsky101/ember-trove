@@ -11,6 +11,7 @@ mod object_store;
 mod repo;
 mod routes;
 mod state;
+mod webhook_dispatch;
 mod wikilink;
 
 #[cfg(test)]
@@ -33,6 +34,7 @@ use repo::{
     node_version::PgNodeVersionRepo, note::PgNoteRepo, permission::PgPermissionRepo,
     node_link::PgNodeLinkRepo, search::PgSearchRepo, search_presets::PgSearchPresetRepo,
     share_token::PgShareTokenRepo, tag::PgTagRepo, task::PgTaskRepo, template::PgTemplateRepo,
+    webhook::PgWebhookRepo,
 };
 use state::AppState;
 
@@ -150,6 +152,7 @@ async fn main() -> anyhow::Result<()> {
         templates: Arc::new(PgTemplateRepo::new(pool.clone())),
         search_presets: Arc::new(PgSearchPresetRepo::new(pool.clone())),
         node_links: Arc::new(PgNodeLinkRepo::new(pool.clone())),
+        webhooks: Arc::new(PgWebhookRepo::new(pool.clone())),
         object_store,
         oidc,
         cognito_admin,

@@ -7,6 +7,7 @@ use leptos::prelude::*;
 use crate::{
     app::TemplatePrefill,
     components::toast::{push_toast, ToastLevel},
+    markdown::render_markdown_plain,
 };
 use leptos_router::hooks::use_navigate;
 
@@ -30,6 +31,26 @@ fn node_type_str(nt: &NodeType) -> &'static str {
     }
 }
 
+fn node_type_icon(nt: &NodeType) -> &'static str {
+    match nt {
+        NodeType::Article => "article",
+        NodeType::Project => "rocket_launch",
+        NodeType::Area => "category",
+        NodeType::Resource => "inventory_2",
+        NodeType::Reference => "link",
+    }
+}
+
+fn node_type_color(nt: &NodeType) -> &'static str {
+    match nt {
+        NodeType::Article => "text-amber-600 dark:text-amber-400",
+        NodeType::Project => "text-blue-600 dark:text-blue-400",
+        NodeType::Area => "text-green-600 dark:text-green-400",
+        NodeType::Resource => "text-purple-600 dark:text-purple-400",
+        NodeType::Reference => "text-red-600 dark:text-red-400",
+    }
+}
+
 fn parse_node_type(s: &str) -> NodeType {
     match s {
         "project" => NodeType::Project,
@@ -39,6 +60,27 @@ fn parse_node_type(s: &str) -> NodeType {
         _ => NodeType::Article,
     }
 }
+
+/// Truncate the body to a short preview (first ~120 chars, break at word boundary).
+fn body_preview(body: &str) -> String {
+    if body.len() <= 120 {
+        return body.to_string();
+    }
+    let truncated = &body[..120];
+    if let Some(pos) = truncated.rfind(char::is_whitespace) {
+        format!("{}…", &truncated[..pos])
+    } else {
+        format!("{truncated}…")
+    }
+}
+
+const ALL_TYPES: [NodeType; 5] = [
+    NodeType::Article,
+    NodeType::Project,
+    NodeType::Area,
+    NodeType::Resource,
+    NodeType::Reference,
+];
 
 #[component]
 pub fn TemplatesView() -> impl IntoView {
@@ -53,7 +95,10 @@ pub fn TemplatesView() -> impl IntoView {
         async move { crate::api::list_templates().await.unwrap_or_default() }
     });
 
-    // editing_id: None = list view; "new" = create form; UUID string = edit form
+    // Filter: None = all types, Some(nt) = only that type
+    let type_filter: RwSignal<Option<NodeType>> = RwSignal::new(None);
+
+    // editing_id: None = gallery view; "new" = create form; UUID string = edit form
     let editing_id: RwSignal<Option<String>> = RwSignal::new(None);
 
     let form_name = RwSignal::new(String::new());
@@ -140,7 +185,8 @@ pub fn TemplatesView() -> impl IntoView {
 
     view! {
         <div class="flex-1 flex flex-col min-h-0 p-4 md:p-6">
-            <div class="flex items-center justify-between mb-6">
+            // ── Header ────────────────────────────────────────────────────────
+            <div class="flex items-center justify-between mb-4">
                 <h1 class="text-xl font-semibold text-stone-900 dark:text-stone-100">
                     "Templates"
                 </h1>
@@ -154,7 +200,47 @@ pub fn TemplatesView() -> impl IntoView {
                 </button>
             </div>
 
-            // ── Inline editor ──────────────────────────────────────────────────
+            // ── Type filter tabs ──────────────────────────────────────────────
+            <div class="flex items-center gap-1 mb-5 flex-wrap">
+                <button
+                    class=move || {
+                        let base = "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer";
+                        if type_filter.get().is_none() {
+                            format!("{base} bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900")
+                        } else {
+                            format!("{base} bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700")
+                        }
+                    }
+                    on:click=move |_| type_filter.set(None)
+                >
+                    "All"
+                </button>
+                {ALL_TYPES.iter().map(|nt| {
+                    let nt = nt.clone();
+                    let label = node_type_label(&nt);
+                    let icon = node_type_icon(&nt);
+                    let nt_click = nt.clone();
+                    let nt_cmp = nt.clone();
+                    view! {
+                        <button
+                            class=move || {
+                                let base = "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1";
+                                if type_filter.get().as_ref() == Some(&nt_cmp) {
+                                    format!("{base} bg-stone-900 dark:bg-stone-100 text-white dark:text-stone-900")
+                                } else {
+                                    format!("{base} bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700")
+                                }
+                            }
+                            on:click=move |_| type_filter.set(Some(nt_click.clone()))
+                        >
+                            <span class="material-symbols-outlined" style="font-size: 14px;">{icon}</span>
+                            {label}
+                        </button>
+                    }
+                }).collect_view()}
+            </div>
+
+            // ── Inline editor ─────────────────────────────────────────────────
             {move || editing_id.get().map(|eid| {
                 let is_new = eid == "new";
                 view! {
@@ -258,38 +344,51 @@ pub fn TemplatesView() -> impl IntoView {
                 }
             })}
 
-            // ── Template list ──────────────────────────────────────────────────
+            // ── Template gallery grid ─────────────────────────────────────────
             <Transition fallback=move || view! {
                 <div class="text-sm text-stone-400 dark:text-stone-500">"Loading..."</div>
             }>
                 {move || templates.get().map(|list| {
-                    if list.is_empty() {
+                    let filter = type_filter.get();
+                    let filtered: Vec<_> = list.iter()
+                        .filter(|t| filter.as_ref().is_none_or(|f| t.node_type == *f))
+                        .cloned()
+                        .collect();
+
+                    if filtered.is_empty() {
                         return view! {
                             <div class="text-sm text-stone-400 dark:text-stone-500">
-                                "No templates yet. Create one to get started."
+                                {if list.is_empty() {
+                                    "No templates yet. Create one to get started."
+                                } else {
+                                    "No templates match this filter."
+                                }}
                             </div>
                         }.into_any();
                     }
                     view! {
-                        <div class="space-y-3">
-                            {list.iter().map(|t| {
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {filtered.iter().map(|t| {
                                 let t_edit      = t.clone();
                                 let t_del       = t.clone();
                                 let t_use       = t.clone();
                                 let is_default  = t.is_default;
                                 let tid         = t.id.0;
                                 let type_label  = node_type_label(&t.node_type);
+                                let icon        = node_type_icon(&t.node_type);
+                                let icon_color  = node_type_color(&t.node_type);
                                 let name        = t.name.clone();
                                 let desc        = t.description.clone();
+                                let preview_html = render_markdown_plain(&body_preview(&t.body));
 
                                 let star_class = if is_default {
-                                    "p-1.5 rounded-lg text-amber-500 \
-                                     hover:bg-stone-100 dark:hover:bg-stone-800 \
+                                    "p-1 rounded text-amber-500 \
+                                     hover:bg-stone-100 dark:hover:bg-stone-700 \
                                      transition-colors cursor-pointer"
                                 } else {
-                                    "p-1.5 rounded-lg text-stone-300 dark:text-stone-600 \
+                                    "p-1 rounded text-stone-300 dark:text-stone-600 \
                                      hover:text-amber-500 \
-                                     hover:bg-stone-100 dark:hover:bg-stone-800 \
+                                     hover:bg-stone-100 dark:hover:bg-stone-700 \
                                      transition-colors cursor-pointer"
                                 };
                                 let star_icon   = if is_default { "star" } else { "star_border" };
@@ -300,95 +399,116 @@ pub fn TemplatesView() -> impl IntoView {
                                 };
 
                                 view! {
-                                    <div class="p-4 rounded-xl border border-stone-200 dark:border-stone-700
+                                    <div class="rounded-xl border border-stone-200 dark:border-stone-700
                                                 bg-white dark:bg-stone-900
-                                                flex items-start justify-between gap-3">
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-2 mb-1">
-                                                <span class="font-medium text-stone-900 dark:text-stone-100 truncate">
-                                                    {name}
+                                                flex flex-col overflow-hidden
+                                                hover:border-stone-300 dark:hover:border-stone-600
+                                                transition-colors">
+                                        // ── Card header ─────────────────────────────
+                                        <div class="px-4 pt-4 pb-2 flex items-start justify-between gap-2">
+                                            <div class="flex items-center gap-2 min-w-0">
+                                                <span class=format!("material-symbols-outlined {icon_color}")
+                                                      style="font-size: 20px;">
+                                                    {icon}
                                                 </span>
-                                                <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-xs
-                                                             font-medium bg-stone-100 dark:bg-stone-800
-                                                             text-stone-600 dark:text-stone-400">
-                                                    {type_label}
-                                                </span>
-                                                // Default badge — only shown when is_default
-                                                {is_default.then_some(view! {
-                                                    <span class="flex-shrink-0 px-2 py-0.5 rounded-full text-xs
-                                                                 font-medium bg-amber-100 dark:bg-amber-900/30
-                                                                 text-amber-700 dark:text-amber-400">
-                                                        "default"
+                                                <div class="min-w-0">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="font-medium text-stone-900 dark:text-stone-100 truncate text-sm">
+                                                            {name}
+                                                        </span>
+                                                        {is_default.then_some(view! {
+                                                            <span class="flex-shrink-0 px-1.5 py-0.5 rounded text-[10px]
+                                                                         font-semibold bg-amber-100 dark:bg-amber-900/30
+                                                                         text-amber-700 dark:text-amber-400">
+                                                                "DEFAULT"
+                                                            </span>
+                                                        })}
+                                                    </div>
+                                                    <span class="text-[11px] text-stone-400 dark:text-stone-500">
+                                                        {type_label}
                                                     </span>
-                                                })}
+                                                </div>
                                             </div>
-                                            {desc.map(|d| view! {
-                                                <p class="text-sm text-stone-500 dark:text-stone-400 truncate">
-                                                    {d}
-                                                </p>
-                                            })}
+                                            // ── Action icons ────────────────────────
+                                            <div class="flex items-center gap-0.5 flex-shrink-0">
+                                                <button
+                                                    class=star_class
+                                                    title=star_title
+                                                    on:click=move |_| {
+                                                        leptos::task::spawn_local(async move {
+                                                            match crate::api::set_template_default(tid).await {
+                                                                Ok(updated) => {
+                                                                    let msg = if updated.is_default {
+                                                                        "Set as default."
+                                                                    } else {
+                                                                        "Default removed."
+                                                                    };
+                                                                    push_toast(ToastLevel::Success, msg);
+                                                                    refresh.update(|n| *n += 1);
+                                                                }
+                                                                Err(e) => {
+                                                                    push_toast(ToastLevel::Error, format!("Error: {e}"));
+                                                                }
+                                                            }
+                                                        });
+                                                    }
+                                                >
+                                                    <span class="material-symbols-outlined"
+                                                          style="font-size: 16px;">{star_icon}</span>
+                                                </button>
+                                                <button
+                                                    class="p-1 rounded text-stone-400
+                                                           hover:text-stone-700 dark:hover:text-stone-200
+                                                           hover:bg-stone-100 dark:hover:bg-stone-700
+                                                           transition-colors cursor-pointer"
+                                                    title="Edit"
+                                                    on:click=move |_| start_edit(t_edit.clone())
+                                                >
+                                                    <span class="material-symbols-outlined"
+                                                          style="font-size: 16px;">"edit"</span>
+                                                </button>
+                                                <button
+                                                    class="p-1 rounded text-stone-400
+                                                           hover:text-red-600 dark:hover:text-red-400
+                                                           hover:bg-stone-100 dark:hover:bg-stone-700
+                                                           transition-colors cursor-pointer"
+                                                    title="Delete"
+                                                    on:click=move |_| on_delete(t_del.clone())
+                                                >
+                                                    <span class="material-symbols-outlined"
+                                                          style="font-size: 16px;">"delete"</span>
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div class="flex items-center gap-1 flex-shrink-0">
-                                            // ── Set/clear default star ──────────────────
+
+                                        // ── Description ─────────────────────────────
+                                        {desc.map(|d| view! {
+                                            <p class="px-4 text-xs text-stone-500 dark:text-stone-400 line-clamp-1">
+                                                {d}
+                                            </p>
+                                        })}
+
+                                        // ── Body preview (rendered markdown) ────────
+                                        <div class="px-4 py-3 flex-1 min-h-0">
+                                            <div class="text-xs text-stone-600 dark:text-stone-400 leading-relaxed
+                                                        line-clamp-4 prose prose-stone dark:prose-invert prose-xs
+                                                        max-w-none"
+                                                 inner_html=preview_html
+                                            />
+                                        </div>
+
+                                        // ── Footer: Use button ──────────────────────
+                                        <div class="px-4 pb-4 pt-1">
                                             <button
-                                                class=star_class
-                                                title=star_title
-                                                on:click=move |_| {
-                                                    leptos::task::spawn_local(async move {
-                                                        match crate::api::set_template_default(tid).await {
-                                                            Ok(updated) => {
-                                                                let msg = if updated.is_default {
-                                                                    "Set as default."
-                                                                } else {
-                                                                    "Default removed."
-                                                                };
-                                                                push_toast(ToastLevel::Success, msg);
-                                                                refresh.update(|n| *n += 1);
-                                                            }
-                                                            Err(e) => {
-                                                                push_toast(ToastLevel::Error, format!("Error: {e}"));
-                                                            }
-                                                        }
-                                                    });
-                                                }
-                                            >
-                                                <span class="material-symbols-outlined"
-                                                      style="font-size: 18px;">{star_icon}</span>
-                                            </button>
-                                            // ── Use ─────────────────────────────────────
-                                            <button
-                                                class="px-3 py-1.5 rounded-lg text-xs font-medium
+                                                class="w-full py-2 rounded-lg text-xs font-medium
                                                        bg-amber-50 dark:bg-amber-900/20
                                                        text-amber-700 dark:text-amber-400
                                                        hover:bg-amber-100 dark:hover:bg-amber-900/40
-                                                       transition-colors cursor-pointer"
+                                                       transition-colors cursor-pointer
+                                                       border border-amber-200 dark:border-amber-800/40"
                                                 on:click=move |_| on_use(t_use.clone())
                                             >
-                                                "Use"
-                                            </button>
-                                            // ── Edit ────────────────────────────────────
-                                            <button
-                                                class="p-1.5 rounded-lg text-stone-400
-                                                       hover:text-stone-700 dark:hover:text-stone-200
-                                                       hover:bg-stone-100 dark:hover:bg-stone-800
-                                                       transition-colors cursor-pointer"
-                                                title="Edit"
-                                                on:click=move |_| start_edit(t_edit.clone())
-                                            >
-                                                <span class="material-symbols-outlined"
-                                                      style="font-size: 18px;">"edit"</span>
-                                            </button>
-                                            // ── Delete ──────────────────────────────────
-                                            <button
-                                                class="p-1.5 rounded-lg text-stone-400
-                                                       hover:text-red-600 dark:hover:text-red-400
-                                                       hover:bg-stone-100 dark:hover:bg-stone-800
-                                                       transition-colors cursor-pointer"
-                                                title="Delete"
-                                                on:click=move |_| on_delete(t_del.clone())
-                                            >
-                                                <span class="material-symbols-outlined"
-                                                      style="font-size: 18px;">"delete"</span>
+                                                "Use Template"
                                             </button>
                                         </div>
                                     </div>

@@ -18,7 +18,7 @@ use crate::{
         favorite::FavoriteRepo, graph::GraphRepo, node::NodeRepo, node_version::NodeVersionRepo,
         note::NoteRepo, permission::PermissionRepo, search::SearchRepo,
         node_link::NodeLinkRepo, search_presets::SearchPresetRepo, share_token::ShareTokenRepo,
-        tag::TagRepo, task::TaskRepo, template::TemplateRepo,
+        tag::TagRepo, task::TaskRepo, template::TemplateRepo, webhook::WebhookRepo,
     },
 };
 
@@ -50,6 +50,7 @@ pub struct AppState {
     pub templates: Arc<dyn TemplateRepo>,
     pub search_presets: Arc<dyn SearchPresetRepo>,
     pub node_links: Arc<dyn NodeLinkRepo>,
+    pub webhooks: Arc<dyn WebhookRepo>,
     pub object_store: Arc<dyn ObjectStore>,
     pub oidc: Option<Arc<OidcClient>>,
     /// Cognito admin client — `None` when `COGNITO_USER_POOL_ID` is not set.

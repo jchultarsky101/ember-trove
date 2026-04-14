@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ember Trove</title>
     <link data-trunk rel="icon" type="image/svg+xml" href="public/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#ea580c" />
+    <link data-trunk rel="copy-file" href="public/manifest.json" />
+    <link data-trunk rel="copy-file" href="public/sw.js" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -47,6 +51,12 @@
         .etl-hint    { color: #57534e; }     /* stone-600 */
       }
     </style>
+    <script>
+      // Register the service worker for offline/PWA support.
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      }
+    </script>
     <script>
       // Workaround: WebAssembly.instantiateStreaming hangs on this server
       // configuration (nginx reverse-proxy + preload hints). Force the
