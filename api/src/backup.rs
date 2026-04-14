@@ -39,7 +39,11 @@ fn add_bytes_to_archive<W: Write>(
 
 /// Collect all owner data, pack it into a tar.gz archive, upload to S3,
 /// and record the job in `backup_jobs`.
-pub async fn create_backup(state: &AppState, owner_id: &str) -> Result<BackupJob, ApiError> {
+pub async fn create_backup(
+    state: &AppState,
+    owner_id: &str,
+    comment: Option<&str>,
+) -> Result<BackupJob, ApiError> {
     // Fetch all data across all users.
     let nodes = state.nodes.list_all().await.map_err(ApiError::from)?;
     let tags = state.tags.list_all().await.map_err(ApiError::from)?;
@@ -146,6 +150,7 @@ pub async fn create_backup(state: &AppState, owner_id: &str) -> Result<BackupJob
             entity_counts.notes as i32,
             entity_counts.tasks as i32,
             entity_counts.attachments as i32,
+            comment,
         )
         .await
         .map_err(ApiError::from)?;
@@ -223,7 +228,7 @@ pub async fn execute_restore(
     }
 
     // Auto snapshot before restore.
-    create_backup(state, owner_id).await?;
+    create_backup(state, owner_id, Some("auto: pre-restore snapshot")).await?;
 
     let archive_bytes = state
         .object_store

@@ -11,7 +11,16 @@ use axum::{
     Extension, Json, Router,
 };
 use common::auth::AuthClaims;
+use serde::Deserialize;
 use uuid::Uuid;
+
+/// Optional request body for creating a backup.
+#[derive(Debug, Deserialize, Default)]
+struct CreateBackupRequest {
+    /// Optional user-provided comment describing the purpose of the backup.
+    #[serde(default)]
+    comment: Option<String>,
+}
 
 use crate::{
     auth::permissions::require_admin,
@@ -47,6 +56,7 @@ async fn list_backups(
 async fn create_backup_handler(
     State(state): State<AppState>,
     Extension(claims): Extension<AuthClaims>,
+    body: Option<Json<CreateBackupRequest>>,
 ) -> Result<(StatusCode, Json<common::backup::BackupJob>), ApiError> {
     require_admin(&claims)?;
 
@@ -66,7 +76,8 @@ async fn create_backup_handler(
         }
     }
 
-    let job = svc::create_backup(&state, &claims.sub).await?;
+    let comment = body.and_then(|b| b.0.comment);
+    let job = svc::create_backup(&state, &claims.sub, comment.as_deref()).await?;
     Ok((StatusCode::CREATED, Json(job)))
 }
 
