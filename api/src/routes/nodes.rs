@@ -287,6 +287,24 @@ async fn upload_attachment(
         .unwrap_or("application/octet-stream")
         .to_string();
 
+    // SECURITY: Reject content types that could enable stored XSS or malware.
+    const BLOCKED_TYPES: &[&str] = &[
+        "text/html",
+        "application/xhtml+xml",
+        "image/svg+xml",
+        "application/javascript",
+        "text/javascript",
+        "application/x-executable",
+        "application/x-sharedlib",
+        "application/x-msdos-program",
+    ];
+    let ct_lower = content_type.to_lowercase();
+    if BLOCKED_TYPES.iter().any(|b| ct_lower.starts_with(b)) {
+        return Err(ApiError::Validation(format!(
+            "file type '{content_type}' is not allowed"
+        )));
+    }
+
     let data: Bytes = field
         .bytes()
         .await

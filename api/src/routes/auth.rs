@@ -138,7 +138,7 @@ async fn callback(
     let session_cookie = Cookie::build((SESSION_COOKIE, session_token))
         .path("/")
         .http_only(true)
-        .same_site(SameSite::Lax)
+        .same_site(SameSite::Strict)
         .secure(secure)
         .build();
 
@@ -147,7 +147,7 @@ async fn callback(
     let cognito_access_cookie = Cookie::build((ACCESS_COOKIE, cognito_access_token))
         .path("/api/auth/change-password")
         .http_only(true)
-        .same_site(SameSite::Lax)
+        .same_site(SameSite::Strict)
         .secure(secure)
         .build();
 
@@ -157,7 +157,7 @@ async fn callback(
         let refresh_cookie = Cookie::build((REFRESH_COOKIE, refresh_token))
             .path("/api/auth/refresh")
             .http_only(true)
-            .same_site(SameSite::Lax)
+            .same_site(SameSite::Strict)
             .secure(secure)
             .build();
         updated_jar = updated_jar.add(refresh_cookie);
@@ -199,7 +199,7 @@ async fn refresh(
     let access_cookie = Cookie::build((SESSION_COOKIE, session_token))
         .path("/")
         .http_only(true)
-        .same_site(SameSite::Lax)
+        .same_site(SameSite::Strict)
         .secure(secure)
         .build();
 
@@ -210,7 +210,7 @@ async fn refresh(
         let refresh_cookie = Cookie::build((REFRESH_COOKIE, new_refresh))
             .path("/api/auth/refresh")
             .http_only(true)
-            .same_site(SameSite::Lax)
+            .same_site(SameSite::Strict)
             .secure(secure)
             .build();
         updated_jar = updated_jar.add(refresh_cookie);

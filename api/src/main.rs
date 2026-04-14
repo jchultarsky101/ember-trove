@@ -88,6 +88,15 @@ async fn main() -> anyhow::Result<()> {
     // Derive cookie encryption key from hex-encoded COOKIE_KEY.
     let key_bytes = hex::decode(&config.cookie_key)
         .map_err(|e| anyhow::anyhow!("COOKIE_KEY is not valid hex: {e}"))?;
+
+    // SECURITY: Reject trivially weak keys (all zeros, all same byte).
+    if key_bytes.iter().all(|&b| b == key_bytes[0]) {
+        anyhow::bail!(
+            "COOKIE_KEY is trivially weak (all identical bytes). \
+             Generate a secure key with: openssl rand -hex 64"
+        );
+    }
+
     let cookie_key = Key::from(&key_bytes);
 
     let object_store: Arc<dyn object_store::ObjectStore> =
@@ -163,6 +172,26 @@ async fn main() -> anyhow::Result<()> {
         pool,
         pkce_store: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
     };
+
+    // Spawn a background task that sweeps expired PKCE entries every 5 minutes.
+    // Without this, abandoned OAuth flows accumulate unboundedly in memory.
+    {
+        let pkce = state.pkce_store.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
+            loop {
+                interval.tick().await;
+                if let Ok(mut store) = pkce.lock() {
+                    let before = store.len();
+                    store.retain(|_, (_, created)| created.elapsed() < std::time::Duration::from_secs(600));
+                    let removed = before - store.len();
+                    if removed > 0 {
+                        tracing::debug!(removed, "PKCE store: swept expired entries");
+                    }
+                }
+            }
+        });
+    }
 
     let app = axum::Router::new().nest("/api", routes::build_router(state)?);
 
