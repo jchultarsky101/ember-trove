@@ -12,7 +12,7 @@ use common::{
 use garde::Validate;
 use uuid::Uuid;
 
-use crate::{error::ApiError, state::AppState};
+use crate::{auth::permissions::require_editor, error::ApiError, state::AppState};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -36,18 +36,7 @@ async fn create_link(
     Json(req): Json<CreateNodeLinkRequest>,
 ) -> Result<(StatusCode, Json<NodeLink>), ApiError> {
     req.validate().map_err(|e| ApiError::Validation(e.to_string()))?;
-    // Require at least editor-level access.
-    state
-        .permissions
-        .find(NodeId(node_id), &claims.sub)
-        .await?
-        .filter(|p| {
-            use common::permission::PermissionRole;
-            claims.roles.contains(&"admin".to_string())
-                || matches!(p.role, PermissionRole::Editor | PermissionRole::Owner)
-        })
-        .ok_or_else(|| ApiError::Forbidden("editor access required".to_string()))?;
-
+    require_editor(state.permissions.as_ref(), &claims, NodeId(node_id)).await?;
     let link = state.node_links.create(NodeId(node_id), req).await?;
     Ok((StatusCode::CREATED, Json(link)))
 }
@@ -59,17 +48,7 @@ async fn update_link(
     Json(req): Json<UpdateNodeLinkRequest>,
 ) -> Result<Json<NodeLink>, ApiError> {
     req.validate().map_err(|e| ApiError::Validation(e.to_string()))?;
-    state
-        .permissions
-        .find(NodeId(node_id), &claims.sub)
-        .await?
-        .filter(|p| {
-            use common::permission::PermissionRole;
-            claims.roles.contains(&"admin".to_string())
-                || matches!(p.role, PermissionRole::Editor | PermissionRole::Owner)
-        })
-        .ok_or_else(|| ApiError::Forbidden("editor access required".to_string()))?;
-
+    require_editor(state.permissions.as_ref(), &claims, NodeId(node_id)).await?;
     let link = state.node_links.update(NodeLinkId(link_id), req).await?;
     Ok(Json(link))
 }
@@ -79,17 +58,7 @@ async fn delete_link(
     Extension(claims): Extension<AuthClaims>,
     Path((node_id, link_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, ApiError> {
-    state
-        .permissions
-        .find(NodeId(node_id), &claims.sub)
-        .await?
-        .filter(|p| {
-            use common::permission::PermissionRole;
-            claims.roles.contains(&"admin".to_string())
-                || matches!(p.role, PermissionRole::Editor | PermissionRole::Owner)
-        })
-        .ok_or_else(|| ApiError::Forbidden("editor access required".to_string()))?;
-
+    require_editor(state.permissions.as_ref(), &claims, NodeId(node_id)).await?;
     state.node_links.delete(NodeLinkId(link_id)).await?;
     Ok(StatusCode::NO_CONTENT)
 }

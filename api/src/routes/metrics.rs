@@ -13,7 +13,7 @@ use axum::{extract::State, Extension, Json};
 use common::auth::AuthClaims;
 use serde::Serialize;
 
-use crate::{error::ApiError, state::AppState};
+use crate::{auth::permissions::require_admin, error::ApiError, state::AppState};
 
 pub fn router() -> axum::Router<AppState> {
     use axum::routing::get;
@@ -53,9 +53,7 @@ async fn get_metrics(
     State(state): State<AppState>,
     Extension(claims): Extension<AuthClaims>,
 ) -> Result<Json<Metrics>, ApiError> {
-    if !claims.roles.contains(&"admin".to_string()) {
-        return Err(ApiError::Forbidden("admin role required".to_string()));
-    }
+    require_admin(&claims)?;
 
     let uptime_secs = state.started_at.elapsed().as_secs();
 

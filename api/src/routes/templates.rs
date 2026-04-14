@@ -12,7 +12,7 @@ use common::{
 use garde::Validate;
 use uuid::Uuid;
 
-use crate::{error::ApiError, state::AppState};
+use crate::{auth::permissions::require_resource_owner, error::ApiError, state::AppState};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -55,9 +55,7 @@ async fn update_template(
     Json(req): Json<UpdateTemplateRequest>,
 ) -> Result<Json<NodeTemplate>, ApiError> {
     let existing = state.templates.get(TemplateId(id)).await?;
-    if existing.created_by != claims.sub && !claims.roles.contains(&"admin".to_string()) {
-        return Err(ApiError::Forbidden("access denied".to_string()));
-    }
+    require_resource_owner(&claims, &existing.created_by)?;
     req.validate().map_err(|e| ApiError::Validation(e.to_string()))?;
     let template = state.templates.update(TemplateId(id), req).await?;
     Ok(Json(template))
@@ -69,9 +67,7 @@ async fn delete_template(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     let existing = state.templates.get(TemplateId(id)).await?;
-    if existing.created_by != claims.sub && !claims.roles.contains(&"admin".to_string()) {
-        return Err(ApiError::Forbidden("access denied".to_string()));
-    }
+    require_resource_owner(&claims, &existing.created_by)?;
     state.templates.delete(TemplateId(id)).await?;
     Ok(StatusCode::NO_CONTENT)
 }

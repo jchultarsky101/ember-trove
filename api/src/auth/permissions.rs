@@ -25,8 +25,32 @@ fn role_satisfies(actual: &PermissionRole, required: &PermissionRole) -> bool {
 /// Returns `true` when the caller holds the `admin` role in their OIDC groups.
 ///
 /// Admins bypass per-node permission checks and can read/write all nodes.
-fn is_admin(claims: &AuthClaims) -> bool {
+pub fn is_admin(claims: &AuthClaims) -> bool {
     claims.roles.contains(&"admin".to_string())
+}
+
+/// Assert that the caller holds the `admin` role.
+///
+/// Returns `Err(ApiError::Forbidden)` when the caller is not an admin.
+pub fn require_admin(claims: &AuthClaims) -> Result<(), ApiError> {
+    if is_admin(claims) {
+        Ok(())
+    } else {
+        Err(ApiError::Forbidden("admin role required".to_string()))
+    }
+}
+
+/// Assert that the caller owns the resource (by comparing subject IDs) or is
+/// an admin.
+///
+/// Use this for resources that have a direct owner field (tags, templates,
+/// tasks, backups) rather than node-level permission rows.
+pub fn require_resource_owner(claims: &AuthClaims, owner_id: &str) -> Result<(), ApiError> {
+    if claims.sub == owner_id || is_admin(claims) {
+        Ok(())
+    } else {
+        Err(ApiError::Forbidden("access denied".to_string()))
+    }
 }
 
 /// Assert that `claims.sub` holds at least `required_role` on `node_id`.

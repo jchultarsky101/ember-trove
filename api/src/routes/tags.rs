@@ -12,7 +12,11 @@ use common::{
 use garde::Validate;
 use uuid::Uuid;
 
-use crate::{error::ApiError, state::AppState};
+use crate::{
+    auth::permissions::{is_admin, require_resource_owner},
+    error::ApiError,
+    state::AppState,
+};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -25,7 +29,7 @@ async fn list_tags(
     Extension(claims): Extension<AuthClaims>,
 ) -> Result<Json<Vec<Tag>>, ApiError> {
     // Admins see all tags; regular users see only their own.
-    let tags = if claims.roles.contains(&"admin".to_string()) {
+    let tags = if is_admin(&claims) {
         state.tags.list_all().await?
     } else {
         state.tags.list(&claims.sub).await?
@@ -52,9 +56,7 @@ async fn update_tag(
 ) -> Result<Json<Tag>, ApiError> {
     // Only the tag owner or an admin may update.
     let existing = state.tags.get(TagId(id)).await?;
-    if existing.owner_id != claims.sub && !claims.roles.contains(&"admin".to_string()) {
-        return Err(ApiError::Forbidden("access denied".to_string()));
-    }
+    require_resource_owner(&claims, &existing.owner_id)?;
     let tag = state.tags.update(TagId(id), req).await?;
     Ok(Json(tag))
 }
@@ -65,9 +67,7 @@ async fn delete_tag(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     let existing = state.tags.get(TagId(id)).await?;
-    if existing.owner_id != claims.sub && !claims.roles.contains(&"admin".to_string()) {
-        return Err(ApiError::Forbidden("access denied".to_string()));
-    }
+    require_resource_owner(&claims, &existing.owner_id)?;
     state.tags.delete(TagId(id)).await?;
     Ok(StatusCode::NO_CONTENT)
 }
