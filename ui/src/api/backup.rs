@@ -11,11 +11,22 @@ pub async fn list_backups() -> Result<Vec<common::backup::BackupJob>, UiError> {
     parse_json(resp).await
 }
 
-pub async fn create_backup_api() -> Result<common::backup::BackupJob, UiError> {
-    let resp = Request::post(&api_url("/admin/backups"))
-        .send()
-        .await
-        .map_err(|e| UiError::Network(e.to_string()))?;
+pub async fn create_backup_api(comment: Option<String>) -> Result<common::backup::BackupJob, UiError> {
+    let builder = Request::post(&api_url("/admin/backups"));
+    let resp = if let Some(ref c) = comment {
+        builder
+            .header("Content-Type", "application/json")
+            .body(serde_json::json!({ "comment": c }).to_string())
+            .map_err(|e| UiError::Network(e.to_string()))?
+            .send()
+            .await
+            .map_err(|e| UiError::Network(e.to_string()))?
+    } else {
+        builder
+            .send()
+            .await
+            .map_err(|e| UiError::Network(e.to_string()))?
+    };
     parse_json(resp).await
 }
 

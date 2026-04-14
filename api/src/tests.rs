@@ -177,7 +177,7 @@ struct StubBackupRepo;
 impl BackupRepo for StubBackupRepo {
     async fn create(
         &self, _: &str, _: &str, _: i64,
-        _: i32, _: i32, _: i32, _: i32, _: i32, _: i32,
+        _: i32, _: i32, _: i32, _: i32, _: i32, _: i32, _: Option<&str>,
     ) -> Result<BackupJob, EmberTroveError> { unimplemented!() }
     async fn list_for_owner(&self, _: &str) -> Result<Vec<BackupJob>, EmberTroveError> { unimplemented!() }
     async fn get(&self, _: Uuid) -> Result<BackupJob, EmberTroveError> { unimplemented!() }

@@ -47,6 +47,9 @@ pub struct BackupJob {
     pub note_count: i32,
     pub task_count: i32,
     pub attachment_count: i32,
+    /// Optional user-provided comment describing the purpose of this backup.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
 }
 
 /// Full data payload written as `data.json` inside the archive.

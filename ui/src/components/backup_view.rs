@@ -27,6 +27,10 @@ pub fn BackupView() -> impl IntoView {
     let previewing = RwSignal::new(false);
     let restoring = RwSignal::new(false);
 
+    // Comment input for the create form.
+    let comment = RwSignal::new(String::new());
+    let show_comment_input = RwSignal::new(false);
+
     // Fetch backup list.
     let jobs = LocalResource::new(move || {
         let _ = refresh.get();
@@ -36,10 +40,14 @@ pub fn BackupView() -> impl IntoView {
     // Create backup handler.
     let on_create = move |_| {
         creating.set(true);
+        let c = comment.get();
+        let c = if c.trim().is_empty() { None } else { Some(c) };
         wasm_bindgen_futures::spawn_local(async move {
-            match api::create_backup_api().await {
+            match api::create_backup_api(c).await {
                 Ok(_) => {
                     push_toast(ToastLevel::Success, "Backup created successfully.");
+                    comment.set(String::new());
+                    show_comment_input.set(false);
                     refresh.update(|n| *n += 1);
                 }
                 Err(e) => push_toast(ToastLevel::Error, format!("Backup failed: {e}")),
@@ -51,27 +59,58 @@ pub fn BackupView() -> impl IntoView {
     view! {
         <div class="p-6">
             // ── Page header ───────────────────────────────────────────────────
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h1 class="text-xl font-semibold text-stone-900 dark:text-stone-100">
-                        "Backup & Restore"
-                    </h1>
-                    <p class="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
-                        "Create, manage and restore full data snapshots."
-                    </p>
+            <div class="mb-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-xl font-semibold text-stone-900 dark:text-stone-100">
+                            "Backup & Restore"
+                        </h1>
+                        <p class="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
+                            "Create, manage and restore full data snapshots."
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button
+                            class="flex items-center gap-1 px-2 py-1.5 rounded-lg text-sm
+                                text-stone-500 hover:text-stone-700 dark:hover:text-stone-300
+                                hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+                            title="Add a comment to the backup"
+                            on:click=move |_| show_comment_input.update(|v| *v = !*v)
+                        >
+                            <span class="material-symbols-outlined" style="font-size: 16px;">
+                                "comment"
+                            </span>
+                        </button>
+                        <button
+                            class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-600
+                                text-white text-sm font-medium hover:bg-amber-700 disabled:opacity-40
+                                transition-colors"
+                            on:click=on_create
+                            disabled=move || creating.get()
+                        >
+                            <span class="material-symbols-outlined" style="font-size: 16px;">
+                                "backup"
+                            </span>
+                            {move || if creating.get() { "Creating…" } else { "Create Backup" }}
+                        </button>
+                    </div>
                 </div>
-                <button
-                    class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-600
-                        text-white text-sm font-medium hover:bg-amber-700 disabled:opacity-40
-                        transition-colors"
-                    on:click=on_create
-                    disabled=move || creating.get()
-                >
-                    <span class="material-symbols-outlined" style="font-size: 16px;">
-                        "backup"
-                    </span>
-                    {move || if creating.get() { "Creating…" } else { "Create Backup" }}
-                </button>
+                {move || show_comment_input.get().then(|| view! {
+                    <div class="mt-3">
+                        <input
+                            type="text"
+                            class="w-full px-3 py-2 rounded-lg border border-stone-200
+                                dark:border-stone-700 bg-white dark:bg-stone-900
+                                text-sm text-stone-800 dark:text-stone-200
+                                placeholder-stone-400 dark:placeholder-stone-600
+                                focus:outline-none focus:ring-2 focus:ring-amber-500/40
+                                focus:border-amber-500"
+                            placeholder="Optional comment, e.g. \"before major system upgrade\""
+                            prop:value=move || comment.get()
+                            on:input=move |ev| comment.set(event_target_value(&ev))
+                        />
+                    </div>
+                })}
             </div>
 
             // ── Restore preview wizard ────────────────────────────────────────
@@ -254,6 +293,8 @@ fn BackupRow(
         job.attachment_count
     );
 
+    let comment_text = job.comment.clone();
+
     let confirm_delete = RwSignal::new(false);
     let deleting = RwSignal::new(false);
 
@@ -263,6 +304,11 @@ fn BackupRow(
             // Left: info
             <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-stone-800 dark:text-stone-200">{ts}</p>
+                {comment_text.map(|c| view! {
+                    <p class="text-xs text-amber-600 dark:text-amber-400 mt-0.5 truncate italic">
+                        {c}
+                    </p>
+                })}
                 <p class="text-xs text-stone-400 dark:text-stone-500 mt-0.5 truncate">{summary}</p>
             </div>
 
