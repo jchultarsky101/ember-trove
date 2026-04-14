@@ -4,7 +4,7 @@
 //   API GET requests → network-first, cached fallback for offline reads
 //   API mutations (POST/PUT/PATCH/DELETE) → network-only (no offline writes)
 
-const CACHE_NAME = "ember-trove-v1";
+const CACHE_NAME = "ember-trove-v2";
 
 // App shell resources cached on install.
 // Trunk hashes WASM/JS/CSS filenames, so we cache "/" (index.html) and let
