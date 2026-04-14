@@ -60,7 +60,7 @@ async fn create_backup_handler(
 ) -> Result<(StatusCode, Json<common::backup::BackupJob>), ApiError> {
     require_admin(&claims)?;
 
-    // Rate limit: at most one backup per hour per user.
+    // Rate limit: at most one backup per 5 minutes per user.
     let existing = state
         .backup
         .list_for_owner(&claims.sub)
@@ -68,10 +68,11 @@ async fn create_backup_handler(
         .map_err(ApiError::from)?;
     if let Some(latest) = existing.first() {
         let age = chrono::Utc::now() - latest.created_at;
-        if age < chrono::Duration::hours(1) {
-            let mins_left = 60 - age.num_minutes();
+        if age < chrono::Duration::minutes(5) {
+            let secs_left = 300 - age.num_seconds();
+            let mins_left = (secs_left + 59) / 60; // round up
             return Err(ApiError::Validation(format!(
-                "backup rate limit: try again in {mins_left} minute(s)"
+                "Rate limit: please wait {mins_left} more minute(s) before creating another backup."
             )));
         }
     }

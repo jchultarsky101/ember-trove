@@ -27,9 +27,9 @@ pub fn BackupView() -> impl IntoView {
     let previewing = RwSignal::new(false);
     let restoring = RwSignal::new(false);
 
-    // Comment input for the create form.
+    // Create-backup form state.
     let comment = RwSignal::new(String::new());
-    let show_comment_input = RwSignal::new(false);
+    let show_create_form = RwSignal::new(false);
 
     // Fetch backup list.
     let jobs = LocalResource::new(move || {
@@ -37,8 +37,8 @@ pub fn BackupView() -> impl IntoView {
         async move { api::list_backups().await }
     });
 
-    // Create backup handler.
-    let on_create = move |_| {
+    // Confirm create handler — called from the inline form.
+    let on_confirm_create = move |_| {
         creating.set(true);
         let c = comment.get();
         let c = if c.trim().is_empty() { None } else { Some(c) };
@@ -47,10 +47,16 @@ pub fn BackupView() -> impl IntoView {
                 Ok(_) => {
                     push_toast(ToastLevel::Success, "Backup created successfully.");
                     comment.set(String::new());
-                    show_comment_input.set(false);
+                    show_create_form.set(false);
                     refresh.update(|n| *n += 1);
                 }
-                Err(e) => push_toast(ToastLevel::Error, format!("Backup failed: {e}")),
+                Err(e) => {
+                    let msg = match &e {
+                        crate::error::UiError::Api { message, .. } => message.clone(),
+                        other => format!("Backup failed: {other}"),
+                    };
+                    push_toast(ToastLevel::Error, msg);
+                }
             }
             creating.set(false);
         });
@@ -69,38 +75,30 @@ pub fn BackupView() -> impl IntoView {
                             "Create, manage and restore full data snapshots."
                         </p>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button
-                            class="flex items-center gap-1 px-2 py-1.5 rounded-lg text-sm
-                                text-stone-500 hover:text-stone-700 dark:hover:text-stone-300
-                                hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
-                            title="Add a comment to the backup"
-                            on:click=move |_| show_comment_input.update(|v| *v = !*v)
-                        >
-                            <span class="material-symbols-outlined" style="font-size: 16px;">
-                                "comment"
-                            </span>
-                        </button>
-                        <button
-                            class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-600
-                                text-white text-sm font-medium hover:bg-amber-700 disabled:opacity-40
-                                transition-colors"
-                            on:click=on_create
-                            disabled=move || creating.get()
-                        >
-                            <span class="material-symbols-outlined" style="font-size: 16px;">
-                                "backup"
-                            </span>
-                            {move || if creating.get() { "Creating…" } else { "Create Backup" }}
-                        </button>
-                    </div>
+                    <button
+                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-600
+                            text-white text-sm font-medium hover:bg-amber-700
+                            transition-colors"
+                        on:click=move |_| show_create_form.set(true)
+                    >
+                        <span class="material-symbols-outlined" style="font-size: 16px;">
+                            "backup"
+                        </span>
+                        "Create Backup"
+                    </button>
                 </div>
-                {move || show_comment_input.get().then(|| view! {
-                    <div class="mt-3">
+
+                // ── Inline create form ───────────────────────────────────────
+                {move || show_create_form.get().then(|| view! {
+                    <div class="mt-4 p-4 rounded-xl border border-stone-200 dark:border-stone-700
+                        bg-white dark:bg-stone-900 space-y-3">
+                        <p class="text-sm font-medium text-stone-700 dark:text-stone-300">
+                            "New Backup"
+                        </p>
                         <input
                             type="text"
                             class="w-full px-3 py-2 rounded-lg border border-stone-200
-                                dark:border-stone-700 bg-white dark:bg-stone-900
+                                dark:border-stone-700 bg-stone-50 dark:bg-stone-800
                                 text-sm text-stone-800 dark:text-stone-200
                                 placeholder-stone-400 dark:placeholder-stone-600
                                 focus:outline-none focus:ring-2 focus:ring-amber-500/40
@@ -109,6 +107,32 @@ pub fn BackupView() -> impl IntoView {
                             prop:value=move || comment.get()
                             on:input=move |ev| comment.set(event_target_value(&ev))
                         />
+                        <div class="flex gap-2">
+                            <button
+                                class="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600
+                                    text-white text-sm font-medium hover:bg-amber-700
+                                    disabled:opacity-40 transition-colors"
+                                on:click=on_confirm_create
+                                disabled=move || creating.get()
+                            >
+                                <span class="material-symbols-outlined" style="font-size: 16px;">
+                                    "backup"
+                                </span>
+                                {move || if creating.get() { "Creating…" } else { "Confirm" }}
+                            </button>
+                            <button
+                                class="px-4 py-2 rounded-lg text-sm text-stone-500
+                                    hover:text-stone-700 dark:hover:text-stone-300
+                                    hover:bg-stone-100 dark:hover:bg-stone-800
+                                    transition-colors"
+                                on:click=move |_| {
+                                    show_create_form.set(false);
+                                    comment.set(String::new());
+                                }
+                            >
+                                "Cancel"
+                            </button>
+                        </div>
                     </div>
                 })}
             </div>
