@@ -4,12 +4,16 @@ use axum::{
     http::{header, StatusCode},
     response::Response,
     routing::{delete, get},
-    Router,
+    Extension, Router,
 };
-use common::id::AttachmentId;
+use common::{auth::AuthClaims, id::AttachmentId};
 use uuid::Uuid;
 
-use crate::{error::ApiError, state::AppState};
+use crate::{
+    auth::permissions::{require_editor, require_viewer},
+    error::ApiError,
+    state::AppState,
+};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -20,9 +24,11 @@ pub fn router() -> Router<AppState> {
 /// Stream the attachment bytes directly from S3.
 async fn download(
     State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
     let attachment = state.attachments.get(AttachmentId(id)).await?;
+    require_viewer(state.permissions.as_ref(), &claims, attachment.node_id).await?;
     let data = state
         .object_store
         .get(&attachment.s3_key)
@@ -51,8 +57,11 @@ async fn download(
 /// Delete the attachment record and the corresponding S3 object.
 async fn delete_attachment(
     State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
+    let attachment = state.attachments.get(AttachmentId(id)).await?;
+    require_editor(state.permissions.as_ref(), &claims, attachment.node_id).await?;
     let s3_key = state.attachments.delete(AttachmentId(id)).await?;
     // Best-effort S3 delete — log but don't fail the request if S3 is unavailable.
     if let Err(e) = state.object_store.delete(&s3_key).await {

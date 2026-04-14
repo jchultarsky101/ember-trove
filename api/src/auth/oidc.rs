@@ -271,7 +271,10 @@ impl OidcClient {
         // Cognito ID tokens set `aud` to the App Client ID.
         // Validate it explicitly so tokens issued for other apps in the same
         // User Pool are rejected.
-        let mut validation = Validation::new(header.alg);
+        // SECURITY: Always enforce RS256 — never trust the algorithm claim
+        // from the untrusted token header.  Accepting `header.alg` would allow
+        // an attacker to craft an HS256 token signed with the public key.
+        let mut validation = Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.set_audience(&[self.client_id.as_str()]);
         validation.validate_exp = true;
 

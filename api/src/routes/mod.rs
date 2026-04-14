@@ -59,13 +59,19 @@ pub fn build_router(state: AppState) -> anyhow::Result<Router> {
     let rate_limit = GovernorLayer::new(std::sync::Arc::new(governor_conf));
 
     // --- CORS ----------------------------------------------------------------
-    // Fall back to permissive origin if parse somehow fails (shouldn't — env validated at startup).
-    let origin = state
-        .auth
-        .frontend_url
-        .parse()
-        .map(AllowOrigin::exact)
-        .unwrap_or_else(|_| AllowOrigin::any());
+    // SECURITY: Fail hard if FRONTEND_URL is not a valid header value.
+    // Silently falling back to AllowOrigin::any() with credentials would be an
+    // open CORS policy — any origin could make authenticated cross-site requests.
+    let origin = AllowOrigin::exact(
+        state
+            .auth
+            .frontend_url
+            .parse()
+            .map_err(|e| anyhow::anyhow!(
+                "FRONTEND_URL '{}' is not a valid CORS origin: {e}",
+                state.auth.frontend_url
+            ))?,
+    );
 
     // With allow_credentials(true), headers and methods must be explicit (not Any).
     let cors = CorsLayer::new()
