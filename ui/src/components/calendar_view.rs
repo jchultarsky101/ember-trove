@@ -299,7 +299,7 @@ pub fn CalendarView() -> impl IntoView {
                     let m2 = month2.get();
 
                     view! {
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="grid grid-cols-1 gap-8">
                             <MonthGrid year=y1 month=m1 tasks=tasks_1 today=today />
                             <MonthGrid year=y2 month=m2 tasks=tasks_2 today=today />
                         </div>
