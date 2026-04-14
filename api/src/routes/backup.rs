@@ -14,6 +14,7 @@ use common::auth::AuthClaims;
 use uuid::Uuid;
 
 use crate::{
+    auth::permissions::require_admin,
     backup as svc,
     error::ApiError,
     state::AppState,
@@ -26,16 +27,6 @@ pub fn router() -> Router<AppState> {
         .route("/{id}/download", get(download_backup_handler))
         .route("/{id}/preview", get(preview_restore_handler))
         .route("/{id}/restore", post(execute_restore_handler))
-}
-
-// ── Helper ────────────────────────────────────────────────────────────────────
-
-fn require_admin(claims: &AuthClaims) -> Result<(), ApiError> {
-    if claims.roles.contains(&"admin".to_string()) {
-        Ok(())
-    } else {
-        Err(ApiError::Forbidden("admin role required".to_string()))
-    }
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────

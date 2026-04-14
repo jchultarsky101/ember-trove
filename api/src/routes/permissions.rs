@@ -17,7 +17,7 @@ use common::{
 use garde::Validate;
 use uuid::Uuid;
 
-use crate::{auth::permissions::require_owner, error::ApiError, state::AppState};
+use crate::{auth::permissions::{is_admin, require_owner}, error::ApiError, state::AppState};
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -40,7 +40,7 @@ async fn list_permissions(
     let all_perms = state.permissions.list_all(node_id).await?;
 
     // Admins see everything.
-    if claims.roles.contains(&"admin".to_string()) {
+    if is_admin(&claims) {
         return Ok(Json(all_perms));
     }
 
