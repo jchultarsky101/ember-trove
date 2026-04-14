@@ -116,6 +116,7 @@ dependencies = [
  "flate2",
  "garde",
  "hex",
+ "hmac",
  "http-body-util",
  "jsonwebtoken",
  "rand 0.8.5",

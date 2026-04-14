@@ -1,0 +1,84 @@
+//! Fire-and-forget webhook delivery.
+//!
+//! After a node mutation, call [`dispatch`] with the event name and optional
+//! node ID.  Active webhooks subscribed to that event are fetched from the repo
+//! and an HTTP POST is spawned for each one.  Delivery failures are logged but
+//! never propagate back to the caller.
+
+use std::sync::Arc;
+
+use chrono::Utc;
+use common::{
+    id::NodeId,
+    webhook::WebhookPayload,
+};
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+use tracing::warn;
+
+use crate::repo::webhook::WebhookRepo;
+
+type HmacSha256 = Hmac<Sha256>;
+
+/// Spawn fire-and-forget tasks that POST webhook payloads to subscribers.
+pub fn dispatch(
+    webhooks: Arc<dyn WebhookRepo>,
+    event: &str,
+    node_id: Option<NodeId>,
+    triggered_by: &str,
+) {
+    let event = event.to_string();
+    let triggered_by = triggered_by.to_string();
+    tokio::spawn(async move {
+        let hooks = match webhooks.list_active_for_event(&event).await {
+            Ok(h) => h,
+            Err(e) => {
+                warn!("webhook list_active_for_event failed: {e}");
+                return;
+            }
+        };
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_default();
+
+        for hook in hooks {
+            let payload = WebhookPayload {
+                event: event.clone(),
+                webhook_id: hook.id,
+                node_id,
+                triggered_by: triggered_by.clone(),
+                timestamp: Utc::now(),
+            };
+            let body = match serde_json::to_string(&payload) {
+                Ok(b) => b,
+                Err(e) => {
+                    warn!("webhook serialize failed for {}: {e}", hook.id);
+                    continue;
+                }
+            };
+
+            let mut req = client
+                .post(&hook.url)
+                .header("Content-Type", "application/json")
+                .header("X-Webhook-Event", &event);
+
+            // HMAC-SHA256 signature if a secret is configured.
+            if let Some(ref secret) = hook.secret
+                && let Ok(mut mac) = HmacSha256::new_from_slice(secret.as_bytes())
+            {
+                mac.update(body.as_bytes());
+                let sig = hex::encode(mac.finalize().into_bytes());
+                req = req.header("X-Webhook-Signature", format!("sha256={sig}"));
+            }
+
+            let url = hook.url.clone();
+            let wid = hook.id;
+            tokio::spawn(async move {
+                if let Err(e) = req.body(body).send().await {
+                    warn!("webhook POST to {url} (id={wid}) failed: {e}");
+                }
+            });
+        }
+    });
+}

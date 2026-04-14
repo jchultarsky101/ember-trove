@@ -55,3 +55,4 @@ uuid_newtype!(NodeVersionId);
 uuid_newtype!(TemplateId);
 uuid_newtype!(SearchPresetId);
 uuid_newtype!(NodeLinkId);
+uuid_newtype!(WebhookId);

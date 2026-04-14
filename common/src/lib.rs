@@ -19,5 +19,6 @@ pub mod template;
 pub mod share_token;
 pub mod task;
 pub mod node_link;
+pub mod webhook;
 
 pub use error::EmberTroveError;
