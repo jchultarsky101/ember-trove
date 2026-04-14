@@ -21,6 +21,7 @@ pub trait BackupRepo: Send + Sync {
         note_count: i32,
         task_count: i32,
         attachment_count: i32,
+        comment: Option<&str>,
     ) -> Result<BackupJob, EmberTroveError>;
 
     /// List all backup jobs for the given owner, newest first.
@@ -59,6 +60,7 @@ struct BackupJobRow {
     note_count: i32,
     task_count: i32,
     attachment_count: i32,
+    comment: Option<String>,
 }
 
 impl From<BackupJobRow> for BackupJob {
@@ -75,6 +77,7 @@ impl From<BackupJobRow> for BackupJob {
             note_count: r.note_count,
             task_count: r.task_count,
             attachment_count: r.attachment_count,
+            comment: r.comment,
         }
     }
 }
@@ -93,15 +96,17 @@ impl BackupRepo for PgBackupRepo {
         note_count: i32,
         task_count: i32,
         attachment_count: i32,
+        comment: Option<&str>,
     ) -> Result<BackupJob, EmberTroveError> {
         let row = sqlx::query_as::<_, BackupJobRow>(
             r#"
             INSERT INTO backup_jobs
                 (created_by, s3_key, size_bytes, node_count, edge_count, tag_count,
-                 note_count, task_count, attachment_count)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                 note_count, task_count, attachment_count, comment)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id, created_by, created_at, size_bytes, s3_key,
-                      node_count, edge_count, tag_count, note_count, task_count, attachment_count
+                      node_count, edge_count, tag_count, note_count, task_count,
+                      attachment_count, comment
             "#,
         )
         .bind(created_by)
@@ -113,6 +118,7 @@ impl BackupRepo for PgBackupRepo {
         .bind(note_count)
         .bind(task_count)
         .bind(attachment_count)
+        .bind(comment)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("backup create failed: {e}")))?;
@@ -124,7 +130,8 @@ impl BackupRepo for PgBackupRepo {
         let rows = sqlx::query_as::<_, BackupJobRow>(
             r#"
             SELECT id, created_by, created_at, size_bytes, s3_key,
-                   node_count, edge_count, tag_count, note_count, task_count, attachment_count
+                   node_count, edge_count, tag_count, note_count, task_count,
+                   attachment_count, comment
             FROM backup_jobs
             WHERE created_by = $1
             ORDER BY created_at DESC
@@ -142,7 +149,8 @@ impl BackupRepo for PgBackupRepo {
         let row = sqlx::query_as::<_, BackupJobRow>(
             r#"
             SELECT id, created_by, created_at, size_bytes, s3_key,
-                   node_count, edge_count, tag_count, note_count, task_count, attachment_count
+                   node_count, edge_count, tag_count, note_count, task_count,
+                   attachment_count, comment
             FROM backup_jobs
             WHERE id = $1
             "#,
