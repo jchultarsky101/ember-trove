@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 #[async_trait]
 pub trait NodeLinkRepo: Send + Sync {
+    async fn list_all(&self) -> Result<Vec<NodeLink>, EmberTroveError>;
     async fn list(&self, node_id: NodeId) -> Result<Vec<NodeLink>, EmberTroveError>;
     async fn create(
         &self,
@@ -62,6 +63,17 @@ impl NodeLinkRow {
 
 #[async_trait]
 impl NodeLinkRepo for PgNodeLinkRepo {
+    async fn list_all(&self) -> Result<Vec<NodeLink>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, NodeLinkRow>(
+            "SELECT id, node_id, name, url, created_at FROM node_links ORDER BY created_at ASC",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list_all node_links failed: {e}")))?;
+
+        Ok(rows.into_iter().map(NodeLinkRow::into_link).collect())
+    }
+
     async fn list(&self, node_id: NodeId) -> Result<Vec<NodeLink>, EmberTroveError> {
         let rows = sqlx::query_as::<_, NodeLinkRow>(
             "SELECT id, node_id, name, url, created_at
