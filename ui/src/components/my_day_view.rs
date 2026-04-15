@@ -21,12 +21,12 @@ pub fn MyDayView() -> impl IntoView {
         .expect("TaskRefresh context must be provided")
         .0;
 
-    let today      = chrono::Utc::now().date_naive();
+    let today      = crate::components::format_helpers::local_today();
     let date_label = today.format("%A, %B %-d").to_string();
 
     let tasks_resource = LocalResource::new(move || {
         let _ = refresh.get();
-        async move { crate::api::fetch_my_day().await }
+        async move { crate::api::fetch_my_day(today).await }
     });
 
     view! {
@@ -283,7 +283,7 @@ fn MyDayGroup(
 fn MyDayTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
     let task_id  = task.id;
     let node_id  = task.node_id;
-    let today    = chrono::Utc::now().date_naive();
+    let today    = crate::components::format_helpers::local_today();
 
     let status_val   = RwSignal::new(status_value(&task.status).to_string());
     let priority_val = RwSignal::new(priority_value(&task.priority).to_string());
