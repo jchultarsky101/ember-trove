@@ -120,6 +120,7 @@ impl TaskRepo for StubTaskRepo {
     async fn list_my_day(&self, _: &str, _: NaiveDate) -> Result<Vec<MyDayTask>, EmberTroveError> { unimplemented!() }
     async fn list_inbox(&self, _: &str) -> Result<Vec<Task>, EmberTroveError> { unimplemented!() }
     async fn counts_for_nodes(&self, _: &[NodeId]) -> Result<Vec<(NodeId, TaskCounts)>, EmberTroveError> { unimplemented!() }
+    async fn list_open_for_nodes(&self, _: &[NodeId], _: i64) -> Result<Vec<(NodeId, Vec<common::task::TaskSummary>, bool)>, EmberTroveError> { unimplemented!() }
     async fn list_all_for_owner(&self, _: &str) -> Result<Vec<Task>, EmberTroveError> { unimplemented!() }
     async fn list_all(&self) -> Result<Vec<Task>, EmberTroveError> { unimplemented!() }
     async fn list_by_due_range(&self, _: &str, _: NaiveDate, _: NaiveDate) -> Result<Vec<MyDayTask>, EmberTroveError> { unimplemented!() }

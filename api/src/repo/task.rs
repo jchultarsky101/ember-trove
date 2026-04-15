@@ -5,7 +5,7 @@ use common::{
     id::{NodeId, TaskId},
     task::{
         CreateTaskRequest, MyDayTask, RecurrenceRule, Task, TaskCounts, TaskPriority, TaskStatus,
-        UpdateTaskRequest,
+        TaskSummary, UpdateTaskRequest,
     },
 };
 use sqlx::PgPool;
@@ -58,6 +58,14 @@ pub trait TaskRepo: Send + Sync {
         &self,
         node_ids: &[NodeId],
     ) -> Result<Vec<(NodeId, TaskCounts)>, EmberTroveError>;
+
+    /// Open/in-progress tasks for the given nodes, capped at `limit` per node.
+    /// Returns `(node_id, tasks, has_more)` tuples.
+    async fn list_open_for_nodes(
+        &self,
+        node_ids: &[NodeId],
+        limit_per_node: i64,
+    ) -> Result<Vec<(NodeId, Vec<TaskSummary>, bool)>, EmberTroveError>;
 
     /// All tasks owned by `owner_id` — used for backup.
     async fn list_all_for_owner(&self, owner_id: &str) -> Result<Vec<Task>, EmberTroveError>;
@@ -517,6 +525,89 @@ impl TaskRepo for PgTaskRepo {
                 )
             })
             .collect())
+    }
+
+    async fn list_open_for_nodes(
+        &self,
+        node_ids: &[NodeId],
+        limit_per_node: i64,
+    ) -> Result<Vec<(NodeId, Vec<TaskSummary>, bool)>, EmberTroveError> {
+        if node_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let ids: Vec<Uuid> = node_ids.iter().map(|n| n.0).collect();
+
+        #[derive(sqlx::FromRow)]
+        struct SummaryRow {
+            node_id: Uuid,
+            id: Uuid,
+            title: String,
+            status: String,
+            priority: String,
+            due_date: Option<NaiveDate>,
+            rn: i64,
+        }
+
+        // Use a window function to rank tasks per node and fetch limit+1 to detect "has more".
+        let rows = sqlx::query_as::<_, SummaryRow>(
+            r#"
+            SELECT node_id, id, title, status::text AS status, priority::text AS priority,
+                   due_date, rn
+            FROM (
+                SELECT node_id, id, title, status, priority, due_date,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY node_id
+                           ORDER BY
+                               CASE priority::text
+                                   WHEN 'high'   THEN 0
+                                   WHEN 'medium' THEN 1
+                                   WHEN 'low'    THEN 2
+                               END,
+                               due_date NULLS LAST,
+                               sort_order ASC,
+                               created_at ASC
+                       ) AS rn
+                FROM node_tasks
+                WHERE node_id = ANY($1)
+                  AND status::text IN ('open', 'in_progress')
+            ) ranked
+            WHERE rn <= $2
+            ORDER BY node_id, rn
+            "#,
+        )
+        .bind(&ids)
+        .bind(limit_per_node + 1) // fetch one extra to detect overflow
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("list_open_for_nodes failed: {e}")))?;
+
+        // Group by node_id.
+        let mut map: std::collections::HashMap<Uuid, Vec<SummaryRow>> =
+            std::collections::HashMap::new();
+        for row in rows {
+            map.entry(row.node_id).or_default().push(row);
+        }
+
+        let limit_usize = limit_per_node as usize;
+        let mut result = Vec::with_capacity(map.len());
+        for (&nid, rows) in &mut map {
+            let has_more = rows.len() > limit_usize;
+            rows.truncate(limit_usize);
+            let summaries: Vec<TaskSummary> = rows
+                .drain(..)
+                .map(|r| TaskSummary {
+                    id: TaskId(r.id),
+                    title: r.title,
+                    status: parse_status(&r.status).unwrap_or(TaskStatus::Open),
+                    priority: parse_priority(&r.priority).unwrap_or(TaskPriority::Medium),
+                    due_date: r.due_date,
+                })
+                .collect();
+            result.push((NodeId(nid), summaries, has_more));
+        }
+
+        Ok(result)
     }
 
     async fn list_all_for_owner(&self, owner_id: &str) -> Result<Vec<Task>, EmberTroveError> {
