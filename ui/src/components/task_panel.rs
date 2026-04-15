@@ -311,7 +311,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
     let due = task.due_date;
     let focus = task.focus_date;
 
-    let today = chrono::Utc::now().date_naive();
+    let today = crate::components::format_helpers::local_today();
     let overdue = due.map(|d| !is_done && d < today).unwrap_or(false);
     let in_my_day = RwSignal::new(focus == Some(today));
 

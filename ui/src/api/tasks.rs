@@ -97,8 +97,9 @@ pub async fn fetch_project_dashboard() -> Result<Vec<ProjectDashboardEntry>, UiE
     parse_json(resp).await
 }
 
-pub async fn fetch_my_day() -> Result<Vec<MyDayTask>, UiError> {
-    let resp = Request::get(&api_url("/my-day"))
+pub async fn fetch_my_day(date: chrono::NaiveDate) -> Result<Vec<MyDayTask>, UiError> {
+    let url = api_url(&format!("/my-day?date={date}"));
+    let resp = Request::get(&url)
         .send()
         .await
         .map_err(|e| UiError::Network(e.to_string()))?;

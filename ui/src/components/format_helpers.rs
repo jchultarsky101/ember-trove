@@ -3,6 +3,20 @@
 //! Centralises locale-aware date/time formatting so every panel speaks
 //! the same language without duplicating JS interop boilerplate.
 
+/// Return today's date in the browser's local timezone.
+///
+/// Uses `js_sys::Date` to read the browser clock, which respects the OS
+/// timezone setting.  Falls back to UTC if the conversion fails.
+pub fn local_today() -> chrono::NaiveDate {
+    let d = js_sys::Date::new_0();
+    chrono::NaiveDate::from_ymd_opt(
+        d.get_full_year() as i32,
+        d.get_month() + 1, // JS months are 0-based
+        d.get_date(),
+    )
+    .unwrap_or_else(|| chrono::Utc::now().date_naive())
+}
+
 /// Format a UTC timestamp as a concise local date-time string using JS's
 /// `Intl.DateTimeFormat` (avoids a full `chrono-tz` / `time` WASM dependency).
 ///
