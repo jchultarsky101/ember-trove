@@ -8,6 +8,7 @@ use chrono::{Datelike, NaiveDate};
 use common::{
     auth::AuthClaims,
     id::{NodeId, TaskId},
+    markdown::extract_section,
     node::{NodeListParams, NodeType},
     task::{
         CreateTaskRequest, MyDayTask, ProjectDashboardEntry, RecurrenceRule, ReorderTasksRequest,
@@ -275,7 +276,11 @@ async fn calendar_handler(
     Ok(Json(tasks))
 }
 
-/// GET /dashboard/projects — all project nodes with aggregated task counts.
+/// Maximum open tasks to include per project card.
+const DASHBOARD_TASK_LIMIT: i64 = 10;
+
+/// GET /dashboard/projects — all project nodes with aggregated task counts,
+/// a rendered status section from the node body, and top open tasks.
 async fn project_dashboard(
     State(state): State<AppState>,
     Extension(claims): Extension<AuthClaims>,
@@ -298,11 +303,18 @@ async fn project_dashboard(
     }
 
     let node_ids: Vec<NodeId> = projects.iter().map(|n| n.id).collect();
-    let counts_map: std::collections::HashMap<NodeId, TaskCounts> = state
-        .tasks
-        .counts_for_nodes(&node_ids)
-        .await?
+
+    // Fetch counts and open tasks in parallel.
+    let (counts_result, open_result) = tokio::join!(
+        state.tasks.counts_for_nodes(&node_ids),
+        state.tasks.list_open_for_nodes(&node_ids, DASHBOARD_TASK_LIMIT),
+    );
+
+    let counts_map: std::collections::HashMap<NodeId, TaskCounts> =
+        counts_result?.into_iter().collect();
+    let open_map: std::collections::HashMap<NodeId, (Vec<_>, bool)> = open_result?
         .into_iter()
+        .map(|(nid, tasks, more)| (nid, (tasks, more)))
         .collect();
 
     let empty = TaskCounts { open: 0, in_progress: 0, done: 0, cancelled: 0 };
@@ -311,11 +323,19 @@ async fn project_dashboard(
         .map(|n| {
             let node_status = format!("{:?}", n.status).to_lowercase();
             let task_counts = counts_map.get(&n.id).cloned().unwrap_or_else(|| empty.clone());
+            let status_section = n.body.as_deref().and_then(|b| extract_section(b, "status"));
+            let (open_tasks, has_more_tasks) = open_map
+                .get(&n.id)
+                .cloned()
+                .unwrap_or_default();
             ProjectDashboardEntry {
                 node_id: n.id,
                 title: n.title,
                 node_status,
                 task_counts,
+                status_section,
+                open_tasks,
+                has_more_tasks,
             }
         })
         .collect();

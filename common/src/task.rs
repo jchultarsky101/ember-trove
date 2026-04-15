@@ -71,6 +71,16 @@ pub struct MyDayTask {
     pub node_title: Option<String>,
 }
 
+/// Compact task info for display inside dashboard project cards.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct TaskSummary {
+    pub id: TaskId,
+    pub title: String,
+    pub status: TaskStatus,
+    pub priority: TaskPriority,
+    pub due_date: Option<NaiveDate>,
+}
+
 /// One row in the Project Dashboard — a project node plus its task counts.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ProjectDashboardEntry {
@@ -78,6 +88,12 @@ pub struct ProjectDashboardEntry {
     pub title: String,
     pub node_status: String,
     pub task_counts: TaskCounts,
+    /// Rendered markdown from the `## Status` heading section, if present.
+    pub status_section: Option<String>,
+    /// Up to 10 open/in-progress tasks, ordered by priority then due date.
+    pub open_tasks: Vec<TaskSummary>,
+    /// `true` when more open tasks exist beyond the returned slice.
+    pub has_more_tasks: bool,
 }
 
 /// Deserialises `Option<Option<T>>` correctly:
