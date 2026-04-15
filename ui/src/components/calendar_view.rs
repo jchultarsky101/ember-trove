@@ -195,7 +195,7 @@ pub fn CalendarView() -> impl IntoView {
         .expect("TaskRefresh context must be provided")
         .0;
 
-    let today = chrono::Utc::now().date_naive();
+    let today = crate::components::format_helpers::local_today();
     let year_sig = RwSignal::new(today.year());
     let month_sig = RwSignal::new(today.month());
 
