@@ -4,7 +4,7 @@
 //! Centralises status / priority / recurrence parsing, formatting, and
 //! comparison so that every task-related view speaks the same language.
 
-use common::task::{RecurrenceRule, TaskPriority, TaskStatus};
+use common::task::{RecurrenceRule, Task, TaskPriority, TaskStatus};
 
 // ── Status ──────────────────────────────────────────────────────────────────
 
@@ -159,11 +159,27 @@ pub fn node_type_icon(node_type: &str) -> &'static str {
     }
 }
 
+// ── My Day predicate ────────────────────────────────────────────────────────
+
+/// Returns `true` when the task is currently visible in today's My Day list.
+///
+/// Mirrors the server's carry-forward rule in `list_my_day`: a task shows up
+/// in My Day when its `focus_date` is on or before `today`, and is either
+/// focused on `today` exactly or still in a non-terminal state. This keeps
+/// the node-detail lightbulb in sync with what actually appears in My Day.
+pub fn is_in_my_day(task: &Task, today: chrono::NaiveDate) -> bool {
+    match task.focus_date {
+        Some(d) if d == today => true,
+        Some(d) if d < today  => !status_done(&task.status),
+        _ => false,
+    }
+}
+
 // ── Sorting ─────────────────────────────────────────────────────────────────
 
 /// Sort tasks by `sort_order` first, then `created_at` as a tiebreak.
 /// Used by TaskPanel (node-scoped task list).
-pub fn sort_tasks_by_order(tasks: &mut [common::task::Task]) {
+pub fn sort_tasks_by_order(tasks: &mut [Task]) {
     tasks.sort_by(|a, b| {
         a.sort_order
             .cmp(&b.sort_order)
@@ -174,7 +190,7 @@ pub fn sort_tasks_by_order(tasks: &mut [common::task::Task]) {
 /// Richer sort: `sort_order` first, then incomplete before done, then
 /// priority (high→low), then due date (soonest first).
 /// Used by MyDayView.
-pub fn sort_tasks_full(tasks: &mut [common::task::Task]) {
+pub fn sort_tasks_full(tasks: &mut [Task]) {
     tasks.sort_by(|a, b| {
         let so = a.sort_order.cmp(&b.sort_order);
         if so != std::cmp::Ordering::Equal { return so; }
