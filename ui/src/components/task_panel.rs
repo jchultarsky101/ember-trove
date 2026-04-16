@@ -7,8 +7,9 @@ use leptos::prelude::*;
 
 use crate::app::TaskRefresh;
 use crate::components::task_common::{
-    parse_priority, parse_recurrence_opt, parse_status, priority_color, priority_icon,
-    priority_label, priority_value, sort_tasks_by_order, status_done, status_label, status_value,
+    is_in_my_day, parse_priority, parse_recurrence_opt, parse_status, priority_color,
+    priority_icon, priority_label, priority_value, sort_tasks_by_order, status_done, status_label,
+    status_value,
 };
 
 // ── TaskPanel ─────────────────────────────────────────────────────────────────
@@ -309,11 +310,10 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
     let p_color = priority_color(&task.priority);
     let p_label = priority_label(&task.priority);
     let due = task.due_date;
-    let focus = task.focus_date;
 
     let today = crate::components::format_helpers::local_today();
     let overdue = due.map(|d| !is_done && d < today).unwrap_or(false);
-    let in_my_day = RwSignal::new(focus == Some(today));
+    let in_my_day = RwSignal::new(is_in_my_day(&task, today));
 
     let status_sig = RwSignal::new(status_val.clone());
 
