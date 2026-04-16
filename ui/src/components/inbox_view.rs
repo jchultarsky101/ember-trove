@@ -16,8 +16,9 @@ use leptos::prelude::*;
 
 use crate::app::TaskRefresh;
 use crate::components::task_common::{
-    node_type_icon, parse_priority, parse_recurrence_opt, parse_status, priority_dot_color,
-    priority_label, priority_value, recurrence_label, recurrence_value, status_done, status_value,
+    is_in_my_day, node_type_icon, parse_priority, parse_recurrence_opt, parse_status,
+    priority_dot_color, priority_label, priority_value, recurrence_label, recurrence_value,
+    status_done, status_value,
 };
 
 // ── InboxView ─────────────────────────────────────────────────────────────────
@@ -239,8 +240,9 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
             .unwrap_or_default(),
     );
 
-    // My Day toggle
-    let in_my_day = RwSignal::new(task.focus_date == Some(today));
+    // My Day toggle — mirrors server carry-forward so tasks set on a
+    // previous day but still open still read as "in My Day" today.
+    let in_my_day = RwSignal::new(is_in_my_day(&task, today));
 
     // Node-picker state
     let assigning      = RwSignal::new(false);
