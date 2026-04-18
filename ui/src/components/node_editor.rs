@@ -26,13 +26,46 @@ fn parse_status(s: &str) -> NodeStatus {
     }
 }
 
+/// Convert a UTF-16 code-unit offset (as reported by `selectionStart` in the
+/// DOM) to a UTF-8 byte offset safe for slicing a Rust `&str`.
+///
+/// JavaScript string APIs count positions in UTF-16 code units, but Rust
+/// strings are UTF-8. Slicing by a UTF-16 offset can land mid-char and
+/// trigger `core::str::slice_error_fail` — e.g. right after an emoji (👉),
+/// em-dash (—), curly quote (’), or `π`. The resulting WASM panic poisons
+/// the Leptos event-dispatch `RefCell`, so every subsequent keystroke is
+/// silently dropped and the user's edit reverts on save. Always route cursor
+/// values from `selection_start()` through this helper before using them to
+/// index `text`.
+fn utf16_to_utf8_offset(text: &str, utf16_offset: usize) -> usize {
+    let mut utf16_count = 0usize;
+    for (byte_idx, ch) in text.char_indices() {
+        if utf16_count >= utf16_offset {
+            return byte_idx;
+        }
+        utf16_count += ch.len_utf16();
+    }
+    text.len()
+}
+
+/// Inverse of [`utf16_to_utf8_offset`]: convert a UTF-8 byte offset back to a
+/// UTF-16 code-unit offset for passing to DOM APIs like `setSelectionRange`.
+fn utf8_to_utf16_offset(text: &str, byte_offset: usize) -> usize {
+    let clamped = byte_offset.min(text.len());
+    text[..clamped].encode_utf16().count()
+}
+
 /// Return the partial wiki-link query being typed at the cursor, if any.
 ///
 /// Looks backwards from `cursor` for an unclosed `[[`. Returns the text
 /// typed after `[[` up to the cursor, or `None` if the cursor is not inside
-/// an open wiki-link context.
+/// an open wiki-link context. `cursor` is a UTF-16 code-unit offset (as
+/// delivered by `selectionStart`); the helper converts it to a UTF-8 byte
+/// offset before slicing so non-ASCII text cannot trigger a char-boundary
+/// panic.
 fn wikilink_query_at(text: &str, cursor: usize) -> Option<String> {
-    let before = &text[..cursor.min(text.len())];
+    let byte_cut = utf16_to_utf8_offset(text, cursor);
+    let before = &text[..byte_cut];
     // Find the last `[[` that has not been closed.
     let open = before.rfind("[[")?;
     let after_open = &before[open + 2..];
@@ -42,6 +75,64 @@ fn wikilink_query_at(text: &str, cursor: usize) -> Option<String> {
         return None;
     }
     Some(after_open.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn utf16_offset_ascii_matches_byte_offset() {
+        assert_eq!(utf16_to_utf8_offset("hello", 3), 3);
+        assert_eq!(utf16_to_utf8_offset("hello", 99), 5);
+    }
+
+    #[test]
+    fn utf16_offset_handles_emoji_surrogate_pair() {
+        // "a👉b" — UTF-16: a(1) + 👉(2) + b(1) = 4 units.
+        //          UTF-8:  a(1) + 👉(4) + b(1) = 6 bytes.
+        let text = "a👉b";
+        assert_eq!(utf16_to_utf8_offset(text, 0), 0);
+        assert_eq!(utf16_to_utf8_offset(text, 1), 1);
+        assert_eq!(utf16_to_utf8_offset(text, 3), 5);
+        assert_eq!(utf16_to_utf8_offset(text, 4), 6);
+    }
+
+    #[test]
+    fn utf16_offset_handles_multibyte_bmp_chars() {
+        // Em-dash: 3 UTF-8 bytes, 1 UTF-16 unit. π: 2 UTF-8 bytes, 1 UTF-16 unit.
+        let text = "a—πb";
+        assert_eq!(utf16_to_utf8_offset(text, 1), 1);
+        assert_eq!(utf16_to_utf8_offset(text, 2), 4);
+        assert_eq!(utf16_to_utf8_offset(text, 3), 6);
+        assert_eq!(utf16_to_utf8_offset(text, 4), 7);
+    }
+
+    #[test]
+    fn utf8_to_utf16_is_inverse_at_char_boundaries() {
+        let text = "a👉b—πc";
+        for (byte_idx, _) in text.char_indices() {
+            let u16 = utf8_to_utf16_offset(text, byte_idx);
+            assert_eq!(utf16_to_utf8_offset(text, u16), byte_idx);
+        }
+    }
+
+    #[test]
+    fn wikilink_query_does_not_panic_past_emoji() {
+        // Regression: before the UTF-16 conversion, this panicked in WASM,
+        // poisoning the Leptos event-dispatch RefCell so every keystroke
+        // after the first was silently dropped and the edit reverted on save.
+        let text = "> 👉 **TIP**: note";
+        let cursor_u16 = text.encode_utf16().count();
+        assert_eq!(wikilink_query_at(text, cursor_u16), None);
+    }
+
+    #[test]
+    fn wikilink_query_returns_partial_after_open_bracket() {
+        let text = "See [[foo";
+        let cursor_u16 = text.encode_utf16().count();
+        assert_eq!(wikilink_query_at(text, cursor_u16), Some("foo".to_string()));
+    }
 }
 
 /// Returns `true` if the browser viewport is ≥ 768 px wide (≈ tablet or larger).
@@ -141,7 +232,9 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
         // Insert placeholder at cursor (or end of text if cursor unavailable).
         // NodeRef<Textarea>.get() deref-chains to web_sys::HtmlElement; use
         // dyn_ref to reach HtmlTextAreaElement and call selection_start.
-        let cursor = textarea_ref
+        // `selection_start` returns a UTF-16 code-unit offset — convert to
+        // a UTF-8 byte offset before slicing (see `utf16_to_utf8_offset`).
+        let cursor_u16 = textarea_ref
             .get()
             .and_then(|el| {
                 use std::ops::Deref as _;
@@ -152,12 +245,14 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
             })
             .unwrap_or(0) as usize;
         let current = body.get_untracked();
-        let cursor = cursor.min(current.len());
+        let cursor = utf16_to_utf8_offset(&current, cursor_u16);
         let new_val = format!("{}{}{}", &current[..cursor], placeholder, &current[cursor..]);
         body.set(new_val.clone());
         if let Some(el) = textarea_ref.get() {
             el.set_value(&new_val);
-            let pos = (cursor + placeholder.len()) as u32;
+            // set_selection_start expects a UTF-16 code-unit offset.
+            let placeholder_u16_len: usize = placeholder.chars().map(char::len_utf16).sum();
+            let pos = (cursor_u16 + placeholder_u16_len) as u32;
             let _ = el.set_selection_start(Some(pos));
             let _ = el.set_selection_end(Some(pos));
         }
@@ -331,12 +426,16 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
     let on_select_title = move |selected: String| {
         wikilink_query.set(None);
         let current = body.get_untracked();
-        let cursor = textarea_ref
+        // `selection_start` is a UTF-16 code-unit offset — convert to a
+        // UTF-8 byte offset before slicing (see `utf16_to_utf8_offset`).
+        let cursor_u16 = textarea_ref
             .get()
             .and_then(|el| el.selection_start().ok().flatten())
             .unwrap_or(0) as usize;
-        let before = &current[..cursor.min(current.len())];
+        let cursor = utf16_to_utf8_offset(&current, cursor_u16);
+        let before = &current[..cursor];
         if let Some(open_pos) = before.rfind("[[") {
+            // open_pos comes from rfind → already a valid UTF-8 boundary.
             let new_val = format!(
                 "[[{}]]{}",
                 selected,
@@ -344,13 +443,15 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
             );
             let prefix = &current[..open_pos];
             let new_val = format!("{prefix}{new_val}");
-            let new_cursor = open_pos + 2 + selected.len() + 2;
+            let new_cursor_bytes = open_pos + 2 + selected.len() + 2;
+            // set_selection_start expects UTF-16; convert back.
+            let new_cursor_u16 = utf8_to_utf16_offset(&new_val, new_cursor_bytes);
             body.set(new_val.clone());
             // Defer cursor placement until after Leptos re-renders the textarea.
             if let Some(el) = textarea_ref.get() {
                 el.set_value(&new_val);
-                let _ = el.set_selection_start(Some(new_cursor as u32));
-                let _ = el.set_selection_end(Some(new_cursor as u32));
+                let _ = el.set_selection_start(Some(new_cursor_u16 as u32));
+                let _ = el.set_selection_end(Some(new_cursor_u16 as u32));
                 let _ = el.focus();
             }
         }
