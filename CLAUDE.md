@@ -51,6 +51,25 @@ cargo test
 
 Run `./scripts/verify.sh` for a full suite (all of the above + git status check).
 
+## Release & CI monitoring (hard rule)
+
+A release is not "shipped" until **every** GitHub Actions workflow on the
+pushed ref is green. The pipeline runs `Release` + `CI` concurrently:
+`Release` builds and deploys GHCR images, `CI` runs `check` / `clippy` /
+`cargo audit` / migrations / docker-build against the same commit. A green
+Release alongside a red CI still leaves master broken.
+
+After `git push origin main develop --tags`:
+
+1. Poll `gh run list --limit 6` until all runs for the release commit
+   report `completed` (no `queued` / `in_progress` left). Use a Bash
+   until-loop or Monitor for this — do not declare done on a partial view.
+2. Any `failure` → read `gh run view <id> --log-failed`, fix the root
+   cause, and ship a follow-up patch. Do **not** claim success while a
+   workflow is red. Transient advisories (cargo-audit) count — suppress
+   them explicitly via `--ignore <RUSTSEC-…>` with a dated rationale.
+3. Only after every workflow is green is the release really done.
+
 ---
 
 ## Project: Ember Trove
