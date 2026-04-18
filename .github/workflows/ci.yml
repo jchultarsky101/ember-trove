@@ -104,14 +104,27 @@ jobs:
         run: cargo install cargo-audit --locked
 
       - name: Run cargo audit
-        # Ignored advisories are transitive-only; see deny.toml-style rationale below.
-        #   RUSTSEC-2026-0002 — `lru` unsoundness via aws-sdk-s3; no available upgrade
-        #     path yet, and we don't exercise the affected API surface.
-        #   RUSTSEC-2026-0097 — `rand` is unsound only with a custom logger installed
-        #     via `rand::rng()`; we never register a custom logger.
-        # Drop the `--ignore` flags the moment either upstream publishes a fix that
-        # bumps our Cargo.lock — don't let this list grow silently.
-        run: cargo audit --ignore RUSTSEC-2026-0002 --ignore RUSTSEC-2026-0097
+        # Ignored advisories are transitive-only with no available upgrade path.
+        # Review on every release — drop an ignore the moment upstream publishes
+        # a fix that bumps our Cargo.lock. Don't let this list grow silently.
+        #
+        #   RUSTSEC-2026-0002 — `lru` unsoundness via aws-sdk-s3; we don't
+        #     exercise the affected API surface.
+        #   RUSTSEC-2026-0097 — `rand` unsound only when a custom logger is
+        #     installed via `rand::rng()`; we never register a custom logger.
+        #   RUSTSEC-2026-0098, 0099 — `rustls-webpki` 0.101.7 name-constraint
+        #     bypass on wildcard / URI names. Only the legacy rustls 0.21 tree
+        #     pulled in by aws-smithy-http-client is affected; the jsonwebtoken
+        #     path was bumped to rustls-webpki 0.103.12 (fixed). The AWS SDK
+        #     path only talks to known AWS endpoints with valid AWS-issued
+        #     certs, so the name-constraint edge case is not reachable in
+        #     practice. Drop once aws-smithy-http-client bumps to rustls 0.23+.
+        run: >
+          cargo audit
+          --ignore RUSTSEC-2026-0002
+          --ignore RUSTSEC-2026-0097
+          --ignore RUSTSEC-2026-0098
+          --ignore RUSTSEC-2026-0099
 
   migrations:
     name: validate migrations
