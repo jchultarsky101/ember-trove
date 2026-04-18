@@ -4,7 +4,13 @@
 //   API GET requests → network-first, cached fallback for offline reads
 //   API mutations (POST/PUT/PATCH/DELETE) → network-only (no offline writes)
 
-const CACHE_NAME = "ember-trove-v2";
+// Bump this cache name whenever a critical UI fix ships that must evict
+// stale bundles from already-installed clients. The activate handler deletes
+// every cache whose name is not CACHE_NAME, so old WASM / JS / HTML is
+// discarded on the next service-worker activation.
+//   v2: initial PWA + security sprint 5.
+//   v3: evict pre-v2.2.2 bundles (node-editor UTF-16/UTF-8 cursor panic fix).
+const CACHE_NAME = "ember-trove-v3";
 
 // App shell resources cached on install.
 // Trunk hashes WASM/JS/CSS filenames, so we cache "/" (index.html) and let
