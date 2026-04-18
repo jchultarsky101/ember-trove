@@ -61,12 +61,24 @@ fn parse_node_type(s: &str) -> NodeType {
     }
 }
 
-/// Truncate the body to a short preview (first ~120 chars, break at word boundary).
+/// Truncate the body to a short preview (~120 bytes, break at word boundary).
+///
+/// Slicing a `&str` at a raw byte offset panics if the cut falls inside a
+/// multi-byte char (em-dash, curly quote, emoji, accented letter). Walk
+/// `char_indices` to find the last char boundary at or before byte 120 so
+/// the slice is always UTF-8-safe.
 fn body_preview(body: &str) -> String {
-    if body.len() <= 120 {
+    const MAX_BYTES: usize = 120;
+    if body.len() <= MAX_BYTES {
         return body.to_string();
     }
-    let truncated = &body[..120];
+    let cut = body
+        .char_indices()
+        .take_while(|(i, _)| *i <= MAX_BYTES)
+        .last()
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+    let truncated = &body[..cut];
     if let Some(pos) = truncated.rfind(char::is_whitespace) {
         format!("{}…", &truncated[..pos])
     } else {
