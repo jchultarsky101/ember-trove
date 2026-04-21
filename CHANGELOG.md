@@ -4,6 +4,20 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [2.3.4] - 2026-04-21
+
+### Changed
+- **Skeleton loaders replace "Loading…" text** — Suspense fallbacks in
+  My Day, Inbox, Notes, Project Dashboard, and NodeView now render a
+  pulsing skeleton shaped like the content about to load (rows, cards,
+  or article).  Removes the layout jump when data arrives and signals
+  that the app is actually working.
+- New `ui/src/components/skeleton.rs` module with reusable
+  `SkeletonBar`, `SkeletonListRow`, `SkeletonList`, `SkeletonCard`,
+  `SkeletonCards`, and `SkeletonArticle` components.
+
+---
+
 ## [2.3.3] - 2026-04-21
 
 ### Changed

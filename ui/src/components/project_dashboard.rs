@@ -36,7 +36,7 @@ pub fn ProjectDashboard() -> impl IntoView {
             // Content
             <div class="flex-1 overflow-auto p-6 flex flex-col">
                 <Suspense fallback=move || view! {
-                    <p class="text-sm text-stone-400">"Loading projects\u{2026}"</p>
+                    <crate::components::skeleton::SkeletonCards cards=3 />
                 }>
                     {move || {
                         let data = entries.get().and_then(|r| r.ok()).unwrap_or_default();
