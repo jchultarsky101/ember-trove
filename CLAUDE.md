@@ -138,12 +138,15 @@ See `.claude/patterns/navigate-reactive.rs` for all patterns.
 **Route paths require `path!()` macro**:
 ```rust
 use leptos_router::path;
-<Route path=path!("/inbox") view=InboxView />
+<Route path=path!("/tasks/inbox") view=|| view!{ <TasksView active=TasksTab::Inbox /> } />
 ```
 
-**URL mapping**: `/inbox` · `/my-day` · `/calendar` · `/dashboard` · `/graph` · `/search` ·
+**URL mapping**: `/tasks/my-day` · `/tasks/inbox` · `/tasks/calendar` · `/dashboard` · `/graph` · `/search` ·
 `/notes` · `/nodes` · `/nodes/new` · `/nodes/:id` · `/nodes/:id/edit` ·
 `/tags` · `/templates` · `/admin/users` · `/admin/permissions` · `/admin/backup`
+
+Legacy `/my-day`, `/inbox`, `/calendar` URLs redirect to `/tasks/...` for
+bookmarks and PWA shortcuts dating back before v2.3.0.
 
 ## Leptos Patterns (Critical)
 

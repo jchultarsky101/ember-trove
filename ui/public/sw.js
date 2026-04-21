@@ -10,7 +10,8 @@
 // discarded on the next service-worker activation.
 //   v2: initial PWA + security sprint 5.
 //   v3: evict pre-v2.2.2 bundles (node-editor UTF-16/UTF-8 cursor panic fix).
-const CACHE_NAME = "ember-trove-v3";
+//   v4: /tasks/* consolidation + manifest start_url change (v2.3.0).
+const CACHE_NAME = "ember-trove-v4";
 
 // App shell resources cached on install.
 // Trunk hashes WASM/JS/CSS filenames, so we cache "/" (index.html) and let
