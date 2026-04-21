@@ -176,18 +176,17 @@ pub async fn create_backup(
 
 /// Download and parse the backup archive, returning a preview without executing
 /// any changes.
+///
+/// `_owner_id` is the sub of the admin previewing the restore.  It is no
+/// longer used to restrict which backups the caller may preview — any
+/// admin may preview any backup — but is retained in the signature for
+/// symmetry with `execute_restore` and potential future auditing.
 pub async fn preview_restore(
     state: &AppState,
     job_id: Uuid,
-    owner_id: &str,
+    _owner_id: &str,
 ) -> Result<BackupPreview, ApiError> {
     let job = state.backup.get(job_id).await.map_err(ApiError::from)?;
-
-    if job.created_by != owner_id {
-        return Err(ApiError::Forbidden(
-            "backup belongs to a different owner".to_string(),
-        ));
-    }
 
     let archive_bytes = state
         .object_store
@@ -224,10 +223,17 @@ pub async fn preview_restore(
 // ── execute_restore ────────────────────────────────────────────────────────────
 
 /// Execute a restore:
-/// 1. Create an automatic pre-restore snapshot.
+/// 1. Create an automatic pre-restore snapshot attributed to the admin
+///    who triggered the restore.
 /// 2. Download and parse the backup archive.
-/// 3. Inside a DB transaction: delete owner data, insert backup data.
+/// 3. Inside a DB transaction: delete existing data, insert backup data.
 /// 4. Re-upload attachment files to S3 (best-effort).
+///
+/// `owner_id` is the sub of the admin running the restore — used only as
+/// the `created_by` field on the pre-restore snapshot so an audit trail
+/// records who initiated the destructive operation.  It does not restrict
+/// which backups the caller may restore: any admin may restore any
+/// backup.
 pub async fn execute_restore(
     state: &AppState,
     job_id: Uuid,
@@ -235,13 +241,7 @@ pub async fn execute_restore(
 ) -> Result<(), ApiError> {
     let job = state.backup.get(job_id).await.map_err(ApiError::from)?;
 
-    if job.created_by != owner_id {
-        return Err(ApiError::Forbidden(
-            "backup belongs to a different owner".to_string(),
-        ));
-    }
-
-    // Auto snapshot before restore.
+    // Auto snapshot before restore, attributed to the admin who triggered it.
     create_backup(state, owner_id, Some("auto: pre-restore snapshot")).await?;
 
     let archive_bytes = state

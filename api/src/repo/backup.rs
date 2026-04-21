@@ -27,6 +27,10 @@ pub trait BackupRepo: Send + Sync {
     /// List all backup jobs for the given owner, newest first.
     async fn list_for_owner(&self, owner_id: &str) -> Result<Vec<BackupJob>, EmberTroveError>;
 
+    /// List every backup job across all owners, newest first.
+    /// Used by admin views — any admin may see and act on any backup.
+    async fn list_all(&self) -> Result<Vec<BackupJob>, EmberTroveError>;
+
     /// Fetch a single backup job by id.
     async fn get(&self, id: Uuid) -> Result<BackupJob, EmberTroveError>;
 
@@ -141,6 +145,23 @@ impl BackupRepo for PgBackupRepo {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| EmberTroveError::Internal(format!("backup list failed: {e}")))?;
+
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn list_all(&self) -> Result<Vec<BackupJob>, EmberTroveError> {
+        let rows = sqlx::query_as::<_, BackupJobRow>(
+            r#"
+            SELECT id, created_by, created_at, size_bytes, s3_key,
+                   node_count, edge_count, tag_count, note_count, task_count,
+                   attachment_count, comment
+            FROM backup_jobs
+            ORDER BY created_at DESC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("backup list_all failed: {e}")))?;
 
         Ok(rows.into_iter().map(Into::into).collect())
     }

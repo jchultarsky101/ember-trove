@@ -91,8 +91,18 @@ async fn list_nodes(
 
 async fn list_titles(
     State(state): State<AppState>,
+    Extension(claims): Extension<AuthClaims>,
 ) -> Result<Json<Vec<NodeTitleEntry>>, ApiError> {
-    let titles = state.nodes.list_titles().await?;
+    // Admins see every title (bypass).  Non-admins only see titles of
+    // nodes they own or have been explicitly granted a permission on —
+    // otherwise wiki-link autocomplete would enumerate every node in the
+    // system, including nodes never shared with the caller.
+    let subject = if is_admin(&claims) {
+        None
+    } else {
+        Some(claims.sub.as_str())
+    };
+    let titles = state.nodes.list_titles(subject).await?;
     Ok(Json(titles))
 }
 

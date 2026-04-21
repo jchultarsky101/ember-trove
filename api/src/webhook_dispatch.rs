@@ -37,10 +37,20 @@ pub fn dispatch(
                 return;
             }
         };
-        let client = reqwest::Client::builder()
+        // If client construction fails (e.g. TLS backend init error) abort
+        // the whole dispatch rather than silently falling back to a client
+        // with no timeout — a slow webhook endpoint on the default client
+        // would pin the tokio task indefinitely.
+        let client = match reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
-            .unwrap_or_default();
+        {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("webhook dispatch: reqwest client build failed: {e}");
+                return;
+            }
+        };
 
         for hook in hooks {
             let payload = WebhookPayload {

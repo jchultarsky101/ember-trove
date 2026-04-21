@@ -77,7 +77,7 @@ impl NodeRepo for StubNodeRepo {
     async fn delete(&self, _: NodeId) -> Result<(), EmberTroveError> { unimplemented!() }
     async fn neighbors(&self, _: NodeId) -> Result<Vec<Node>, EmberTroveError> { unimplemented!() }
     async fn backlinks(&self, _: NodeId) -> Result<Vec<Node>, EmberTroveError> { unimplemented!() }
-    async fn list_titles(&self) -> Result<Vec<NodeTitleEntry>, EmberTroveError> { unimplemented!() }
+    async fn list_titles(&self, _: Option<&str>) -> Result<Vec<NodeTitleEntry>, EmberTroveError> { unimplemented!() }
     async fn find_id_by_title(&self, _: &str) -> Result<Option<NodeId>, EmberTroveError> { unimplemented!() }
     async fn list_all_for_owner(&self, _: &str) -> Result<Vec<Node>, EmberTroveError> { unimplemented!() }
     async fn list_all(&self) -> Result<Vec<Node>, EmberTroveError> { unimplemented!() }
@@ -182,6 +182,7 @@ impl BackupRepo for StubBackupRepo {
         _: i32, _: i32, _: i32, _: i32, _: i32, _: i32, _: Option<&str>,
     ) -> Result<BackupJob, EmberTroveError> { unimplemented!() }
     async fn list_for_owner(&self, _: &str) -> Result<Vec<BackupJob>, EmberTroveError> { unimplemented!() }
+    async fn list_all(&self) -> Result<Vec<BackupJob>, EmberTroveError> { unimplemented!() }
     async fn get(&self, _: Uuid) -> Result<BackupJob, EmberTroveError> { unimplemented!() }
     async fn delete(&self, _: Uuid) -> Result<(), EmberTroveError> { unimplemented!() }
 }
