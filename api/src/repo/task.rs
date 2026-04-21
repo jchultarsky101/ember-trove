@@ -602,16 +602,21 @@ impl TaskRepo for PgTaskRepo {
         for (&nid, rows) in &mut map {
             let has_more = rows.len() > limit_usize;
             rows.truncate(limit_usize);
+            // Propagate unknown status/priority rather than silently falling
+            // back to Open/Medium — a silent fallback lets a bad migration
+            // render done/cancelled tasks as open on the dashboard.
             let summaries: Vec<TaskSummary> = rows
                 .drain(..)
-                .map(|r| TaskSummary {
-                    id: TaskId(r.id),
-                    title: r.title,
-                    status: parse_status(&r.status).unwrap_or(TaskStatus::Open),
-                    priority: parse_priority(&r.priority).unwrap_or(TaskPriority::Medium),
-                    due_date: r.due_date,
+                .map(|r| {
+                    Ok(TaskSummary {
+                        id: TaskId(r.id),
+                        title: r.title,
+                        status: parse_status(&r.status)?,
+                        priority: parse_priority(&r.priority)?,
+                        due_date: r.due_date,
+                    })
                 })
-                .collect();
+                .collect::<Result<Vec<_>, EmberTroveError>>()?;
             result.push((NodeId(nid), summaries, has_more));
         }
 
