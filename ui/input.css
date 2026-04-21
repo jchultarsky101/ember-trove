@@ -30,6 +30,24 @@
   .dark summary:focus-visible {
     outline-color: #fcd34d !important; /* amber-300 — brighter on dark bg */
   }
+
+  /* ── Ghost icon buttons ─────────────────────────────────────────────────
+     Many action buttons in the app render just a single Material Symbols
+     icon with no label and no background.  Without affordance they are
+     nearly invisible until hovered — a common accessibility complaint in
+     the UX review.  Add a subtle hover/focus surface for buttons whose
+     only child is a material-symbols icon, unless the button already
+     defines its own background (either via an inline `style="background…"`
+     or a Tailwind `bg-*` utility class). */
+  button:has(> .material-symbols-outlined:only-child):not([style*="background"]):not([class*="bg-"]):hover,
+  button:has(> .material-symbols-outlined:only-child):not([style*="background"]):not([class*="bg-"]):focus-visible {
+    background-color: rgba(120, 113, 108, 0.12); /* stone-500 @ 12% */
+    border-radius: 0.375rem;
+  }
+  .dark button:has(> .material-symbols-outlined:only-child):not([style*="background"]):not([class*="bg-"]):hover,
+  .dark button:has(> .material-symbols-outlined:only-child):not([style*="background"]):not([class*="bg-"]):focus-visible {
+    background-color: rgba(231, 229, 228, 0.10); /* stone-200 @ 10% */
+  }
 }
 
 /* ── Markdown prose ───────────────────────────────────────────────────────── */
