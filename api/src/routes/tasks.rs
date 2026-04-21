@@ -304,10 +304,11 @@ async fn project_dashboard(
 
     let node_ids: Vec<NodeId> = projects.iter().map(|n| n.id).collect();
 
-    // Fetch counts and open tasks in parallel.
-    let (counts_result, open_result) = tokio::join!(
+    // Fetch counts, open tasks, and per-node task activity in parallel.
+    let (counts_result, open_result, activity_result) = tokio::join!(
         state.tasks.counts_for_nodes(&node_ids),
         state.tasks.list_open_for_nodes(&node_ids, DASHBOARD_TASK_LIMIT),
+        state.tasks.max_task_updated_for_nodes(&node_ids),
     );
 
     let counts_map: std::collections::HashMap<NodeId, TaskCounts> =
@@ -316,9 +317,11 @@ async fn project_dashboard(
         .into_iter()
         .map(|(nid, tasks, more)| (nid, (tasks, more)))
         .collect();
+    let activity_map: std::collections::HashMap<NodeId, chrono::DateTime<chrono::Utc>> =
+        activity_result?.into_iter().collect();
 
     let empty = TaskCounts { open: 0, in_progress: 0, done: 0, cancelled: 0 };
-    let entries = projects
+    let mut entries: Vec<ProjectDashboardEntry> = projects
         .into_iter()
         .map(|n| {
             let node_status = format!("{:?}", n.status).to_lowercase();
@@ -328,6 +331,10 @@ async fn project_dashboard(
                 .get(&n.id)
                 .cloned()
                 .unwrap_or_default();
+            let last_activity_at = activity_map
+                .get(&n.id)
+                .copied()
+                .map_or(n.updated_at, |t| t.max(n.updated_at));
             ProjectDashboardEntry {
                 node_id: n.id,
                 title: n.title,
@@ -336,9 +343,14 @@ async fn project_dashboard(
                 status_section,
                 open_tasks,
                 has_more_tasks,
+                last_activity_at,
             }
         })
         .collect();
+
+    // Most recently active projects first — keeps the 2–3 projects the
+    // user is currently working on at the top of the dashboard.
+    entries.sort_by(|a, b| b.last_activity_at.cmp(&a.last_activity_at));
 
     Ok(Json(entries))
 }

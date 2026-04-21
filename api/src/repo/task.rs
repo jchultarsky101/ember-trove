@@ -67,6 +67,14 @@ pub trait TaskRepo: Send + Sync {
         limit_per_node: i64,
     ) -> Result<Vec<(NodeId, Vec<TaskSummary>, bool)>, EmberTroveError>;
 
+    /// Most recent `updated_at` across tasks for each given node.
+    /// Only returns entries for nodes that have at least one task; absent
+    /// nodes should fall back to the node's own `updated_at` at the caller.
+    async fn max_task_updated_for_nodes(
+        &self,
+        node_ids: &[NodeId],
+    ) -> Result<Vec<(NodeId, DateTime<Utc>)>, EmberTroveError>;
+
     /// All tasks owned by `owner_id` — used for backup.
     async fn list_all_for_owner(&self, owner_id: &str) -> Result<Vec<Task>, EmberTroveError>;
 
@@ -608,6 +616,41 @@ impl TaskRepo for PgTaskRepo {
         }
 
         Ok(result)
+    }
+
+    async fn max_task_updated_for_nodes(
+        &self,
+        node_ids: &[NodeId],
+    ) -> Result<Vec<(NodeId, DateTime<Utc>)>, EmberTroveError> {
+        if node_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let ids: Vec<Uuid> = node_ids.iter().map(|n| n.0).collect();
+
+        #[derive(sqlx::FromRow)]
+        struct MaxRow {
+            node_id: Uuid,
+            max_updated: DateTime<Utc>,
+        }
+
+        let rows = sqlx::query_as::<_, MaxRow>(
+            r#"
+            SELECT node_id, MAX(updated_at) AS max_updated
+            FROM node_tasks
+            WHERE node_id = ANY($1)
+            GROUP BY node_id
+            "#,
+        )
+        .bind(&ids)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| EmberTroveError::Internal(format!("max_task_updated_for_nodes failed: {e}")))?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| (NodeId(r.node_id), r.max_updated))
+            .collect())
     }
 
     async fn list_all_for_owner(&self, owner_id: &str) -> Result<Vec<Task>, EmberTroveError> {

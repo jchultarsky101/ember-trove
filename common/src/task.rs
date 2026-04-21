@@ -94,6 +94,10 @@ pub struct ProjectDashboardEntry {
     pub open_tasks: Vec<TaskSummary>,
     /// `true` when more open tasks exist beyond the returned slice.
     pub has_more_tasks: bool,
+    /// Most recent activity across the project's own metadata and its tasks.
+    /// Equals `MAX(node.updated_at, MAX(tasks.updated_at))`; used to sort
+    /// the dashboard so currently-active projects rise to the top.
+    pub last_activity_at: DateTime<Utc>,
 }
 
 /// Deserialises `Option<Option<T>>` correctly:

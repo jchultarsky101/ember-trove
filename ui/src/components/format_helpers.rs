@@ -32,3 +32,41 @@ pub fn format_timestamp(ts: &chrono::DateTime<chrono::Utc>) -> String {
         .and_then(|v| v.as_string())
         .unwrap_or_else(|| iso[..16].replace('T', " "))
 }
+
+/// Short relative-time label for scannable lists (e.g. "just now", "2h ago",
+/// "3d ago", or a short absolute date for anything older than a week).
+/// Uses the browser clock via `js_sys::Date::now()` so the result reflects
+/// the user's local time.
+pub fn format_relative_short(ts: &chrono::DateTime<chrono::Utc>) -> String {
+    let now_ms = js_sys::Date::now();
+    let ts_ms = ts.timestamp_millis() as f64;
+    let diff_secs = ((now_ms - ts_ms) / 1000.0) as i64;
+
+    if diff_secs < 0 {
+        return "just now".to_string();
+    }
+    if diff_secs < 45 {
+        return "just now".to_string();
+    }
+    let diff_mins = diff_secs / 60;
+    if diff_mins < 60 {
+        return format!("{diff_mins}m ago");
+    }
+    let diff_hrs = diff_mins / 60;
+    if diff_hrs < 24 {
+        return format!("{diff_hrs}h ago");
+    }
+    let diff_days = diff_hrs / 24;
+    if diff_days < 7 {
+        return format!("{diff_days}d ago");
+    }
+    // Older than a week — show a short absolute date ("Apr 18") to remain scannable.
+    let iso = ts.to_rfc3339();
+    let js = format!(
+        "new Intl.DateTimeFormat(undefined, {{month:'short',day:'numeric'}}).format(new Date('{iso}'))"
+    );
+    js_sys::eval(&js)
+        .ok()
+        .and_then(|v| v.as_string())
+        .unwrap_or_else(|| iso[..10].to_string())
+}
