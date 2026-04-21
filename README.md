@@ -27,7 +27,7 @@ Ember Trove is a web-based personal knowledge management (PKM) application where
 - **Activity log** — per-node audit trail of 10 action types (created, updated, tag changes, permission changes, attachments, etc.).
 - **Node pinning** — pin important nodes; pinned nodes sort first in the list and are highlighted with an amber ring in the graph. `p` key toggles pin on the open node.
 - **Node templates** — create reusable Markdown templates for each node type; "Use" pre-fills the editor body.
-- **Quick capture** — floating amber FAB (bottom-right) and `n` keyboard shortcut both open a lightweight modal for rapid node creation. Type, title, and optional body; Ctrl+Enter to save.
+- **Quick capture** — `n` keyboard shortcut opens a lightweight modal for rapid node creation. Type, title, and optional body; Ctrl+Enter to save.
 - **Keyboard shortcuts** — `n` new node · `g` graph · `/` search · `p` pin · `?` shortcut help · `Esc` back. All suppressed inside form fields.
 - **Multi-user permissions** — nodes are **private by default**. Owners can invite others by email with Viewer / Editor / Owner roles. Bulk permission management available in the admin panel. Admin users have full access to all nodes regardless of ownership.
 - **User management** — admin UI backed by Amazon Cognito (production) or Keycloak (local). User invite emails via AWS SES.
