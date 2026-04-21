@@ -468,25 +468,30 @@ pub fn NodeEditor(node: Option<NodeId>) -> impl IntoView {
 
     view! {
         <div class="flex flex-col h-full">
-            // Header
-            <div class="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-800">
-                <div class="flex items-center gap-3 flex-1">
+            // Header — stacks vertically below md: so the metadata selects +
+            // Save/Cancel buttons remain reachable without horizontal scroll
+            // on mobile.
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between
+                        gap-2 px-4 md:px-6 py-3 md:py-4
+                        border-b border-stone-200 dark:border-stone-800">
+                <div class="flex items-center gap-3 flex-1 min-w-0">
                     <button
-                        class="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+                        class="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 flex-shrink-0"
                         on:click=move |_| nav_back1("/nodes", Default::default())
                     >
                         <span class="material-symbols-outlined">"arrow_back"</span>
                     </button>
                     <input
                         type="text"
-                        class="flex-1 text-lg font-semibold bg-transparent text-stone-900 dark:text-stone-100
-                            focus:outline-none placeholder-stone-400"
+                        class="flex-1 min-w-0 text-lg font-semibold bg-transparent
+                               text-stone-900 dark:text-stone-100
+                               focus:outline-none placeholder-stone-400"
                         placeholder="Node title..."
                         prop:value=move || title.get()
                         on:input=move |ev| title.set(event_target_value(&ev))
                     />
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap md:flex-nowrap md:justify-end">
                     <select
                         class="text-sm bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300
                             rounded-lg px-2 py-1.5 focus:outline-none"
