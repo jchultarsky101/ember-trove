@@ -4,6 +4,20 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [2.3.5] - 2026-04-21
+
+### Fixed
+- **Node editor: Save button reachable on mobile portrait** — the editor
+  header was a single `justify-between` row with title + 5-6 controls,
+  which overflowed horizontally on narrow viewports so the Save button
+  was off-screen right and users had to horizontally scroll to commit
+  their edits.  Below `md:`, the header now stacks vertically (title
+  row on top, controls row below with `flex-wrap`), keeping Save and
+  Cancel always visible without horizontal scrolling.  Desktop layout
+  is unchanged.
+
+---
+
 ## [2.3.4] - 2026-04-21
 
 ### Changed
