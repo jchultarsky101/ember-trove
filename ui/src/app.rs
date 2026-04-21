@@ -125,7 +125,7 @@ pub fn App() -> impl IntoView {
     let task_refresh = TaskRefresh(RwSignal::new(0u32));
     provide_context(task_refresh);
 
-    // Quick-capture modal — shared between `n` shortcut and the FAB button.
+    // Quick-capture modal — opened via the `n` keyboard shortcut.
     let show_capture = ShowCapture(RwSignal::new(false));
     provide_context(show_capture);
 
