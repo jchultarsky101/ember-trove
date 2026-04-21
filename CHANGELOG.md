@@ -4,6 +4,106 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [2.3.2] - 2026-04-21
+
+### Changed
+- **NodeView header: mobile overflow menu** — on narrow viewports the four
+  action buttons (Export, Edit, Duplicate, Delete) collapse into a single
+  kebab (`⋮`) menu. The header no longer wraps on small screens, and the
+  desktop cluster is unchanged at `md:` and above. Click-outside and
+  item-click both close the menu; loading / disabled states preserved.
+- **CHANGELOG sync** — backfilled releases 2.2.4 → 2.3.1 from internal
+  notes and re-anchored ongoing releases to this file.
+
+---
+
+## [2.3.1] - 2026-04-21
+
+### Changed
+- **Ghost icon buttons are discoverable** — global `input.css` rule adds
+  a subtle hover / focus-visible background to any `<button>` whose only
+  child is a Material Symbols icon and that does not already define its
+  own background.  Surface small action buttons (edit, delete, pin,
+  toggle my-day) that were previously nearly invisible.
+
+---
+
+## [2.3.0] - 2026-04-21
+
+### Changed
+- **IA: `/tasks/*` consolidation** — My Day, Inbox, and Calendar are now
+  three tabs inside a single Tasks area instead of three sidebar peers.
+  New `TasksView` wrapper with a `role="tablist"` tab bar preserves each
+  inner view's behaviour unchanged.
+  - New URLs: `/tasks/my-day`, `/tasks/inbox`, `/tasks/calendar`.
+  - Legacy `/my-day`, `/inbox`, `/calendar` redirect for bookmarks / PWA.
+  - PWA `start_url` moved from `/my-day` to `/tasks/my-day`.
+  - Service-worker `CACHE_NAME` bumped v3 → v4 to evict pre-consolidation
+    bundles on next visit.
+
+---
+
+## [2.2.7] - 2026-04-21
+
+### Added
+- **Keyboard focus ring (a11y)** — `:focus-visible` rule in `input.css`
+  applies an amber outline to buttons, `[role=button]`, anchors, and
+  summary elements.  Fires only for non-pointer focus, so mouse clicks
+  never produce a ring.  `!important` wins against per-component
+  `focus:outline-none` utilities.
+
+---
+
+## [2.2.6] - 2026-04-21
+
+### Changed
+- **Dashboard sort: most-recently-active projects first** —
+  `ProjectDashboardEntry.last_activity_at = MAX(node.updated_at, MAX(tasks.updated_at))`
+  surfaces the 2–3 projects currently in flight at the top of the
+  dashboard.  Each card displays a compact "Updated 3h ago" label
+  (hidden below `sm:` to preserve the mobile layout).
+
+### Added
+- `TaskRepo::max_task_updated_for_nodes` method; `format_relative_short`
+  UI helper in `format_helpers.rs`.
+
+---
+
+## [2.2.5] - 2026-04-21
+
+### Removed
+- **Quick Add floating action button** — the amber FAB in the lower-right
+  was rarely used and often occluded content.  Quick capture remains
+  accessible via the `n` keyboard shortcut.
+
+---
+
+## [2.2.4] - 2026-04-18
+
+### Security
+- **rustls-webpki name-constraint bypass** — bumped `rustls-webpki`
+  0.103.10 → 0.103.12 to resolve RUSTSEC-2026-0098 / 0099.  Bumped the
+  `aws-smithy-runtime` stack to the latest as a follow-up.
+- **cargo-audit hygiene** — expanded `ignore` list with dated rationale
+  for the remaining transitive 0.101.7 path (AWS endpoints only, rustls
+  0.21).  CI is green on a clean advisory database.
+
+### Documentation
+- CLAUDE.md: release is not done until every workflow on the pushed ref
+  is green; a successful `Release` alongside a red `CI` still leaves
+  `master` broken for the next merge.
+
+---
+
+> Note: releases 1.76 through 2.2.3 are tracked in the internal release
+> notes (see `.claude/MEMORY.md`) rather than this file. Major themes
+> during that period: backup/restore with schema v2 (2.1.0), enhanced
+> dashboard with project status and open tasks (2.2.0), security
+> hardening sprints (1.95 → 1.98), PWA offline (1.93.0), graph-view
+> improvements, task panel refactor, and multi-user permissions.
+
+---
+
 ## [1.75.12] - 2026-04-06
 
 ### Fixed

@@ -179,56 +179,154 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
                                                 {status_icon(&status)}
                                             </span>
                                         </div>
-                                        <div class="flex items-center gap-1">
-                                            // Export — opens the markdown download in a new tab.
-                                            // Using an <a> with the API URL triggers the browser's
-                                            // native file-save dialog without any JS fetch.
-                                            <a
-                                                href=format!("/api/nodes/{id}/export")
-                                                download=true
-                                                class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
-                                                    dark:hover:text-stone-300 hover:bg-stone-100
-                                                    dark:hover:bg-stone-800 transition-colors"
-                                                title="Export as Markdown"
-                                            >
-                                                <span class="material-symbols-outlined">"download"</span>
-                                            </a>
-                                            <button
-                                                class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
-                                                    dark:hover:text-stone-300 hover:bg-stone-100
-                                                    dark:hover:bg-stone-800 transition-colors"
-                                                on:click=move |_| nav_edit(&format!("/nodes/{edit_id}/edit"), Default::default())
-                                                title="Edit"
-                                            >
-                                                <span class="material-symbols-outlined">"edit"</span>
-                                            </button>
-                                            <button
-                                                class="p-1.5 rounded-lg text-stone-400 hover:text-amber-600
-                                                    dark:hover:text-amber-400 hover:bg-amber-50
-                                                    dark:hover:bg-amber-900/30 transition-colors
-                                                    disabled:opacity-30"
-                                                on:click=move |_| do_duplicate()
-                                                disabled=move || duplicating.get()
-                                                title=move || if duplicating.get() { "Duplicating…" } else { "Duplicate" }
-                                            >
-                                                <span class="material-symbols-outlined">
-                                                    {move || if duplicating.get() { "hourglass_empty" } else { "content_copy" }}
-                                                </span>
-                                            </button>
-                                            <button
-                                                class="p-1.5 rounded-lg text-stone-400 hover:text-red-600
-                                                    dark:hover:text-red-400 hover:bg-red-50
-                                                    dark:hover:bg-red-900/30 transition-colors
-                                                    disabled:opacity-30"
-                                                on:click=move |_| show_delete_confirm.set(true)
-                                                disabled=move || deleting.get()
-                                                title=move || if deleting.get() { "Deleting…" } else { "Delete" }
-                                            >
-                                                <span class="material-symbols-outlined">
-                                                    {move || if deleting.get() { "hourglass_empty" } else { "delete" }}
-                                                </span>
-                                            </button>
-                                        </div>
+                                        {
+                                            // Overflow dropdown state — scoped to this rendered
+                                            // node so switching nodes implicitly closes the menu.
+                                            let menu_open = RwSignal::new(false);
+                                            view! {
+                                                <div class="flex items-center gap-1">
+                                                    // Desktop cluster — all four actions visible
+                                                    <div class="hidden md:flex items-center gap-1">
+                                                        <a
+                                                            href=format!("/api/nodes/{id}/export")
+                                                            download=true
+                                                            class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                                                                dark:hover:text-stone-300 hover:bg-stone-100
+                                                                dark:hover:bg-stone-800 transition-colors"
+                                                            title="Export as Markdown"
+                                                        >
+                                                            <span class="material-symbols-outlined">"download"</span>
+                                                        </a>
+                                                        <button
+                                                            class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600
+                                                                dark:hover:text-stone-300 hover:bg-stone-100
+                                                                dark:hover:bg-stone-800 transition-colors"
+                                                            on:click=move |_| nav_edit(&format!("/nodes/{edit_id}/edit"), Default::default())
+                                                            title="Edit"
+                                                        >
+                                                            <span class="material-symbols-outlined">"edit"</span>
+                                                        </button>
+                                                        <button
+                                                            class="p-1.5 rounded-lg text-stone-400 hover:text-amber-600
+                                                                dark:hover:text-amber-400 hover:bg-amber-50
+                                                                dark:hover:bg-amber-900/30 transition-colors
+                                                                disabled:opacity-30"
+                                                            on:click=move |_| do_duplicate()
+                                                            disabled=move || duplicating.get()
+                                                            title=move || if duplicating.get() { "Duplicating…" } else { "Duplicate" }
+                                                        >
+                                                            <span class="material-symbols-outlined">
+                                                                {move || if duplicating.get() { "hourglass_empty" } else { "content_copy" }}
+                                                            </span>
+                                                        </button>
+                                                        <button
+                                                            class="p-1.5 rounded-lg text-stone-400 hover:text-red-600
+                                                                dark:hover:text-red-400 hover:bg-red-50
+                                                                dark:hover:bg-red-900/30 transition-colors
+                                                                disabled:opacity-30"
+                                                            on:click=move |_| show_delete_confirm.set(true)
+                                                            disabled=move || deleting.get()
+                                                            title=move || if deleting.get() { "Deleting…" } else { "Delete" }
+                                                        >
+                                                            <span class="material-symbols-outlined">
+                                                                {move || if deleting.get() { "hourglass_empty" } else { "delete" }}
+                                                            </span>
+                                                        </button>
+                                                    </div>
+
+                                                    // Mobile overflow — single kebab opens a dropdown with
+                                                    // the same four actions.  The header stops wrapping on
+                                                    // narrow viewports.
+                                                    <div class="md:hidden relative">
+                                                        <button
+                                                            class="p-1.5 rounded-lg text-stone-500 dark:text-stone-400
+                                                                hover:text-stone-800 dark:hover:text-stone-100
+                                                                transition-colors"
+                                                            aria-haspopup="menu"
+                                                            aria-expanded=move || if menu_open.get() { "true" } else { "false" }
+                                                            title="Actions"
+                                                            on:click=move |_| menu_open.update(|v| *v = !*v)
+                                                        >
+                                                            <span class="material-symbols-outlined">"more_vert"</span>
+                                                        </button>
+                                                        {move || menu_open.get().then(|| view! {
+                                                            <>
+                                                            // Click-outside backdrop
+                                                            <div
+                                                                class="fixed inset-0 z-20"
+                                                                on:click=move |_| menu_open.set(false)
+                                                            />
+                                                            <div
+                                                                class="absolute right-0 top-full mt-1 w-48 rounded-lg
+                                                                    border border-stone-200 dark:border-stone-700
+                                                                    bg-white dark:bg-stone-900 shadow-lg
+                                                                    overflow-hidden z-30"
+                                                                role="menu"
+                                                            >
+                                                                <a
+                                                                    href=format!("/api/nodes/{id}/export")
+                                                                    download=true
+                                                                    class="flex items-center gap-2 px-3 py-2 text-sm
+                                                                        text-stone-700 dark:text-stone-200
+                                                                        hover:bg-stone-100 dark:hover:bg-stone-800"
+                                                                    role="menuitem"
+                                                                    on:click=move |_| menu_open.set(false)
+                                                                >
+                                                                    <span class="material-symbols-outlined" style="font-size:18px;">"download"</span>
+                                                                    "Export as Markdown"
+                                                                </a>
+                                                                <button
+                                                                    type="button"
+                                                                    class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm
+                                                                        text-stone-700 dark:text-stone-200
+                                                                        hover:bg-stone-100 dark:hover:bg-stone-800"
+                                                                    role="menuitem"
+                                                                    on:click=move |_| {
+                                                                        menu_open.set(false);
+                                                                        navigate.get_value()(&format!("/nodes/{edit_id}/edit"), Default::default());
+                                                                    }
+                                                                >
+                                                                    <span class="material-symbols-outlined" style="font-size:18px;">"edit"</span>
+                                                                    "Edit"
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm
+                                                                        text-stone-700 dark:text-stone-200
+                                                                        hover:bg-amber-50 dark:hover:bg-amber-900/30
+                                                                        hover:text-amber-700 dark:hover:text-amber-400
+                                                                        disabled:opacity-40"
+                                                                    role="menuitem"
+                                                                    disabled=move || duplicating.get()
+                                                                    on:click=move |_| { menu_open.set(false); do_duplicate(); }
+                                                                >
+                                                                    <span class="material-symbols-outlined" style="font-size:18px;">
+                                                                        {move || if duplicating.get() { "hourglass_empty" } else { "content_copy" }}
+                                                                    </span>
+                                                                    {move || if duplicating.get() { "Duplicating…" } else { "Duplicate" }}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    class="flex items-center gap-2 w-full text-left px-3 py-2 text-sm
+                                                                        text-red-600 dark:text-red-400
+                                                                        hover:bg-red-50 dark:hover:bg-red-900/30
+                                                                        disabled:opacity-40"
+                                                                    role="menuitem"
+                                                                    disabled=move || deleting.get()
+                                                                    on:click=move |_| { menu_open.set(false); show_delete_confirm.set(true); }
+                                                                >
+                                                                    <span class="material-symbols-outlined" style="font-size:18px;">
+                                                                        {move || if deleting.get() { "hourglass_empty" } else { "delete" }}
+                                                                    </span>
+                                                                    {move || if deleting.get() { "Deleting…" } else { "Delete" }}
+                                                                </button>
+                                                            </div>
+                                                            </>
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            }
+                                        }
                                     </div>
                                     // Tags
                                     <div class="border-b border-stone-200 dark:border-stone-800">
