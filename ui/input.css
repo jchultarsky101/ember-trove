@@ -11,6 +11,25 @@
   body {
     font-family: 'Inter', system-ui, sans-serif;
   }
+
+  /* ── Keyboard focus ring ────────────────────────────────────────────────
+     :focus-visible fires only when focus was reached via keyboard (or other
+     non-pointer input), so mouse clicks never produce a ring.  !important
+     wins against per-component Tailwind `focus:outline-none` utilities so
+     the accessibility indicator is never accidentally suppressed. */
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  a:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid #fbbf24 !important; /* amber-400 */
+    outline-offset: 2px !important;
+  }
+  .dark button:focus-visible,
+  .dark [role="button"]:focus-visible,
+  .dark a:focus-visible,
+  .dark summary:focus-visible {
+    outline-color: #fcd34d !important; /* amber-300 — brighter on dark bg */
+  }
 }
 
 /* ── Markdown prose ───────────────────────────────────────────────────────── */
