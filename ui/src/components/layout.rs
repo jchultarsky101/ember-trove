@@ -263,24 +263,7 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                 </main>
             </div>
 
-            // Floating Action Button
-            <button
-                class="fixed bottom-6 right-6 z-30
-                       w-14 h-14 rounded-full shadow-lg
-                       bg-gradient-to-br from-amber-500 to-orange-600
-                       hover:from-amber-400 hover:to-orange-500
-                       text-white flex items-center justify-center
-                       hover:shadow-xl hover:scale-105
-                       transition-all duration-150 cursor-pointer"
-                title="Quick capture (new node)"
-                on:click=move |_| show_capture.set(true)
-            >
-                <span class="material-symbols-outlined" style="font-size: 28px; font-weight: 300;">
-                    "add"
-                </span>
-            </button>
-
-            // Quick-capture modal
+            // Quick-capture modal (invoked via `n` keyboard shortcut)
             <CreateNodeModal
                 show=show_capture.read_only()
                 on_close=Callback::new(move |_| show_capture.set(false))
