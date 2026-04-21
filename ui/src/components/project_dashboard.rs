@@ -2,6 +2,7 @@ use common::task::{ProjectDashboardEntry, TaskSummary};
 use leptos::prelude::*;
 
 use crate::app::TaskRefresh;
+use crate::components::format_helpers::format_relative_short;
 use crate::components::node_meta::{status_color, status_icon, status_label};
 use crate::components::task_common::priority_color_hex;
 use crate::markdown::render_markdown_plain;
@@ -95,6 +96,7 @@ fn ProjectCard(
     let open_tasks = entry.open_tasks;
     let has_more = entry.has_more_tasks;
     let open_count = counts.open + counts.in_progress;
+    let updated_label = format_relative_short(&entry.last_activity_at);
 
     view! {
         <div
@@ -120,6 +122,14 @@ fn ProjectCard(
                 <div class="flex items-center gap-1 text-sm flex-shrink-0" style=s_color>
                     <span class="material-symbols-outlined" style="font-size: 15px;">{s_icon}</span>
                     <span class="text-xs">{s_label}</span>
+                </div>
+
+                // Last-activity label
+                <div class="hidden sm:flex items-center gap-1 text-xs
+                    text-stone-500 dark:text-stone-400 flex-shrink-0"
+                    title="Most recent activity across the project and its tasks">
+                    <span class="material-symbols-outlined" style="font-size: 14px;">{"history"}</span>
+                    <span>{updated_label}</span>
                 </div>
 
                 // Count badges
