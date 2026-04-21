@@ -10,12 +10,9 @@ use crate::{
         admin_view::AdminView,
         backup_view::BackupView,
         bulk_permissions_view::BulkPermissionsView,
-        calendar_view::CalendarView,
         dark_mode_toggle::DarkModeToggle,
         graph_view::GraphView,
-        inbox_view::InboxView,
         modals::{create_node::CreateNodeModal, shortcuts::ShortcutsModal},
-        my_day_view::MyDayView,
         node_editor::NodeEditor,
         node_list::NodeList,
         node_view::NodeView,
@@ -24,6 +21,7 @@ use crate::{
         search_view::SearchView,
         sidebar::Sidebar,
         tag_manager::TagManager,
+        tasks_view::{TasksTab, TasksView},
         templates_view::TemplatesView,
         toast::ToastOverlay,
     },
@@ -241,11 +239,17 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                 </aside>
 
                 <main class="flex-1 overflow-auto flex flex-col min-w-0">
-                    <Routes fallback=|| view! { <Redirect path="/my-day" /> }>
-                        <Route path=path!("/")          view=|| view! { <Redirect path="/my-day" /> } />
-                        <Route path=path!("/inbox")     view=InboxView />
-                        <Route path=path!("/my-day")    view=MyDayView />
-                        <Route path=path!("/calendar")  view=CalendarView />
+                    <Routes fallback=|| view! { <Redirect path="/tasks/my-day" /> }>
+                        <Route path=path!("/")                 view=|| view! { <Redirect path="/tasks/my-day" /> } />
+                        <Route path=path!("/tasks")            view=|| view! { <Redirect path="/tasks/my-day" /> } />
+                        <Route path=path!("/tasks/my-day")     view=|| view! { <TasksView active=TasksTab::MyDay    /> } />
+                        <Route path=path!("/tasks/inbox")      view=|| view! { <TasksView active=TasksTab::Inbox    /> } />
+                        <Route path=path!("/tasks/calendar")   view=|| view! { <TasksView active=TasksTab::Calendar /> } />
+                        // Legacy URL redirects — preserve bookmarks, PWA shortcuts, and any
+                        // external links dating back before the Tasks consolidation.
+                        <Route path=path!("/my-day")    view=|| view! { <Redirect path="/tasks/my-day"    /> } />
+                        <Route path=path!("/inbox")     view=|| view! { <Redirect path="/tasks/inbox"     /> } />
+                        <Route path=path!("/calendar")  view=|| view! { <Redirect path="/tasks/calendar"  /> } />
                         <Route path=path!("/dashboard") view=ProjectDashboard />
                         <Route path=path!("/graph")     view=GraphView />
                         <Route path=path!("/search")    view=SearchView />
