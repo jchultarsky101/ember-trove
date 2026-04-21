@@ -4,7 +4,7 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     api::{delete_favorite, fetch_favorites, reorder_favorites},
-    app::FavoritesRefresh,
+    app::{FavoritesRefresh, storage_get, storage_set},
     components::{
         layout::SidebarCollapsed,
         modals::add_favorite::AddFavoriteModal,
@@ -13,6 +13,19 @@ use crate::{
 };
 use leptos_router::hooks::use_navigate;
 
+// localStorage keys for each sub-group's expand state.  Default false
+// (collapsed) so the sidebar stays compact as the lists grow.
+const LS_WEB_EXPANDED:   &str = "et.fav.web.expanded";
+const LS_NODES_EXPANDED: &str = "et.fav.nodes.expanded";
+
+fn read_expanded(key: &str) -> bool {
+    storage_get(key).as_deref() == Some("1")
+}
+
+fn write_expanded(key: &str, value: bool) {
+    storage_set(key, if value { "1" } else { "0" });
+}
+
 /// Sidebar section that shows the user's pinned favorites split into two
 /// sub-groups: external Web Links (sky accent) on top, internal Nodes (amber
 /// accent) below.  Position: below search, above "All Nodes".
@@ -20,6 +33,13 @@ use leptos_router::hooks::use_navigate;
 pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> impl IntoView {
     let favorites: RwSignal<Vec<Favorite>> = RwSignal::new(vec![]);
     let show_modal = RwSignal::new(false);
+
+    // Expand state for the two sub-groups — persisted per-user in
+    // localStorage so each section remembers its own state across reloads.
+    let web_expanded   = RwSignal::new(read_expanded(LS_WEB_EXPANDED));
+    let nodes_expanded = RwSignal::new(read_expanded(LS_NODES_EXPANDED));
+    Effect::new(move |_| write_expanded(LS_WEB_EXPANDED,   web_expanded.get()));
+    Effect::new(move |_| write_expanded(LS_NODES_EXPANDED, nodes_expanded.get()));
 
     // Re-fetch whenever NodeView pins/unpins a node (FavoritesRefresh bumped).
     let fav_refresh = use_context::<FavoritesRefresh>().map(|fr| fr.0);
@@ -146,39 +166,42 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
                         let node_len  = node_favs.len();
 
                         view! {
-                            // ── Web Links sub-group ───────────────────────────
+                            // ── Web Links sub-group (collapsible) ──────────────
                             {has_web.then(|| {
-                                let rows = web_favs.into_iter().enumerate().map(|(i, fav)| {
-                                    let fav_id = fav.id;
-                                    let label  = fav.label.clone();
-                                    let url    = fav.url.clone();
-                                    view! {
-                                        <FavoriteRow
-                                            label=label
-                                            url=url
-                                            node_id=fav.node_id
-                                            fav_id=fav_id
-                                            is_first=i == 0
-                                            is_last=i + 1 == web_len
-                                            on_delete=on_delete
-                                            on_move_up=move_up
-                                            on_move_down=move_down
-                                            on_nav=on_nav
-                                        />
-                                    }
-                                }).collect_view();
-
+                                let rows_data = web_favs.clone();
                                 view! {
-                                    <div class="flex items-center gap-1.5 px-3 pt-0.5 pb-0.5">
-                                        <span class="material-symbols-outlined
-                                                     text-sky-400 dark:text-sky-500"
-                                              style="font-size: 12px;">"public"</span>
-                                        <span class="text-[10px] font-semibold uppercase tracking-widest
-                                                     text-sky-500/60 dark:text-sky-400/50 select-none">
-                                            "Web Links"
-                                        </span>
-                                    </div>
-                                    {rows}
+                                    <FavoriteSubheader
+                                        icon="public"
+                                        icon_class="material-symbols-outlined text-sky-400 dark:text-sky-500"
+                                        label_class="text-[10px] font-semibold uppercase tracking-widest \
+                                                     text-sky-500/60 dark:text-sky-400/50"
+                                        label="Web Links"
+                                        count=web_len
+                                        expanded=web_expanded
+                                    />
+                                    {move || {
+                                        if !web_expanded.get() { return None; }
+                                        let rows = rows_data.clone().into_iter().enumerate().map(|(i, fav)| {
+                                            let fav_id = fav.id;
+                                            let label  = fav.label.clone();
+                                            let url    = fav.url.clone();
+                                            view! {
+                                                <FavoriteRow
+                                                    label=label
+                                                    url=url
+                                                    node_id=fav.node_id
+                                                    fav_id=fav_id
+                                                    is_first=i == 0
+                                                    is_last=i + 1 == web_len
+                                                    on_delete=on_delete
+                                                    on_move_up=move_up
+                                                    on_move_down=move_down
+                                                    on_nav=on_nav
+                                                />
+                                            }
+                                        }).collect_view();
+                                        Some(rows)
+                                    }}
                                 }
                             })}
 
@@ -188,39 +211,42 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
                                             border-stone-200 dark:border-stone-700/60" />
                             })}
 
-                            // ── Nodes sub-group ───────────────────────────────
+                            // ── Nodes sub-group (collapsible) ──────────────────
                             {has_nodes.then(|| {
-                                let rows = node_favs.into_iter().enumerate().map(|(i, fav)| {
-                                    let fav_id = fav.id;
-                                    let label  = fav.label.clone();
-                                    let url    = fav.url.clone();
-                                    view! {
-                                        <FavoriteRow
-                                            label=label
-                                            url=url
-                                            node_id=fav.node_id
-                                            fav_id=fav_id
-                                            is_first=i == 0
-                                            is_last=i + 1 == node_len
-                                            on_delete=on_delete
-                                            on_move_up=move_up
-                                            on_move_down=move_down
-                                            on_nav=on_nav
-                                        />
-                                    }
-                                }).collect_view();
-
+                                let rows_data = node_favs.clone();
                                 view! {
-                                    <div class="flex items-center gap-1.5 px-3 pt-0.5 pb-0.5">
-                                        <span class="material-symbols-outlined
-                                                     text-amber-400 dark:text-amber-500"
-                                              style="font-size: 12px;">"star"</span>
-                                        <span class="text-[10px] font-semibold uppercase tracking-widest
-                                                     text-amber-500/60 dark:text-amber-400/50 select-none">
-                                            "Nodes"
-                                        </span>
-                                    </div>
-                                    {rows}
+                                    <FavoriteSubheader
+                                        icon="star"
+                                        icon_class="material-symbols-outlined text-amber-400 dark:text-amber-500"
+                                        label_class="text-[10px] font-semibold uppercase tracking-widest \
+                                                     text-amber-500/60 dark:text-amber-400/50"
+                                        label="Nodes"
+                                        count=node_len
+                                        expanded=nodes_expanded
+                                    />
+                                    {move || {
+                                        if !nodes_expanded.get() { return None; }
+                                        let rows = rows_data.clone().into_iter().enumerate().map(|(i, fav)| {
+                                            let fav_id = fav.id;
+                                            let label  = fav.label.clone();
+                                            let url    = fav.url.clone();
+                                            view! {
+                                                <FavoriteRow
+                                                    label=label
+                                                    url=url
+                                                    node_id=fav.node_id
+                                                    fav_id=fav_id
+                                                    is_first=i == 0
+                                                    is_last=i + 1 == node_len
+                                                    on_delete=on_delete
+                                                    on_move_up=move_up
+                                                    on_move_down=move_down
+                                                    on_nav=on_nav
+                                                />
+                                            }
+                                        }).collect_view();
+                                        Some(rows)
+                                    }}
                                 }
                             })}
                         }.into_any()
@@ -235,6 +261,45 @@ pub fn FavoritesSection(collapsed: SidebarCollapsed, on_nav: Callback<()>) -> im
             on_close=Callback::new(move |()| show_modal.set(false))
             on_added=on_added
         />
+    }
+}
+
+/// Header row for a favorites sub-group.  Acts as a button that toggles the
+/// `expanded` signal; shows a chevron indicator + item count so the section
+/// is useful even when collapsed.
+#[component]
+fn FavoriteSubheader(
+    icon: &'static str,
+    icon_class: &'static str,
+    label_class: &'static str,
+    label: &'static str,
+    count: usize,
+    expanded: RwSignal<bool>,
+) -> impl IntoView {
+    view! {
+        <button
+            type="button"
+            class="w-full flex items-center gap-1.5 px-3 py-0.5 rounded-lg
+                   hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors
+                   cursor-pointer text-left"
+            aria-expanded=move || if expanded.get() { "true" } else { "false" }
+            title=move || if expanded.get() {
+                format!("Hide {label}")
+            } else {
+                format!("Show {label} ({count})")
+            }
+            on:click=move |_| expanded.update(|v| *v = !*v)
+        >
+            <span class="material-symbols-outlined text-stone-400 dark:text-stone-500 shrink-0"
+                  style="font-size: 14px;">
+                {move || if expanded.get() { "expand_more" } else { "chevron_right" }}
+            </span>
+            <span class=icon_class style="font-size: 12px;">{icon}</span>
+            <span class=format!("{label_class} select-none")>{label}</span>
+            <span class="ml-auto text-[10px] text-stone-400 dark:text-stone-500 tabular-nums select-none">
+                {count}
+            </span>
+        </button>
     }
 }
 

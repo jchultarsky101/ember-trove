@@ -4,6 +4,18 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [2.3.3] - 2026-04-21
+
+### Changed
+- **Sidebar · Favorites are collapsible per sub-group** — the "Web Links"
+  and "Nodes" sub-sections under Favorites each have an independent
+  expand/collapse toggle (chevron + count in the header).  Both are
+  collapsed by default and state persists per-user in `localStorage`
+  under `et.fav.web.expanded` / `et.fav.nodes.expanded`.  Keeps the
+  sidebar compact as favorite lists grow.
+
+---
+
 ## [2.3.2] - 2026-04-21
 
 ### Changed
