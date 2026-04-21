@@ -4,6 +4,45 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [2.3.6] - 2026-04-21
+
+### Security
+- **`GET /api/nodes/titles` IDOR fix** — the wiki-link autocomplete
+  endpoint previously returned every node title and slug in the database
+  to any authenticated user, including Viewers with no permission grants
+  on any shared node.  Handler now extracts the caller's claims and
+  scopes the query to nodes owned by the caller or explicitly shared
+  with them via the `permissions` table.  Admin role bypasses the scope
+  filter (unchanged behaviour for admins).
+
+### Changed — Backup / restore trust model
+- **Any admin may operate on any backup** — the per-creator ownership
+  checks on `GET /admin/backups`, `DELETE /admin/backups/{id}`,
+  `GET /admin/backups/{id}/download`, `GET /admin/backups/{id}/preview`,
+  and `POST /admin/backups/{id}/restore` have been removed.  The admin
+  role is explicitly trusted to repair the entire system, so one admin
+  blocking another from restoring a legitimately-created backup was a
+  capability gap, not a protection.  `require_admin` still gates every
+  handler.
+- **`GET /admin/backups` now lists every backup**, not only those
+  created by the caller.  Added `BackupRepo::list_all`.
+- **Admin backups are exempt from the 5-minute rate limit** — the
+  throttle was defence against untrusted-user abuse; admins are
+  categorically outside that scope and may legitimately chain backups
+  around a risky migration.
+
+### Fixed — Robustness
+- **`webhook_dispatch`: reqwest client build failure now aborts the
+  dispatch** with a warn log instead of silently falling back to a
+  default client with no timeout — a slow webhook receiver on the
+  fallback client would pin the tokio task indefinitely.
+- **`list_open_for_nodes`: unknown task status / priority now errors**
+  instead of silently rendering as Open / Medium on the project
+  dashboard — a future migration adding an enum variant would have
+  corrupted the dashboard view with the old fallback.
+
+---
+
 ## [2.3.5] - 2026-04-21
 
 ### Fixed

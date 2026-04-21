@@ -30,9 +30,16 @@ pub trait NodeRepo: Send + Sync {
 
     async fn backlinks(&self, id: NodeId) -> Result<Vec<Node>, EmberTroveError>;
 
-    /// Return all nodes as lightweight title entries, ordered by title.
+    /// Return nodes as lightweight title entries, ordered by title.
     /// Used for wiki-link autocomplete and resolution.
-    async fn list_titles(&self) -> Result<Vec<NodeTitleEntry>, EmberTroveError>;
+    ///
+    /// - `subject = None` returns every node in the system (admin bypass).
+    /// - `subject = Some(sub)` returns only nodes owned by `sub` or
+    ///   explicitly shared with `sub` via the `permissions` table.
+    async fn list_titles(
+        &self,
+        subject: Option<&str>,
+    ) -> Result<Vec<NodeTitleEntry>, EmberTroveError>;
 
     /// Find a node's ID by exact title (case-insensitive). Returns `None` if no
     /// node with that title exists.
@@ -491,7 +498,10 @@ impl NodeRepo for PgNodeRepo {
         rows.into_iter().map(NodeRow::into_node).collect()
     }
 
-    async fn list_titles(&self) -> Result<Vec<NodeTitleEntry>, EmberTroveError> {
+    async fn list_titles(
+        &self,
+        subject: Option<&str>,
+    ) -> Result<Vec<NodeTitleEntry>, EmberTroveError> {
         #[derive(sqlx::FromRow)]
         struct TitleRow {
             id: Uuid,
@@ -499,11 +509,34 @@ impl NodeRepo for PgNodeRepo {
             slug: String,
         }
 
-        let rows = sqlx::query_as::<_, TitleRow>(
-            "SELECT id, title, slug FROM nodes ORDER BY title",
-        )
-        .fetch_all(&self.pool)
-        .await
+        // Admin bypass: no filter.  Non-admin: scope to nodes owned by the
+        // caller OR shared with them via the permissions table.  DISTINCT
+        // avoids duplicates when a caller holds multiple permission rows
+        // for the same node.
+        let rows = match subject {
+            None => {
+                sqlx::query_as::<_, TitleRow>(
+                    "SELECT id, title, slug FROM nodes ORDER BY title",
+                )
+                .fetch_all(&self.pool)
+                .await
+            }
+            Some(sub) => {
+                sqlx::query_as::<_, TitleRow>(
+                    r#"
+                    SELECT DISTINCT n.id, n.title, n.slug
+                    FROM nodes n
+                    LEFT JOIN permissions p
+                      ON p.node_id = n.id AND p.subject_id = $1
+                    WHERE n.owner_id = $1 OR p.subject_id IS NOT NULL
+                    ORDER BY n.title
+                    "#,
+                )
+                .bind(sub)
+                .fetch_all(&self.pool)
+                .await
+            }
+        }
         .map_err(|e| EmberTroveError::Internal(format!("list_titles failed: {e}")))?;
 
         Ok(rows
