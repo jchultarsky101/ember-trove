@@ -22,6 +22,7 @@ pub mod share_panel;
 pub mod search_bar;
 pub mod search_view;
 pub mod sidebar;
+pub mod skeleton;
 pub mod calendar_view;
 pub mod change_password_modal;
 pub mod inbox_view;

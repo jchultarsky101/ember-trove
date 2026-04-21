@@ -149,9 +149,9 @@ pub fn InboxView() -> impl IntoView {
 
                 // ── Task list ─────────────────────────────────────────────────
                 <Suspense fallback=|| view! {
-                    <p class="text-sm text-stone-400 dark:text-stone-500 text-center py-8">
-                        "Loading…"
-                    </p>
+                    <div class="px-4">
+                        <crate::components::skeleton::SkeletonList rows=6 />
+                    </div>
                 }>
                     {move || {
                         let tasks = tasks_res.get()

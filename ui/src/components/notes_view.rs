@@ -43,7 +43,7 @@ pub fn NotesView() -> impl IntoView {
             // Feed
             <div class="flex-1 overflow-auto p-6 flex flex-col">
                 <Suspense fallback=move || view! {
-                    <p class="text-sm text-stone-400">"Loading…"</p>
+                    <crate::components::skeleton::SkeletonList rows=6 />
                 }>
                     {move || {
                         let notes = feed_resource.get()
