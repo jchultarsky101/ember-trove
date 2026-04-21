@@ -89,7 +89,7 @@ pub fn MyDayView() -> impl IntoView {
             // ── Content ───────────────────────────────────────────────────────
             <div class="flex-1 overflow-auto p-4 md:p-6 flex flex-col">
                 <Suspense fallback=move || view! {
-                    <p class="text-sm text-stone-400">"Loading…"</p>
+                    <crate::components::skeleton::SkeletonList rows=6 />
                 }>
                     {move || {
                         let raw_tasks = tasks_resource.get()

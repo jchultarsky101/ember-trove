@@ -90,7 +90,7 @@ pub fn NodeView(id: NodeId) -> impl IntoView {
 
     view! {
         <Suspense fallback=move || view! {
-            <div class="p-6 text-stone-400 text-sm">"Loading node..."</div>
+            <crate::components::skeleton::SkeletonArticle />
         }>
             {move || {
                 node.get().map(|result| {
