@@ -4,6 +4,23 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [2.3.8] - 2026-04-26
+
+### Security / CI hygiene
+- **Bumped `rustls-webpki` 0.103.12 → 0.103.13** to resolve
+  RUSTSEC-2026-0104 ("Reachable panic in certificate revocation list
+  parsing").  The bump applies cleanly to the modern path
+  (reqwest + jsonwebtoken).  The legacy 0.101.7 path pulled in by
+  `aws-smithy-http-client → hyper-rustls 0.24 → rustls 0.21` has no
+  upstream fix; we don't feed CRLs to the AWS SDK rustls config, so the
+  panic is unreachable in practice.  Added
+  `--ignore RUSTSEC-2026-0104` to the cargo-audit step in `ci.yml`
+  with a dated rationale alongside the existing 0098 / 0099 ignores
+  (same legacy path).  Drop once `aws-smithy-http-client` bumps to
+  `rustls 0.23+`.
+
+---
+
 ## [2.3.7] - 2026-04-26
 
 ### Fixed — Mobile UI
