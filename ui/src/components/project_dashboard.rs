@@ -107,9 +107,12 @@ fn ProjectCard(
             on:click=move |_| on_navigate()
         >
             // ── Top bar: title + status + counts + progress ──────────────
-            <div class="flex items-center gap-4 px-4 py-3">
+            // Mobile: title row stacks above a wrapping meta row so the title
+            // is never crushed by the badges/progress on narrow viewports.
+            // Desktop (sm+): single horizontal row as before.
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3">
                 // Title
-                <div class="flex items-center gap-2 min-w-0 flex-1">
+                <div class="flex items-center gap-2 min-w-0 sm:flex-1">
                     <span class="material-symbols-outlined text-amber-500 flex-shrink-0"
                         style="font-size: 16px;">{"rocket_launch"}</span>
                     <span class="font-medium text-stone-800 dark:text-stone-200 truncate
@@ -118,53 +121,57 @@ fn ProjectCard(
                     </span>
                 </div>
 
-                // Node status badge
-                <div class="flex items-center gap-1 text-sm flex-shrink-0" style=s_color>
-                    <span class="material-symbols-outlined" style="font-size: 15px;">{s_icon}</span>
-                    <span class="text-xs">{s_label}</span>
-                </div>
+                // Meta row: status + activity + counts + progress.
+                // On mobile this wraps under the title; on sm+ it sits inline.
+                <div class="flex items-center flex-wrap gap-x-3 gap-y-2 sm:gap-4 sm:flex-nowrap">
+                    // Node status badge
+                    <div class="flex items-center gap-1 text-sm flex-shrink-0" style=s_color>
+                        <span class="material-symbols-outlined" style="font-size: 15px;">{s_icon}</span>
+                        <span class="text-xs">{s_label}</span>
+                    </div>
 
-                // Last-activity label
-                <div class="hidden sm:flex items-center gap-1 text-xs
-                    text-stone-500 dark:text-stone-400 flex-shrink-0"
-                    title="Most recent activity across the project and its tasks">
-                    <span class="material-symbols-outlined" style="font-size: 14px;">{"history"}</span>
-                    <span>{updated_label}</span>
-                </div>
+                    // Last-activity label
+                    <div class="hidden sm:flex items-center gap-1 text-xs
+                        text-stone-500 dark:text-stone-400 flex-shrink-0"
+                        title="Most recent activity across the project and its tasks">
+                        <span class="material-symbols-outlined" style="font-size: 14px;">{"history"}</span>
+                        <span>{updated_label}</span>
+                    </div>
 
-                // Count badges
-                <div class="flex items-center gap-1 flex-shrink-0">
-                    <CountBadge count=counts.open
-                        color="bg-stone-200 dark:bg-stone-700 text-stone-700 dark:text-stone-300" />
-                    <CountBadge count=counts.in_progress
-                        color="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" />
-                    <CountBadge count=counts.done
-                        color="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" />
-                    <CountBadge count=counts.cancelled
-                        color="bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500" />
-                </div>
+                    // Count badges
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                        <CountBadge count=counts.open
+                            color="bg-stone-200 dark:bg-stone-700 text-stone-700 dark:text-stone-300" />
+                        <CountBadge count=counts.in_progress
+                            color="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" />
+                        <CountBadge count=counts.done
+                            color="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" />
+                        <CountBadge count=counts.cancelled
+                            color="bg-stone-100 dark:bg-stone-800 text-stone-400 dark:text-stone-500" />
+                    </div>
 
-                // Progress
-                <div class="flex items-center gap-2 w-28 flex-shrink-0">
-                    {if total == 0 {
-                        view! {
-                            <span class="text-xs text-stone-400 dark:text-stone-500 italic">"No tasks"</span>
-                        }.into_any()
-                    } else {
-                        view! {
-                            <div class="flex items-center gap-2 w-full">
-                                <div class="flex-1 h-1.5 bg-stone-200 dark:bg-stone-700 rounded-full overflow-hidden">
-                                    <div
-                                        class="h-full bg-green-500 rounded-full transition-all"
-                                        style=format!("width: {done_pct:.0}%")
-                                    />
+                    // Progress
+                    <div class="flex items-center gap-2 w-28 flex-shrink-0">
+                        {if total == 0 {
+                            view! {
+                                <span class="text-xs text-stone-400 dark:text-stone-500 italic">"No tasks"</span>
+                            }.into_any()
+                        } else {
+                            view! {
+                                <div class="flex items-center gap-2 w-full">
+                                    <div class="flex-1 h-1.5 bg-stone-200 dark:bg-stone-700 rounded-full overflow-hidden">
+                                        <div
+                                            class="h-full bg-green-500 rounded-full transition-all"
+                                            style=format!("width: {done_pct:.0}%")
+                                        />
+                                    </div>
+                                    <span class="text-xs text-stone-500 dark:text-stone-400 flex-shrink-0">
+                                        {format!("{done_pct:.0}%")}
+                                    </span>
                                 </div>
-                                <span class="text-xs text-stone-500 dark:text-stone-400 flex-shrink-0">
-                                    {format!("{done_pct:.0}%")}
-                                </span>
-                            </div>
-                        }.into_any()
-                    }}
+                            }.into_any()
+                        }}
+                    </div>
                 </div>
             </div>
 

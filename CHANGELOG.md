@@ -4,6 +4,31 @@ All notable changes to Ember Trove are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
 
+## [2.3.7] - 2026-04-26
+
+### Fixed — Mobile UI
+- **Project Dashboard: project title now visible on portrait phones** —
+  the dashboard card top row packed title + status + 4 count badges +
+  progress bar onto a single horizontal flex row, which crushed the
+  title to zero width on narrow viewports and left users with no way
+  to identify which project a card referred to.  Below `sm:`, the row
+  now stacks: the title (with rocket icon) gets its own full-width
+  line, and the status / activity / count badges / progress bar wrap
+  underneath as a flex-wrap meta row.  Desktop layout is unchanged.
+- **Sidebar: portrait drawer is always fully expanded** — when the
+  user collapsed the sidebar on desktop and resized to mobile (or
+  loaded mobile with a stale collapsed preference), the slide-in
+  drawer kept its `w-72` width but rendered icon-only content inside,
+  wasting half the screen with no way to expand because the collapse
+  toggle is `hidden md:flex`.  `SidebarCollapsed` is now a read-only
+  `Signal<bool>` derived from `!is_mobile && collapsed_state`, where
+  `is_mobile` is driven by a `(max-width: 767px)` `MediaQueryList`
+  listener in `Layout`.  The desktop collapse preference is preserved
+  across resize round-trips.  Children unchanged (they only call
+  `.get()`).
+
+---
+
 ## [2.3.6] - 2026-04-21
 
 ### Security

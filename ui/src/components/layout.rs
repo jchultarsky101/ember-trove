@@ -2,6 +2,8 @@ use leptos::{ev, prelude::*};
 use leptos_router::components::{Redirect, Route, Routes};
 use leptos_router::hooks::{use_location, use_navigate, use_params_map};
 use leptos_router::path;
+use wasm_bindgen::JsCast;
+use wasm_bindgen::closure::Closure;
 
 use crate::{
     app::{AppVersion, ShowCapture},
@@ -54,12 +56,37 @@ fn NodeEditRoute() -> impl IntoView {
     }
 }
 
-/// Whether the sidebar is collapsed (icon-only mode, desktop only).
-pub type SidebarCollapsed = RwSignal<bool>;
+/// Whether the sidebar should render in icon-only mode.
+///
+/// Read-only `Signal` so children cannot toggle it directly. The Layout owns
+/// the underlying `RwSignal<bool>` (the user's desktop preference) and derives
+/// this signal so it returns `false` at mobile breakpoints — the slide-in
+/// drawer should always be fully expanded since it auto-hides on selection.
+pub type SidebarCollapsed = Signal<bool>;
 
 #[component]
 pub fn Layout(auth_state: AuthState) -> impl IntoView {
-    let collapsed: SidebarCollapsed = RwSignal::new(false);
+    // User-controlled collapse preference (only mutated by the desktop toggle).
+    let collapsed_state: RwSignal<bool> = RwSignal::new(false);
+    // Tracks whether the viewport is at the mobile breakpoint (`< md`, 768px).
+    let is_mobile: RwSignal<bool> = RwSignal::new(false);
+
+    if let Some(window) = web_sys::window()
+        && let Ok(Some(mql)) = window.match_media("(max-width: 767px)")
+    {
+        is_mobile.set(mql.matches());
+        let cb = Closure::wrap(Box::new(move |e: web_sys::MediaQueryListEvent| {
+            is_mobile.set(e.matches());
+        }) as Box<dyn FnMut(_)>);
+        let _ = mql.add_event_listener_with_callback("change", cb.as_ref().unchecked_ref());
+        // Leak the closure for the lifetime of the page; Layout lives the full session.
+        cb.forget();
+    }
+
+    // Effective collapsed state passed to children: forced `false` on mobile.
+    let collapsed: SidebarCollapsed =
+        Signal::derive(move || !is_mobile.get() && collapsed_state.get());
+
     let mobile_open: RwSignal<bool> = RwSignal::new(false);
     let show_capture = use_context::<ShowCapture>()
         .expect("ShowCapture context missing")
@@ -206,7 +233,7 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                         } else {
                             "fixed inset-y-0 left-0 z-40 w-72 -translate-x-full md:translate-x-0"
                         };
-                        let desktop = if collapsed.get() {
+                        let desktop = if collapsed_state.get() {
                             "md:relative md:inset-auto md:w-16 md:flex-shrink-0 md:transform-none"
                         } else {
                             "md:relative md:inset-auto md:w-64 md:flex-shrink-0 md:transform-none"
@@ -218,7 +245,7 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                     <Sidebar auth_state=auth_state collapsed=collapsed on_nav=Callback::new(move |_| close_mobile()) />
 
                     <button
-                        on:click=move |_| collapsed.update(|c| *c = !*c)
+                        on:click=move |_| collapsed_state.update(|c| *c = !*c)
                         class="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-20
                             w-5 h-5 rounded-full
                             bg-white dark:bg-stone-900
@@ -227,13 +254,13 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                             text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
                             hover:border-stone-400 dark:hover:border-stone-500
                             hover:shadow-md transition-all cursor-pointer"
-                        title=move || if collapsed.get() { "Expand sidebar" } else { "Collapse sidebar" }
+                        title=move || if collapsed_state.get() { "Expand sidebar" } else { "Collapse sidebar" }
                     >
                         <span
                             class="material-symbols-outlined"
                             style="font-size: 14px; line-height: 1;"
                         >
-                            {move || if collapsed.get() { "chevron_right" } else { "chevron_left" }}
+                            {move || if collapsed_state.get() { "chevron_right" } else { "chevron_left" }}
                         </span>
                     </button>
                 </aside>
