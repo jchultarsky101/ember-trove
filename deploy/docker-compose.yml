@@ -88,7 +88,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.ui
     ports:
-      - "8003:80"
+      - "8003:8080"
     depends_on:
       - api
 

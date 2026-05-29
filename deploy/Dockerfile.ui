@@ -36,8 +36,11 @@ COPY ui/     ./ui/
 WORKDIR /build/ui
 RUN trunk build --release
 
-# ── Stage 2: nginx static serving ─────────────────────────────────────────────
-FROM nginx:alpine
+# ── Stage 2: nginx static serving (non-root) ──────────────────────────────────
+# nginx-unprivileged runs as the unprivileged `nginx` user (uid 101) and binds
+# port 8080 instead of 80 — no root, no Linux capabilities required. The edge
+# proxy / ingress forwards to this container on 8080.
+FROM nginxinc/nginx-unprivileged:alpine
 
 # trunk outputs to dist/ relative to the ui crate directory
 COPY --from=builder /build/ui/dist /usr/share/nginx/html
@@ -45,4 +48,4 @@ COPY --from=builder /build/ui/dist /usr/share/nginx/html
 # SPA fallback + compression + long-lived asset caching
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
+EXPOSE 8080
