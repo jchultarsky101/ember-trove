@@ -54,7 +54,7 @@ use crate::{
     repo::{
         activity::ActivityRepo, attachment::AttachmentRepo, backup::BackupRepo, edge::EdgeRepo,
         favorite::FavoriteRepo, graph::GraphRepo, node::NodeRepo, node_version::NodeVersionRepo,
-        note::NoteRepo, permission::PermissionRepo, search::SearchRepo,
+        note::NoteRepo, permission::PermissionRepo, pkce::PkceRepo, search::SearchRepo,
         search_presets::SearchPresetRepo, share_token::ShareTokenRepo, tag::TagRepo,
         node_link::NodeLinkRepo, task::TaskRepo, template::TemplateRepo, webhook::WebhookRepo,
     },
@@ -266,6 +266,14 @@ impl WebhookRepo for StubWebhookRepo {
     async fn delete(&self, _: WebhookId, _: &str) -> Result<(), EmberTroveError> { unimplemented!() }
 }
 
+struct StubPkceRepo;
+#[async_trait]
+impl PkceRepo for StubPkceRepo {
+    async fn store(&self, _: &str, _: &str) -> Result<(), EmberTroveError> { Ok(()) }
+    async fn take(&self, _: &str, _: Duration) -> Result<Option<String>, EmberTroveError> { Ok(None) }
+    async fn sweep_expired(&self, _: Duration) -> Result<u64, EmberTroveError> { Ok(0) }
+}
+
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
 fn test_state() -> AppState {
@@ -314,7 +322,8 @@ fn test_state() -> AppState {
             ..Config::default()
         },
         started_at: Instant::now(),
-        pkce_store: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+        request_metrics: Arc::new(crate::routes::metrics::RequestMetrics::default()),
+        pkce: Arc::new(StubPkceRepo),
     }
 }
 
@@ -356,6 +365,28 @@ async fn health_returns_200() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn request_metrics_middleware_counts_responses() {
+    // Inject a shared counter so we can read it after driving requests through
+    // the real router — proves the track_requests middleware is wired in.
+    let metrics = Arc::new(crate::routes::metrics::RequestMetrics::default());
+    let mut state = test_state();
+    state.request_metrics = metrics.clone();
+    let app = build_router(state).expect("router builds");
+
+    for _ in 0..3 {
+        let _ = app
+            .clone()
+            .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+    }
+
+    let snap = metrics.snapshot();
+    assert_eq!(snap.total, 3, "all three /health responses must be counted");
+    assert_eq!(snap.status_2xx, 3, "/health returns 200 → 2xx bucket");
 }
 
 #[tokio::test]
