@@ -110,11 +110,11 @@ pub fn InboxView() -> impl IntoView {
             <div class="flex-shrink-0 px-4 py-4 border-b border-stone-200 dark:border-stone-800">
                 <div class="flex items-center justify-between gap-3">
                     <div class="flex items-center gap-3">
-                        <span class="material-symbols-outlined text-amber-500" style="font-size: 26px;">
+                        <span class="material-symbols-outlined text-amber-500" style="font-size: 22px;">
                             "inbox"
                         </span>
                         <div>
-                            <h1 class="text-xl font-semibold text-stone-900 dark:text-stone-100">
+                            <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
                                 "Inbox"
                             </h1>
                             <p class="text-xs text-stone-500 dark:text-stone-400">
@@ -567,7 +567,7 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                     {move || (!editing.get()).then(|| view! {
                         <div class="flex items-center gap-0.5 flex-shrink-0">
                             <button
-                                class=action_btn_class("hover:text-blue-500 dark:hover:text-blue-400")
+                                class=action_btn_class("hover:text-amber-600 dark:hover:text-amber-500")
                                 title="Assign to node"
                                 on:click=move |_| assigning.set(true)
                             >

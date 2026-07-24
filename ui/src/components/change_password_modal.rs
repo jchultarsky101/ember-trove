@@ -63,7 +63,7 @@ pub fn ChangePasswordModal(on_close: Callback<()>) -> impl IntoView {
         // Backdrop
         <div
             class="fixed inset-0 z-50 flex items-center justify-center
-                   bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+                   bg-black/50 backdrop-blur-sm"
             on:click=move |_| on_close.run(())
         >
             // Modal card — stop propagation so clicking inside doesn't close
@@ -99,7 +99,7 @@ pub fn ChangePasswordModal(on_close: Callback<()>) -> impl IntoView {
                             "Password changed successfully."
                         </p>
                         <button
-                            class="mt-1 text-xs bg-amber-500 hover:bg-amber-600 text-white
+                            class="mt-1 text-xs bg-amber-600 hover:bg-amber-700 text-white
                                    rounded px-4 py-1.5 transition-colors"
                             on:click=move |_| on_close.run(())
                         >
@@ -176,7 +176,7 @@ pub fn ChangePasswordModal(on_close: Callback<()>) -> impl IntoView {
                                 "Cancel"
                             </button>
                             <button
-                                class="text-xs bg-amber-500 hover:bg-amber-600 text-white
+                                class="text-xs bg-amber-600 hover:bg-amber-700 text-white
                                        rounded px-4 py-1.5 transition-colors
                                        disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled=move || saving.get()

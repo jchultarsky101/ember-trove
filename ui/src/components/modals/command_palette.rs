@@ -621,7 +621,7 @@ pub fn CommandPalette(
             <Portal>
                 // Backdrop — click closes
                 <div
-                    class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+                    class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
                     on:click=move |_| on_close.run(())
                 />
                 // Panel

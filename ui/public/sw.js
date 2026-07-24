@@ -12,7 +12,10 @@
 //   v3: evict pre-v2.2.2 bundles (node-editor UTF-16/UTF-8 cursor panic fix).
 //   v4: /tasks/* consolidation + manifest start_url change (v2.3.0).
 //   v5: Web Share Target POST /share interceptor (v2.4.0).
-const CACHE_NAME = "ember-trove-v5";
+//   v6: self-hosted fonts — evict cached index.html that still references
+//       Google Fonts (cross-origin fonts were never SW-cached, so icons
+//       were missing offline before this).
+const CACHE_NAME = "ember-trove-v6";
 
 // App shell resources cached on install.
 // Trunk hashes WASM/JS/CSS filenames, so we cache "/" (index.html) and let

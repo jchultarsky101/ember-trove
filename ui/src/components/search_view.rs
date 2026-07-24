@@ -398,8 +398,8 @@ pub fn SearchView() -> impl IntoView {
                                                         on:input=move |ev| preset_name.set(event_target_value(&ev))
                                                     />
                                                     <button
-                                                        class="text-xs px-2 py-1 rounded bg-amber-500 text-white
-                                                            hover:bg-amber-600 transition-colors"
+                                                        class="text-xs px-2 py-1 rounded bg-amber-600 text-white
+                                                            hover:bg-amber-700 transition-colors"
                                                         on:click=move |_| {
                                                             let name = preset_name.get_untracked()
                                                                 .trim()
@@ -557,7 +557,7 @@ pub fn SearchView() -> impl IntoView {
                                     let active = node_type_filter.get() == value_owned;
                                     if active {
                                         "px-2.5 py-0.5 text-xs rounded-full font-medium \
-                                         bg-amber-500 text-white transition-colors"
+                                         bg-amber-600 text-white transition-colors"
                                     } else {
                                         "px-2.5 py-0.5 text-xs rounded-full font-medium \
                                          text-stone-500 dark:text-stone-400 \
@@ -689,9 +689,9 @@ pub fn SearchView() -> impl IntoView {
                                                         Some("note") => Some(view! {
                                                             <span class="inline-flex items-center gap-1 mb-1 px-1.5 py-0.5
                                                                 text-xs rounded
-                                                                bg-blue-50 dark:bg-blue-900/20
-                                                                text-blue-600 dark:text-blue-400
-                                                                border border-blue-200 dark:border-blue-800">
+                                                                bg-stone-100 dark:bg-stone-800
+                                                                text-stone-600 dark:text-stone-300
+                                                                border border-stone-200 dark:border-stone-700">
                                                                 <span class="material-symbols-outlined"
                                                                     style="font-size: 11px;">"sticky_note_2"</span>
                                                                 "matched in note"
@@ -700,9 +700,9 @@ pub fn SearchView() -> impl IntoView {
                                                         Some("task") => Some(view! {
                                                             <span class="inline-flex items-center gap-1 mb-1 px-1.5 py-0.5
                                                                 text-xs rounded
-                                                                bg-amber-50 dark:bg-amber-900/20
-                                                                text-amber-700 dark:text-amber-400
-                                                                border border-amber-200 dark:border-amber-800">
+                                                                bg-stone-100 dark:bg-stone-800
+                                                                text-stone-600 dark:text-stone-300
+                                                                border border-stone-200 dark:border-stone-700">
                                                                 <span class="material-symbols-outlined"
                                                                     style="font-size: 11px;">"task_alt"</span>
                                                                 "matched in task"
