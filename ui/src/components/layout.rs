@@ -261,7 +261,7 @@ pub fn Layout(auth_state: AuthState) -> impl IntoView {
                                 <circle cx="32" cy="38" r="3" fill="#ffffff" opacity="0.9"/>
                             </svg>
                         </div>
-                        <span class="font-semibold text-stone-900 dark:text-stone-100 text-sm">
+                        <span class="font-display font-semibold text-stone-900 dark:text-stone-100 text-sm">
                             "Ember Trove"
                         </span>
                     </div>
@@ -458,7 +458,7 @@ fn SidebarHeader(collapsed: SidebarCollapsed) -> impl IntoView {
                 // dark-mode icons on its right.  Version lives under the
                 // title as a small footnote.
                 <div class="flex flex-col min-w-0 leading-tight">
-                    <span class="font-semibold text-stone-900 dark:text-stone-100 truncate">
+                    <span class="font-display font-semibold text-stone-900 dark:text-stone-100 truncate">
                         "Ember Trove"
                     </span>
                     {move || {

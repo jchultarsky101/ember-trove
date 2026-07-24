@@ -321,9 +321,12 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
     };
 
     // Toggle done ↔ open on checkbox click
-    let on_toggle = move |_| {
+    let on_toggle = move |ev: web_sys::MouseEvent| {
         let current = status_sig.get_untracked();
         let next = if current == "done" { "open" } else { "done" };
+        if next == "done" {
+            crate::spark::strike_spark(&ev);
+        }
         let next_status = parse_status(next);
         let req = UpdateTaskRequest {
             title: None,

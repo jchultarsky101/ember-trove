@@ -335,9 +335,12 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
         });
     };
 
-    let on_toggle = move |_| {
+    let on_toggle = move |ev: web_sys::MouseEvent| {
         let current = status_val.get_untracked();
         let next = if current == "done" { "open" } else { "done" };
+        if next == "done" {
+            crate::spark::strike_spark(&ev);
+        }
         let req = UpdateTaskRequest {
             title: None,
             status: Some(parse_status(next)),

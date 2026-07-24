@@ -47,7 +47,7 @@ pub fn PageHeader(
                         }
                     })}
                 <div class="flex-1 min-w-0">
-                    <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
+                    <h1 class="font-display text-lg font-semibold text-stone-900 dark:text-stone-100">
                         {move || title.get()}
                     </h1>
                     {subtitle

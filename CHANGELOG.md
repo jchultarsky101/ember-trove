@@ -6,6 +6,28 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — display typeface, heat tokens, and the spark (design phase 3)
+The identity pass, implementing the approved comp:
+- **Fraunces** (variable, self-hosted latin subset, SOFT axis raised via the
+  `.font-display` utility) is the display face — applied only where the app
+  "speaks": page titles (via `PageHeader`), the wordmark, My Day zone names
+  (now sentence-case display; DOM text unchanged), and empty-state messages.
+  All interface text stays Inter.
+- **Heat tokens** in Tailwind v4 `@theme` (`--color-ember/glow/heat-high/
+  heat-max`): warm color encodes urgency, informational stays stone. New
+  code uses the generated utilities; existing amber-* classes migrate
+  incrementally as files are touched.
+- **Spark on completion** (`ui/src/spark.rs`): completing a task strikes a
+  ~0.5 s burst of seven ember particles off the checkbox — fixed-position
+  overlay on `<body>`, so row markup and e2e selectors are untouched;
+  timer-based cleanup; fires only on the transition *to* done; skipped
+  entirely under `prefers-reduced-motion`. Wired into all three task rows
+  (My Day/Kanban, Inbox, node task panel).
+- **Hearth meter**: the My Day header's "X / Y done" counter gains a small
+  flame that lights and brightens with the day's done fraction (unlit
+  outline at zero; 0.6 s opacity transition is the only motion; counter
+  text format unchanged).
+
 ### Changed — shared PageHeader and EmptyState primitives (design phase 2)
 Top-level views now render their header through one `PageHeader` component
 (`ui/src/components/page_header.rs`: `px-4 md:px-6 py-4` bar, optional
