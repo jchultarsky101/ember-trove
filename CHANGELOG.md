@@ -6,6 +6,97 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.26.0] - 2026-07-24
+
+### Added — display typeface, heat tokens, and the spark (design phase 3)
+The identity pass, implementing the approved comp:
+- **Fraunces** (variable, self-hosted latin subset, SOFT axis raised via the
+  `.font-display` utility) is the display face — applied only where the app
+  "speaks": page titles (via `PageHeader`), the wordmark, My Day zone names
+  (now sentence-case display; DOM text unchanged), and empty-state messages.
+  All interface text stays Inter.
+- **Heat tokens** in Tailwind v4 `@theme` (`--color-ember/glow/heat-high/
+  heat-max`): warm color encodes urgency, informational stays stone. New
+  code uses the generated utilities; existing amber-* classes migrate
+  incrementally as files are touched.
+- **Spark on completion** (`ui/src/spark.rs`): completing a task strikes a
+  ~0.5 s burst of seven ember particles off the checkbox — fixed-position
+  overlay on `<body>`, so row markup and e2e selectors are untouched;
+  timer-based cleanup; fires only on the transition *to* done; skipped
+  entirely under `prefers-reduced-motion`. Wired into all three task rows
+  (My Day/Kanban, Inbox, node task panel).
+- **Hearth meter**: the My Day header's "X / Y done" counter gains a small
+  flame that lights and brightens with the day's done fraction (unlit
+  outline at zero; 0.6 s opacity transition is the only motion; counter
+  text format unchanged).
+
+### Changed — shared PageHeader and EmptyState primitives (design phase 2)
+Top-level views now render their header through one `PageHeader` component
+(`ui/src/components/page_header.rs`: `px-4 md:px-6 py-4` bar, optional
+22 px amber icon, `text-lg` title, `text-xs` subtitle, right-aligned
+action slot) instead of seven hand-rolled variants — converted: My Day,
+Inbox, Calendar, All Nodes (reactive title), Notes, Dashboard, Tags (which
+gains its sidebar `label` icon). The padded settings pages (admin, backup,
+permissions, templates, webhooks) align to the same `text-lg font-semibold`
+title scale (webhooks was `text-2xl font-bold`). Page-level empty states
+render through one `EmptyState` (48 px muted icon + line + optional hint) —
+converted: All Nodes, Inbox, Notes, Dashboard, and Search (previously a
+smaller `text-4xl` outlier); My Day's in-zone empties intentionally stay
+compact. Radius convention is now stated and enforced by usage: cards
+`rounded-lg` (inbox list container was `rounded-xl`), popovers
+`rounded-xl`, modals `rounded-2xl` (add-favorite was `rounded-xl
+shadow-xl`, now matches its siblings incl. border); card row dividers unify
+on `divide-stone-100 dark:divide-stone-800` (node list was `stone-200`).
+Pattern recorded in `.claude/patterns/page-scaffold.rs`, linked from
+`.claude/rules/leptos.md`.
+
+### Changed — self-hosted fonts; icon FOUT and offline icons fixed (design phase 1)
+Inter and Material Symbols now ship from `/fonts/` (`ui/public/fonts/`,
+copied by Trunk) instead of Google Fonts. The icon font is subsetted to the
+96 icon names the UI uses (~91 KB vs ~4 MB) and loads with
+`font-display: block`, so cold loads no longer flash raw ligature names
+("wb_sunny", "call_merge") while the font downloads. Because the service
+worker only caches same-origin requests, the cross-origin icon font was
+never available offline — self-hosting fixes missing icons in the offline
+PWA (SW cache bumped to v6 to evict the old shell). After adding a *new*
+icon name, run `scripts/refresh-icon-font.sh` and commit the refreshed
+`.woff2`. No request leaves the origin for fonts anymore.
+
+### Security — ammonia 4.1.3 → 4.1.4 (RUSTSEC-2026-0213)
+Advisory published 2026-07-24 against the HTML sanitizer that guards all
+user-supplied markdown; lockfile-only bump to the fixed release, caught by
+the PR's `cargo audit` gate.
+
+### Security — CSP drops Google Fonts origins; SPA shell no longer browser-cached
+With fonts self-hosted, `https://fonts.googleapis.com` (style-src) and
+`https://fonts.gstatic.com` (font-src) are removed from the CSP in all
+three nginx configs (`deploy/nginx.conf`, `nginx.local-auth.conf`,
+`nginx.prod.conf`) — no third-party origins remain in the policy.
+`index.html` now ships `Cache-Control: no-cache` (via `expires -1`, which
+preserves the inherited server-level security headers), so browsers can't
+heuristically cache a stale shell across deploys; `/fonts/` gets a 7-day
+policy so the in-place-refreshed icon subset can't be pinned by the 1-year
+immutable rule for hashed assets.
+
+### Changed — one primary amber; palette and modal normalization (design phase 1)
+- All labeled primary CTAs now use `bg-amber-600 hover:bg-amber-700`
+  (attachments upload, change-password, search preset save, search type
+  filter pill, add-favorite); the graph toolbar's active-toggle states
+  follow (`bg-amber-600/90`). Previously five surfaces sat a half-step
+  lighter at amber-500.
+- Retired the two stray blues: the search "matched in note" badge (was
+  blue-tinted) and its amber "matched in task" twin are both neutral stone
+  now — informational badges carry no accent; the Inbox "assign to node"
+  row action hovers amber like every other context action (was blue).
+- One modal backdrop recipe (`bg-black/50 backdrop-blur-sm`): command
+  palette was `/40`, add-favorite had no blur, change-password had a
+  dark-mode-only `/60`; fast-capture's panel joins its siblings on
+  `bg-white dark:bg-stone-900` (was `bg-stone-50`).
+- Inbox header matches the shared header shape (`text-lg`, 22px icon — was
+  the lone `text-xl`/26px outlier).
+- My Day's keyboard/drag hint line is hidden below `md` — it named keys a
+  phone doesn't have and wrapped to three lines.
+
 ## [2.25.0] - 2026-07-20
 
 ### Changed — node task panel joins the shared task-row layout (task-row phase 3)

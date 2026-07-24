@@ -8,10 +8,12 @@ use common::{
 use leptos::prelude::*;
 use uuid::Uuid;
 
+use crate::components::empty_state::EmptyState;
 use crate::components::modals::delete_confirm::DeleteConfirmModal;
 use crate::components::node_meta::{
     status_color, status_icon, status_label, type_icon, type_label,
 };
+use crate::components::page_header::PageHeader;
 use crate::components::toast::{ToastLevel, push_toast};
 use leptos_router::hooks::use_navigate;
 
@@ -134,17 +136,14 @@ pub fn NodeList() -> impl IntoView {
 
     view! {
         <div class="flex flex-col h-full">
-            <div class="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-800">
-                <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
-                    {move || match node_type_filter.get().as_deref() {
-                        Some("project")   => "Projects",
-                        Some("area")      => "Areas",
-                        Some("resource")  => "Resources",
-                        Some("reference") => "References",
-                        Some("article") | Some(_) => "Articles",
-                        None              => "All Nodes",
-                    }}
-                </h1>
+            <PageHeader title=Signal::derive(move || match node_type_filter.get().as_deref() {
+                Some("project") => "Projects",
+                Some("area") => "Areas",
+                Some("resource") => "Resources",
+                Some("reference") => "References",
+                Some("article") | Some(_) => "Articles",
+                None => "All Nodes",
+            })>
                 <div class="flex items-center gap-2">
                     // Active tag-filter badge
                     {move || tag_filter.get().map(|tag| {
@@ -227,7 +226,7 @@ pub fn NodeList() -> impl IntoView {
                         <span class="material-symbols-outlined">"add"</span>
                     </button>
                 </div>
-            </div>
+            </PageHeader>
 
             // Status filter pills + archived toggle
             <div class="flex items-center gap-1 px-6 py-2 border-b border-stone-100 dark:border-stone-800">
@@ -494,7 +493,7 @@ pub fn NodeList() -> impl IntoView {
 
             <div class="flex-1 overflow-auto">
                 <Suspense fallback=move || view! {
-                    <ul class="divide-y divide-stone-200 dark:divide-stone-800">
+                    <ul class="divide-y divide-stone-100 dark:divide-stone-800">
                         {(0..6).map(|_| view! {
                             <li class="px-6 py-4">
                                 <div class="flex items-start justify-between gap-3">
@@ -516,16 +515,8 @@ pub fn NodeList() -> impl IntoView {
                         nodes.get().map(|result| {
                             match result {
                                 Ok(list) if list.is_empty() => view! {
-                                    <div class="flex flex-col items-center justify-center h-full gap-3 p-12">
-                                        <span
-                                            class="material-symbols-outlined text-stone-300 dark:text-stone-700"
-                                            style="font-size: 48px;"
-                                        >
-                                            "description"
-                                        </span>
-                                        <p class="text-stone-400 dark:text-stone-600 text-sm text-center">
-                                            "No nodes found."
-                                        </p>
+                                    <div class="h-full flex flex-col justify-center">
+                                        <EmptyState icon="description" message="No nodes found." />
                                     </div>
                                 }.into_any(),
                                 Ok(list) => {
@@ -629,7 +620,7 @@ fn NodeCards(
     let available_tags = StoredValue::new(available_tags);
 
     view! {
-        <ul class="divide-y divide-stone-200 dark:divide-stone-800">
+        <ul class="divide-y divide-stone-100 dark:divide-stone-800">
             {nodes.into_iter().map(|node| {
                 let id      = node.id;
                 let nt      = format!("{:?}", node.node_type).to_lowercase();

@@ -92,10 +92,10 @@ pub fn AdminView() -> impl IntoView {
             // ── Page header ───────────────────────────────────────────────────
             <div class="flex items-center justify-between mb-6">
                 <div>
-                    <h1 class="text-xl font-semibold text-stone-900 dark:text-stone-100">
+                    <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
                         "User Management"
                     </h1>
-                    <p class="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
+                    <p class="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
                         "Create and manage Cognito users and groups."
                     </p>
                 </div>

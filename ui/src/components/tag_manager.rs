@@ -3,6 +3,7 @@ use leptos::prelude::*;
 
 use crate::components::icon_button::{IconButton, IconButtonVariant};
 use crate::components::modals::delete_confirm::DeleteConfirmModal;
+use crate::components::page_header::PageHeader;
 use crate::components::toast::{ToastLevel, push_toast};
 use leptos_router::hooks::use_navigate;
 
@@ -179,9 +180,7 @@ pub fn TagManager() -> impl IntoView {
         <div class="flex flex-col h-full">
 
             // ── Header ─────────────────────────────────────────────────────────
-            <div class="flex items-center justify-between px-6 py-4
-                        border-b border-stone-200 dark:border-stone-800">
-                <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">"Tags"</h1>
+            <PageHeader icon="label" title="Tags">
                 <button
                     class="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-300
                         hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
@@ -192,7 +191,7 @@ pub fn TagManager() -> impl IntoView {
                         {move || if show_create.get() { "close" } else { "add" }}
                     </span>
                 </button>
-            </div>
+            </PageHeader>
 
             // ── Create form (collapsible) ───────────────────────────────────────
             {move || show_create.get().then(|| view! {

@@ -7,6 +7,65 @@
 /* Class-based dark mode: add `.dark` to <html> to activate dark: variants */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ── Self-hosted fonts ─────────────────────────────────────────────────────
+   Served same-origin from /fonts/ (ui/public/fonts/, copied by Trunk) so the
+   PWA service worker can cache them and no request leaves the origin.
+   - Inter: variable weight, latin subset.
+   - Material Symbols: subsetted to the icon names the app uses (96 glyphs,
+     ~91 KB vs ~4 MB full). `font-display: block` prevents the raw ligature
+     text ("wb_sunny") from flashing before the font arrives — blank beats
+     wrong for icons. Adding a NEW icon name? Run scripts/refresh-icon-font.sh. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url('/fonts/material-symbols-outlined.woff2') format('woff2');
+}
+/* Fraunces (variable: opsz 9-144, wght 100-900, SOFT 0-100) — the display
+   face (design phase 3). Used only where the app "speaks": page titles,
+   the wordmark, My Day zone names, empty states. Interface text stays Inter. */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/fraunces-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ── Design tokens (design phase 3) ──────────────────────────────────────────
+   The "heat" rule: warm color encodes urgency/recency; informational stays
+   stone. These generate Tailwind utilities (text-ember, bg-glow, …) for new
+   code; existing amber-* classes migrate incrementally as files are touched. */
+@theme {
+  --color-ember: #d97706;     /* the one primary (amber-600) */
+  --color-glow: #fbbf24;      /* heat-1: today, focus, carried */
+  --color-heat-high: #ea580c; /* heat-2: imminent */
+  --color-heat-max: #dc2626;  /* heat-3: overdue, destructive */
+}
+
+/* Display-face utility — pairs the family with its variation settings so a
+   bare `font-family` swap can't forget the SOFT axis that gives Fraunces its
+   hearth-side character. */
+.font-display {
+  font-family: 'Fraunces', Georgia, serif;
+  font-optical-sizing: auto;
+  font-variation-settings: 'SOFT' 60;
+}
+
 @layer base {
   body {
     font-family: 'Inter', system-ui, sans-serif;
@@ -204,6 +263,51 @@ input[type="checkbox"]:checked::after {
   cursor: default;
 }
 
+/* ── Spark on task completion (design phase 3) ────────────────────────────────
+   The signature micro-interaction: completing a task strikes a brief burst of
+   ember particles off the checkbox. Particles are spawned by
+   `ui/src/spark.rs` into a fixed-position wrapper on <body> (no row markup
+   involved) and removed on a timer. The helper skips entirely under
+   prefers-reduced-motion. */
+.spark-particle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--color-glow);
+  opacity: 0;
+  animation: spark-fly 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.spark-particle:nth-child(2n) {
+  background: var(--color-heat-high);
+  width: 4px;
+  height: 4px;
+}
+@keyframes spark-fly {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--spark-dx)), calc(-50% + var(--spark-dy)))
+      scale(0.4);
+  }
+}
+
+/* Hearth meter (My Day header) — the lit flame overlay brightens with the
+   day's done fraction; the transition is the only motion. */
+.hearth-lit {
+  transition: opacity 0.6s ease;
+  filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.55));
+}
+@media (prefers-reduced-motion: reduce) {
+  .spark-particle { animation: none; }
+  .hearth-lit { transition: none; }
+}
+
 /* ── Toast animation ──────────────────────────────────────────────────────────── */
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(8px); }
@@ -227,8 +331,19 @@ input[type="checkbox"]:checked::after {
   border-radius: 0.5rem;
 }
 
-/* Material Symbols */
+/* Material Symbols — the class Google's stylesheet used to provide; now that
+   the font is self-hosted the font-family must be set here. */
 .material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
   font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
   font-size: 20px;
   line-height: 1;

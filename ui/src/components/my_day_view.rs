@@ -47,6 +47,7 @@ use leptos::{ev, prelude::*};
 use leptos_router::hooks::use_navigate;
 
 use crate::app::TaskRefresh;
+use crate::components::page_header::PageHeader;
 use crate::components::task_common::{status_done, undo_restore_task};
 use crate::components::task_row::{
     EditingTaskId, FocusedTaskId, KanbanTaskRow, KanbanZone, TaskEditorHeights,
@@ -281,38 +282,74 @@ pub fn MyDayView() -> impl IntoView {
         <div class="flex flex-col h-full">
 
             // ── Header ──────────────────────────────────────────────────
-            <div class="px-4 md:px-6 py-4 border-b border-stone-200 dark:border-stone-800">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-amber-500" style="font-size:22px;">
-                        "wb_sunny"
+            <PageHeader
+                icon="wb_sunny"
+                title="My Day"
+                subtitle=view! {
+                    {date_label}
+                    // Keyboard/drag hints are desktop-only noise on a phone
+                    <span class="hidden md:inline">
+                        " · drag, tap ☀/×, or use j/k + Enter/Space/t/e/d (press ? for the full list)"
                     </span>
-                    <div class="flex-1 min-w-0">
-                        <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
-                            "My Day"
-                        </h1>
-                        <p class="text-xs text-stone-400 dark:text-stone-500">
-                            {date_label}
-                            " · drag, tap ☀/×, or use j/k + Enter/Space/t/e/d (press ? for the full list)"
-                        </p>
-                    </div>
-                    // X / Y done counter for today
-                    {move || {
-                        let tasks = today_tasks.get()
-                            .and_then(|r| r.ok())
-                            .unwrap_or_default();
-                        let total = tasks.len();
-                        if total == 0 { return None; }
-                        let done = tasks.iter()
-                            .filter(|t| status_done(&t.task.status))
-                            .count();
-                        Some(view! {
-                            <span class="text-xs text-stone-400 dark:text-stone-500 flex-shrink-0">
+                }.into_any()
+            >
+                // X / Y done counter for today
+                {move || {
+                    let tasks = today_tasks.get()
+                        .and_then(|r| r.ok())
+                        .unwrap_or_default();
+                    let total = tasks.len();
+                    if total == 0 { return None; }
+                    let done = tasks.iter()
+                        .filter(|t| status_done(&t.task.status))
+                        .count();
+                    // Hearth meter: the lit flame overlay brightens with the
+                    // done fraction (0 done = unlit outline). Text stays the
+                    // exact "X / Y done" the e2e suite may match.
+                    let lit = if done == 0 {
+                        0.0
+                    } else {
+                        0.15 + 0.85 * (done as f64 / total as f64)
+                    };
+                    Some(view! {
+                        <span class="flex items-center gap-2 flex-shrink-0">
+                            <span class="text-xs text-stone-400 dark:text-stone-500">
                                 {format!("{done} / {total} done")}
                             </span>
-                        })
-                    }}
-                </div>
-            </div>
+                            <span class="relative w-[22px] h-[26px]" aria-hidden="true">
+                                <svg viewBox="0 0 32 36" width="22" height="26" class="absolute inset-0">
+                                    <path
+                                        d="M16 2 C12 9, 6 13, 6 21 C6 28, 10 33 16 33 C22 33, 26 28, 26 21 C26 13, 20 9, 16 2Z"
+                                        style="fill:none;stroke:#a8a29e;stroke-width:1.6"
+                                        opacity="0.6"
+                                    />
+                                </svg>
+                                <svg
+                                    viewBox="0 0 32 36" width="22" height="26"
+                                    class="absolute inset-0 hearth-lit"
+                                    style=format!("opacity:{lit:.2};")
+                                >
+                                    <defs>
+                                        <linearGradient id="hearth-fill" x1="0" y1="1" x2="0" y2="0">
+                                            <stop offset="0%" stop-color="#f59e0b"/>
+                                            <stop offset="60%" stop-color="#ef4444"/>
+                                            <stop offset="100%" stop-color="#f97316"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path
+                                        d="M16 2 C12 9, 6 13, 6 21 C6 28, 10 33 16 33 C22 33, 26 28, 26 21 C26 13, 20 9, 16 2Z"
+                                        fill="url(#hearth-fill)"
+                                    />
+                                    <path
+                                        d="M16 13 C14 17, 11 19, 11 24 C11 28, 13 30.5, 16 30.5 C19 30.5, 21 28, 21 24 C21 19, 18 17, 16 13Z"
+                                        fill="#fbbf24" opacity="0.9"
+                                    />
+                                </svg>
+                            </span>
+                        </span>
+                    })
+                }}
+            </PageHeader>
 
             // ── Two-zone scroll surface ─────────────────────────────────
             <div class="flex-1 overflow-auto p-4 md:p-6 space-y-6">
@@ -493,8 +530,7 @@ fn KanbanZoneRow(
             on:drop=on_drop
         >
             <div class="flex items-center gap-2 mb-2">
-                <span class="text-xs font-semibold text-stone-700 dark:text-stone-300 \
-                             uppercase tracking-wider">
+                <span class="font-display text-[15px] font-semibold text-stone-800 dark:text-stone-200">
                     {title}
                 </span>
                 <span class="text-xs text-stone-500 dark:text-stone-400">

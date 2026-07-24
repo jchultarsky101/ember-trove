@@ -198,6 +198,9 @@ pub fn KanbanTaskRow(
         } else {
             TaskStatus::Done
         };
+        if next == TaskStatus::Done {
+            crate::spark::strike_spark(&ev);
+        }
         status_sig.set(next.clone());
         busy.set(true);
         let req = UpdateTaskRequest {

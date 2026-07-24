@@ -9,6 +9,7 @@ mod focus_task;
 mod keyboard;
 mod markdown;
 mod recent;
+mod spark;
 mod templates;
 mod wikilink;
 

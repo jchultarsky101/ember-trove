@@ -28,8 +28,10 @@ use leptos::prelude::*;
 use leptos_router::hooks::use_navigate;
 
 use crate::app::TaskRefresh;
+use crate::components::empty_state::EmptyState;
 use crate::components::format_helpers::format_relative_short;
 use crate::components::node_meta::{status_color, status_icon, status_label};
+use crate::components::page_header::PageHeader;
 use crate::components::task_common::priority_color_hex;
 use crate::components::toast::{ToastLevel, push_toast};
 use crate::markdown::render_markdown_plain;
@@ -60,15 +62,7 @@ pub fn ProjectDashboard() -> impl IntoView {
 
     view! {
         <div class="flex flex-col h-full">
-            // Header
-            <div class="flex items-center gap-3 px-6 py-4 border-b border-stone-200 dark:border-stone-800">
-                <span class="material-symbols-outlined text-amber-500" style="font-size: 22px;">
-                    {"rocket_launch"}
-                </span>
-                <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
-                    "Project Dashboard"
-                </h1>
-            </div>
+            <PageHeader icon="rocket_launch" title="Project Dashboard" />
 
             <div class="flex-1 overflow-auto p-6 flex flex-col space-y-6">
 
@@ -90,12 +84,12 @@ pub fn ProjectDashboard() -> impl IntoView {
                         let data = entries.get().and_then(|r| r.ok()).unwrap_or_default();
                         if data.is_empty() {
                             return view! {
-                                <div class="flex-1 flex flex-col items-center justify-center gap-3">
-                                    <span class="material-symbols-outlined text-stone-300 dark:text-stone-700"
-                                        style="font-size: 48px;">{"rocket_launch"}</span>
-                                    <p class="text-stone-400 dark:text-stone-500 text-sm">
-                                        "No projects yet. Create a Project node to get started."
-                                    </p>
+                                <div class="flex-1 flex flex-col justify-center">
+                                    <EmptyState
+                                        icon="rocket_launch"
+                                        message="No projects yet."
+                                        hint="Create a Project node to get started."
+                                    />
                                 </div>
                             }.into_any();
                         }

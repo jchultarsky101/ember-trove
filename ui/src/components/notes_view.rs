@@ -7,8 +7,10 @@ use common::{
 use gloo_timers::callback::Timeout;
 use leptos_router::hooks::use_navigate;
 
+use crate::components::empty_state::EmptyState;
 use crate::components::icon_button::{IconButton, IconButtonVariant};
 use crate::components::node_picker::NodePicker;
+use crate::components::page_header::PageHeader;
 use crate::components::resizable_editor::ResizableEditor;
 use crate::components::toast::{ToastLevel, ToastState, push_undo_toast};
 use crate::markdown::render_markdown_plain;
@@ -270,15 +272,7 @@ pub fn NotesView() -> impl IntoView {
 
     view! {
         <div class="flex flex-col h-full">
-            // Header
-            <div class="flex items-center gap-3 px-6 py-4 border-b border-stone-200 dark:border-stone-800">
-                <span class="material-symbols-outlined text-amber-500" style="font-size: 22px;">
-                    {"sticky_note_2"}
-                </span>
-                <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
-                    "Notes"
-                </h1>
-            </div>
+            <PageHeader icon="sticky_note_2" title="Notes" />
 
             // ── Compose box ──────────────────────────────────────────────
             <div class="px-6 py-4 border-b border-stone-200 dark:border-stone-800 space-y-2">
@@ -391,12 +385,8 @@ pub fn NotesView() -> impl IntoView {
                                 "No notes yet. Write one above, or add one from a node."
                             };
                             return view! {
-                                <div class="flex-1 flex flex-col items-center justify-center gap-3">
-                                    <span class="material-symbols-outlined text-stone-300 dark:text-stone-700"
-                                        style="font-size: 48px;">{"sticky_note_2"}</span>
-                                    <p class="text-stone-400 dark:text-stone-500 text-sm text-center">
-                                        {msg}
-                                    </p>
+                                <div class="flex-1 flex flex-col justify-center">
+                                    <EmptyState icon="sticky_note_2" message=msg />
                                 </div>
                             }.into_any();
                         }

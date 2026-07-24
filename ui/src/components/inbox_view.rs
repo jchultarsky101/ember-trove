@@ -15,8 +15,10 @@ use common::{
 use leptos::prelude::*;
 
 use crate::app::TaskRefresh;
+use crate::components::empty_state::EmptyState;
 use crate::components::icon_button::{IconButton, IconButtonVariant};
 use crate::components::new_task_form::NewTaskForm;
+use crate::components::page_header::PageHeader;
 use crate::components::task_common::{
     is_in_my_day, node_type_icon, parse_priority, parse_recurrence_opt, parse_status,
     priority_value, recurrence_label, recurrence_value, status_done, status_value,
@@ -107,37 +109,26 @@ pub fn InboxView() -> impl IntoView {
     view! {
         <div class="flex flex-col h-full">
             // ── Header ────────────────────────────────────────────────────────
-            <div class="flex-shrink-0 px-4 py-4 border-b border-stone-200 dark:border-stone-800">
-                <div class="flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <span class="material-symbols-outlined text-amber-500" style="font-size: 26px;">
-                            "inbox"
-                        </span>
-                        <div>
-                            <h1 class="text-xl font-semibold text-stone-900 dark:text-stone-100">
-                                "Inbox"
-                            </h1>
-                            <p class="text-xs text-stone-500 dark:text-stone-400">
-                                "Capture tasks — link to a node when ready"
-                            </p>
-                        </div>
-                    </div>
-                    {move || (!triage.get()).then(|| view! {
-                        <button
-                            class="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg
-                                   border border-stone-200 dark:border-stone-700
-                                   text-stone-600 dark:text-stone-300
-                                   hover:border-amber-400 hover:text-amber-600 dark:hover:text-amber-400
-                                   transition-colors cursor-pointer"
-                            title="Process the inbox one task at a time (keyboard-driven)"
-                            on:click=move |_| triage.set(true)
-                        >
-                            <span class="material-symbols-outlined" style="font-size:16px;">"playlist_add_check"</span>
-                            "Process"
-                        </button>
-                    })}
-                </div>
-            </div>
+            <PageHeader
+                icon="inbox"
+                title="Inbox"
+                subtitle="Capture tasks — link to a node when ready".into_any()
+            >
+                {move || (!triage.get()).then(|| view! {
+                    <button
+                        class="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg
+                               border border-stone-200 dark:border-stone-700
+                               text-stone-600 dark:text-stone-300
+                               hover:border-amber-400 hover:text-amber-600 dark:hover:text-amber-400
+                               transition-colors cursor-pointer"
+                        title="Process the inbox one task at a time (keyboard-driven)"
+                        on:click=move |_| triage.set(true)
+                    >
+                        <span class="material-symbols-outlined" style="font-size:16px;">"playlist_add_check"</span>
+                        "Process"
+                    </button>
+                })}
+            </PageHeader>
 
             // ── Scrollable content ────────────────────────────────────────────
             <div class="flex-1 overflow-auto px-4 py-4 space-y-4">
@@ -166,15 +157,7 @@ pub fn InboxView() -> impl IntoView {
                             .unwrap_or_default();
                         if tasks.is_empty() {
                             return view! {
-                                <div class="text-center py-16 space-y-2">
-                                    <span class="material-symbols-outlined text-stone-300
-                                        dark:text-stone-600" style="font-size: 48px;">
-                                        "check_circle"
-                                    </span>
-                                    <p class="text-stone-400 dark:text-stone-500 text-sm">
-                                        "Inbox zero!"
-                                    </p>
-                                </div>
+                                <EmptyState icon="check_circle" message="Inbox zero!" />
                             }.into_any();
                         }
                         let (active, done): (Vec<Task>, Vec<Task>) =
@@ -185,7 +168,7 @@ pub fn InboxView() -> impl IntoView {
                         view! {
                             // One bordered container of flat rows (divide-y),
                             // matching the My Day zone-box look.
-                            <div class="rounded-xl border border-stone-100 dark:border-stone-800 \
+                            <div class="rounded-lg border border-stone-100 dark:border-stone-800 \
                                         bg-white dark:bg-stone-900 \
                                         divide-y divide-stone-100 dark:divide-stone-800 \
                                         overflow-hidden">
@@ -352,9 +335,12 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
         });
     };
 
-    let on_toggle = move |_| {
+    let on_toggle = move |ev: web_sys::MouseEvent| {
         let current = status_val.get_untracked();
         let next = if current == "done" { "open" } else { "done" };
+        if next == "done" {
+            crate::spark::strike_spark(&ev);
+        }
         let req = UpdateTaskRequest {
             title: None,
             status: Some(parse_status(next)),
@@ -567,7 +553,7 @@ fn InboxTaskRow(task: Task, refresh: RwSignal<u32>) -> impl IntoView {
                     {move || (!editing.get()).then(|| view! {
                         <div class="flex items-center gap-0.5 flex-shrink-0">
                             <button
-                                class=action_btn_class("hover:text-blue-500 dark:hover:text-blue-400")
+                                class=action_btn_class("hover:text-amber-600 dark:hover:text-amber-500")
                                 title="Assign to node"
                                 on:click=move |_| assigning.set(true)
                             >

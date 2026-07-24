@@ -144,7 +144,7 @@ pub fn FastCaptureModal(
             <div class="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-8 pointer-events-none">
                 <div
                     node_ref=panel_ref
-                    class="w-full max-w-xl bg-stone-50 dark:bg-stone-900 rounded-2xl shadow-2xl \
+                    class="w-full max-w-xl bg-white dark:bg-stone-900 rounded-2xl shadow-2xl \
                            border border-stone-200 dark:border-stone-700 pointer-events-auto \
                            mt-8 sm:mt-16"
                     role="dialog"
