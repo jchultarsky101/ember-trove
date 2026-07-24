@@ -135,7 +135,7 @@ pub fn AddFavoriteModal(
             view! {
                 <Portal>
                 <div
-                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
                     on:keydown=handle_keydown
                 >
                     <div
@@ -312,7 +312,7 @@ pub fn AddFavoriteModal(
                                 "Cancel"
                             </button>
                             <button
-                                class="px-4 py-2 text-sm font-medium bg-amber-500 hover:bg-amber-600
+                                class="px-4 py-2 text-sm font-medium bg-amber-600 hover:bg-amber-700
                                        text-white rounded-lg disabled:opacity-50 cursor-pointer"
                                 disabled=move || loading.get()
                                 on:click=move |_| handle_submit()

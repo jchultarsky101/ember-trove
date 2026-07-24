@@ -292,7 +292,10 @@ pub fn MyDayView() -> impl IntoView {
                         </h1>
                         <p class="text-xs text-stone-400 dark:text-stone-500">
                             {date_label}
-                            " · drag, tap ☀/×, or use j/k + Enter/Space/t/e/d (press ? for the full list)"
+                            // Keyboard/drag hints are desktop-only noise on a phone
+                            <span class="hidden md:inline">
+                                " · drag, tap ☀/×, or use j/k + Enter/Space/t/e/d (press ? for the full list)"
+                            </span>
                         </p>
                     </div>
                     // X / Y done counter for today

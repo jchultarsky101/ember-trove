@@ -6,6 +6,53 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — self-hosted fonts; icon FOUT and offline icons fixed (design phase 1)
+Inter and Material Symbols now ship from `/fonts/` (`ui/public/fonts/`,
+copied by Trunk) instead of Google Fonts. The icon font is subsetted to the
+96 icon names the UI uses (~91 KB vs ~4 MB) and loads with
+`font-display: block`, so cold loads no longer flash raw ligature names
+("wb_sunny", "call_merge") while the font downloads. Because the service
+worker only caches same-origin requests, the cross-origin icon font was
+never available offline — self-hosting fixes missing icons in the offline
+PWA (SW cache bumped to v6 to evict the old shell). After adding a *new*
+icon name, run `scripts/refresh-icon-font.sh` and commit the refreshed
+`.woff2`. No request leaves the origin for fonts anymore.
+
+### Security — ammonia 4.1.3 → 4.1.4 (RUSTSEC-2026-0213)
+Advisory published 2026-07-24 against the HTML sanitizer that guards all
+user-supplied markdown; lockfile-only bump to the fixed release, caught by
+the PR's `cargo audit` gate.
+
+### Security — CSP drops Google Fonts origins; SPA shell no longer browser-cached
+With fonts self-hosted, `https://fonts.googleapis.com` (style-src) and
+`https://fonts.gstatic.com` (font-src) are removed from the CSP in all
+three nginx configs (`deploy/nginx.conf`, `nginx.local-auth.conf`,
+`nginx.prod.conf`) — no third-party origins remain in the policy.
+`index.html` now ships `Cache-Control: no-cache` (via `expires -1`, which
+preserves the inherited server-level security headers), so browsers can't
+heuristically cache a stale shell across deploys; `/fonts/` gets a 7-day
+policy so the in-place-refreshed icon subset can't be pinned by the 1-year
+immutable rule for hashed assets.
+
+### Changed — one primary amber; palette and modal normalization (design phase 1)
+- All labeled primary CTAs now use `bg-amber-600 hover:bg-amber-700`
+  (attachments upload, change-password, search preset save, search type
+  filter pill, add-favorite); the graph toolbar's active-toggle states
+  follow (`bg-amber-600/90`). Previously five surfaces sat a half-step
+  lighter at amber-500.
+- Retired the two stray blues: the search "matched in note" badge (was
+  blue-tinted) and its amber "matched in task" twin are both neutral stone
+  now — informational badges carry no accent; the Inbox "assign to node"
+  row action hovers amber like every other context action (was blue).
+- One modal backdrop recipe (`bg-black/50 backdrop-blur-sm`): command
+  palette was `/40`, add-favorite had no blur, change-password had a
+  dark-mode-only `/60`; fast-capture's panel joins its siblings on
+  `bg-white dark:bg-stone-900` (was `bg-stone-50`).
+- Inbox header matches the shared header shape (`text-lg`, 22px icon — was
+  the lone `text-xl`/26px outlier).
+- My Day's keyboard/drag hint line is hidden below `md` — it named keys a
+  phone doesn't have and wrapped to three lines.
+
 ## [2.25.0] - 2026-07-20
 
 ### Changed — node task panel joins the shared task-row layout (task-row phase 3)
