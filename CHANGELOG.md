@@ -6,6 +6,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.26.0] - 2026-07-24
+
 ### Added — display typeface, heat tokens, and the spark (design phase 3)
 The identity pass, implementing the approved comp:
 - **Fraunces** (variable, self-hosted latin subset, SOFT axis raised via the
