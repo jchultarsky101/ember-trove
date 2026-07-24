@@ -3,7 +3,28 @@
 Living document: current state, backlog, and the decisions behind the architecture.
 Keep it current as part of each change (see `POLICY.md` §10).
 
-## Current state (2026-07-20)
+## Current state (2026-07-24)
+
+- **v2.26.0 shipped — design refresh (three-phase arc, PRs #63/#66/#65):**
+  full UI audit → approved interactive comp → three stacked slices.
+  Phase 1: fonts self-hosted (Material Symbols subsetted to the ~96 used
+  glyphs, 91 KB vs 4 MB, `font-display: block` kills the icon-name FOUT;
+  offline PWA icons work for the first time; `scripts/refresh-icon-font.sh`
+  regenerates after adding a NEW icon name); one primary `amber-600`; one
+  modal backdrop recipe; CSP dropped the Google Fonts origins in all three
+  nginx configs; `index.html` ships `Cache-Control: no-cache` via
+  `expires -1` (preserves add_header inheritance — the trap is documented
+  in-file). Phase 2: `PageHeader` + `EmptyState` primitives (7 views + 5
+  settings pages aligned; `.claude/patterns/page-scaffold.rs`); radius
+  tiers cards-lg/popovers-xl/modals-2xl. Phase 3: Fraunces display face
+  (`.font-display`, titles/wordmark/zone names/empty states only),
+  Tailwind v4 `@theme` heat tokens (ember/glow/heat-high/heat-max — warm =
+  urgency, `amber-*` migrates incrementally), spark-on-complete
+  (`ui/src/spark.rs`, →done only, reduced-motion safe), hearth meter in the
+  My Day header. Also: ammonia 4.1.4 (RUSTSEC-2026-0213, published and
+  fixed same day). Process lesson: stacked-PR merge closed #64 when the
+  base branch was deleted → recreated as #66 (see memory:
+  stacked-pr-merge-order).
 
 - **v2.25.0 shipped — unified task rows (three-phase arc, PRs #60–#62):** all
   task lists (My Day, Inbox, node task panel) render through one display-mode
