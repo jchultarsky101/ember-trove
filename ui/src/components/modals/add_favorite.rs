@@ -139,7 +139,7 @@ pub fn AddFavoriteModal(
                     on:keydown=handle_keydown
                 >
                     <div
-                        class="bg-white dark:bg-stone-900 rounded-xl shadow-xl w-full max-w-md mx-4 p-6"
+                        class="bg-white dark:bg-stone-900 rounded-2xl shadow-2xl border border-stone-200 dark:border-stone-700 w-full max-w-md mx-4 p-6"
                         node_ref=panel_ref
                         role="dialog"
                         aria-modal="true"

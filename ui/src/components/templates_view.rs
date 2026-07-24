@@ -215,7 +215,7 @@ pub fn TemplatesView() -> impl IntoView {
         <div class="flex-1 flex flex-col min-h-0 p-4 md:p-6">
             // ── Header ────────────────────────────────────────────────────────
             <div class="flex items-center justify-between mb-4">
-                <h1 class="text-xl font-semibold text-stone-900 dark:text-stone-100">
+                <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
                     "Templates"
                 </h1>
                 <button

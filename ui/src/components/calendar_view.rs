@@ -3,6 +3,7 @@ use common::task::{CreateTaskRequest, MyDayTask};
 use leptos::prelude::*;
 
 use crate::app::TaskRefresh;
+use crate::components::page_header::PageHeader;
 use crate::components::task_common::{priority_color_hex, status_done};
 use crate::components::toast::{ToastLevel, push_toast};
 use leptos_router::hooks::use_navigate;
@@ -300,14 +301,11 @@ pub fn CalendarView() -> impl IntoView {
     view! {
         <div class="flex flex-col h-full">
             // Header
-            <div class="flex items-center gap-3 px-6 py-4 border-b border-stone-200 dark:border-stone-800">
-                <span class="material-symbols-outlined text-amber-500" style="font-size: 22px;">
-                    {"calendar_month"}
-                </span>
-                <div class="flex-1">
-                    <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">"Calendar"</h1>
-                    <p class="text-xs text-stone-400 dark:text-stone-500">"Tasks by due date"</p>
-                </div>
+            <PageHeader
+                icon="calendar_month"
+                title="Calendar"
+                subtitle="Tasks by due date".into_any()
+            >
                 // Month navigation
                 <div class="flex items-center gap-2">
                     <button
@@ -350,7 +348,7 @@ pub fn CalendarView() -> impl IntoView {
                         "Today"
                     </button>
                 </div>
-            </div>
+            </PageHeader>
 
             // Two-month calendar grid
             <div class="flex-1 overflow-auto p-4">

@@ -47,6 +47,7 @@ use leptos::{ev, prelude::*};
 use leptos_router::hooks::use_navigate;
 
 use crate::app::TaskRefresh;
+use crate::components::page_header::PageHeader;
 use crate::components::task_common::{status_done, undo_restore_task};
 use crate::components::task_row::{
     EditingTaskId, FocusedTaskId, KanbanTaskRow, KanbanZone, TaskEditorHeights,
@@ -281,41 +282,34 @@ pub fn MyDayView() -> impl IntoView {
         <div class="flex flex-col h-full">
 
             // ── Header ──────────────────────────────────────────────────
-            <div class="px-4 md:px-6 py-4 border-b border-stone-200 dark:border-stone-800">
-                <div class="flex items-center gap-3">
-                    <span class="material-symbols-outlined text-amber-500" style="font-size:22px;">
-                        "wb_sunny"
+            <PageHeader
+                icon="wb_sunny"
+                title="My Day"
+                subtitle=view! {
+                    {date_label}
+                    // Keyboard/drag hints are desktop-only noise on a phone
+                    <span class="hidden md:inline">
+                        " · drag, tap ☀/×, or use j/k + Enter/Space/t/e/d (press ? for the full list)"
                     </span>
-                    <div class="flex-1 min-w-0">
-                        <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
-                            "My Day"
-                        </h1>
-                        <p class="text-xs text-stone-400 dark:text-stone-500">
-                            {date_label}
-                            // Keyboard/drag hints are desktop-only noise on a phone
-                            <span class="hidden md:inline">
-                                " · drag, tap ☀/×, or use j/k + Enter/Space/t/e/d (press ? for the full list)"
-                            </span>
-                        </p>
-                    </div>
-                    // X / Y done counter for today
-                    {move || {
-                        let tasks = today_tasks.get()
-                            .and_then(|r| r.ok())
-                            .unwrap_or_default();
-                        let total = tasks.len();
-                        if total == 0 { return None; }
-                        let done = tasks.iter()
-                            .filter(|t| status_done(&t.task.status))
-                            .count();
-                        Some(view! {
-                            <span class="text-xs text-stone-400 dark:text-stone-500 flex-shrink-0">
-                                {format!("{done} / {total} done")}
-                            </span>
-                        })
-                    }}
-                </div>
-            </div>
+                }.into_any()
+            >
+                // X / Y done counter for today
+                {move || {
+                    let tasks = today_tasks.get()
+                        .and_then(|r| r.ok())
+                        .unwrap_or_default();
+                    let total = tasks.len();
+                    if total == 0 { return None; }
+                    let done = tasks.iter()
+                        .filter(|t| status_done(&t.task.status))
+                        .count();
+                    Some(view! {
+                        <span class="text-xs text-stone-400 dark:text-stone-500 flex-shrink-0">
+                            {format!("{done} / {total} done")}
+                        </span>
+                    })
+                }}
+            </PageHeader>
 
             // ── Two-zone scroll surface ─────────────────────────────────
             <div class="flex-1 overflow-auto p-4 md:p-6 space-y-6">

@@ -110,7 +110,7 @@ pub fn BulkPermissionsView() -> impl IntoView {
 
             // ── Header ─────────────────────────────────────────────────────
             <div class="flex items-center justify-between mb-6">
-                <h1 class="text-xl font-semibold text-stone-900 dark:text-stone-100">
+                <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">
                     "Permission Management"
                 </h1>
             </div>
