@@ -5,6 +5,7 @@ use common::{
 use leptos::prelude::*;
 
 use crate::app::{storage_get, storage_set};
+use crate::components::empty_state::EmptyState;
 use crate::components::node_meta::{
     status_color, status_icon, status_label, type_icon, type_label,
 };
@@ -601,10 +602,11 @@ pub fn SearchView() -> impl IntoView {
 
                             {if resp.results.is_empty() && total == 0 {
                                 view! {
-                                    <div class="text-center py-12 text-stone-400 dark:text-stone-600">
-                                        <span class="material-symbols-outlined text-4xl mb-2 block">"search_off"</span>
-                                        <p>"No results found. Try different keywords, tags, or enable fuzzy search."</p>
-                                    </div>
+                                    <EmptyState
+                                        icon="search_off"
+                                        message="No results found."
+                                        hint="Try different keywords, tags, or enable fuzzy search."
+                                    />
                                 }.into_any()
                             } else {
                                 view! {

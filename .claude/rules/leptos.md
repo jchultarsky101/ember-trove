@@ -49,6 +49,12 @@ cargo clippy -p ui --target wasm32-unknown-unknown -- -D warnings
 - **Debounced search:** version counter + 300 ms `Timeout`; only the latest version
   commits. Real example: `ui/src/components/notes_view.rs` (`debounce_v`). See
   `.claude/patterns/reactive-effect-debounce.rs`.
+- **Page headers & empty states are primitives, not markup.** Top-level views
+  use `PageHeader` (`ui/src/components/page_header.rs`) and `EmptyState`
+  (`empty_state.rs`) — never a hand-rolled `<h1>` bar or centered-icon block.
+  Radius convention: cards `rounded-lg` · popovers `rounded-xl` · modals
+  `rounded-2xl`; card row dividers `divide-stone-100 dark:divide-stone-800`.
+  See `.claude/patterns/page-scaffold.rs`.
 - **Context newtypes** to prevent collisions:
   `#[derive(Clone, Copy)] struct ShowCapture(pub RwSignal<bool>);` (see `ui/src/app.rs`).
 - **Required context = `expect_context::<T>()`, never `use_context::<T>().expect(..)`.**

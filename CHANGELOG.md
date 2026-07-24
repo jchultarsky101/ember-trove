@@ -6,6 +6,26 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — shared PageHeader and EmptyState primitives (design phase 2)
+Top-level views now render their header through one `PageHeader` component
+(`ui/src/components/page_header.rs`: `px-4 md:px-6 py-4` bar, optional
+22 px amber icon, `text-lg` title, `text-xs` subtitle, right-aligned
+action slot) instead of seven hand-rolled variants — converted: My Day,
+Inbox, Calendar, All Nodes (reactive title), Notes, Dashboard, Tags (which
+gains its sidebar `label` icon). The padded settings pages (admin, backup,
+permissions, templates, webhooks) align to the same `text-lg font-semibold`
+title scale (webhooks was `text-2xl font-bold`). Page-level empty states
+render through one `EmptyState` (48 px muted icon + line + optional hint) —
+converted: All Nodes, Inbox, Notes, Dashboard, and Search (previously a
+smaller `text-4xl` outlier); My Day's in-zone empties intentionally stay
+compact. Radius convention is now stated and enforced by usage: cards
+`rounded-lg` (inbox list container was `rounded-xl`), popovers
+`rounded-xl`, modals `rounded-2xl` (add-favorite was `rounded-xl
+shadow-xl`, now matches its siblings incl. border); card row dividers unify
+on `divide-stone-100 dark:divide-stone-800` (node list was `stone-200`).
+Pattern recorded in `.claude/patterns/page-scaffold.rs`, linked from
+`.claude/rules/leptos.md`.
+
 ### Changed — self-hosted fonts; icon FOUT and offline icons fixed (design phase 1)
 Inter and Material Symbols now ship from `/fonts/` (`ui/public/fonts/`,
 copied by Trunk) instead of Google Fonts. The icon font is subsetted to the
