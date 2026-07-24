@@ -18,6 +18,11 @@ PWA (SW cache bumped to v6 to evict the old shell). After adding a *new*
 icon name, run `scripts/refresh-icon-font.sh` and commit the refreshed
 `.woff2`. No request leaves the origin for fonts anymore.
 
+### Security — ammonia 4.1.3 → 4.1.4 (RUSTSEC-2026-0213)
+Advisory published 2026-07-24 against the HTML sanitizer that guards all
+user-supplied markdown; lockfile-only bump to the fixed release, caught by
+the PR's `cargo audit` gate.
+
 ### Security — CSP drops Google Fonts origins; SPA shell no longer browser-cached
 With fonts self-hosted, `https://fonts.googleapis.com` (style-src) and
 `https://fonts.gstatic.com` (font-src) are removed from the CSP in all
