@@ -49,6 +49,14 @@ cargo clippy -p ui --target wasm32-unknown-unknown -- -D warnings
 - **Debounced search:** version counter + 300 ms `Timeout`; only the latest version
   commits. Real example: `ui/src/components/notes_view.rs` (`debounce_v`). See
   `.claude/patterns/reactive-effect-debounce.rs`.
+- **Design tokens & display face (phase 3).** Heat colors live in `@theme`
+  (`input.css`): `ember` (the one primary), `glow`, `heat-high`, `heat-max` —
+  use the generated utilities (`text-heat-max`, …) in new code; warm color
+  means urgency, informational stays stone. Display type is the
+  `.font-display` utility (Fraunces + SOFT axis) — page titles, wordmark,
+  zone names, empty states ONLY; interface text stays Inter. Completing a
+  task must call `crate::spark::strike_spark(&ev)` on the →done transition
+  (already wired in all three row components).
 - **Page headers & empty states are primitives, not markup.** Top-level views
   use `PageHeader` (`ui/src/components/page_header.rs`) and `EmptyState`
   (`empty_state.rs`) — never a hand-rolled `<h1>` bar or centered-icon block.

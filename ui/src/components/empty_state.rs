@@ -25,7 +25,7 @@ pub fn EmptyState(
             >
                 {icon}
             </span>
-            <p class="mt-3 text-sm text-stone-400 dark:text-stone-500">{message}</p>
+            <p class="font-display mt-3 text-sm text-stone-400 dark:text-stone-500">{message}</p>
             {hint
                 .map(|h| {
                     view! { <p class="mt-1 text-xs text-stone-400 dark:text-stone-600">{h}</p> }
