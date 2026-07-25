@@ -6,6 +6,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.27.1] - 2026-07-25
+
+### Tooling — weekly dependency bumps (Dependabot #67, #68, #69, #70)
+`jsonwebtoken` 10.4 → 11.0 (major: none of the breaking items touch our
+`auth/oidc.rs` usage — removed insecure-validation escape hatches and
+renamed key accessors we don't call; API tests exercise real token
+validation and pass), `base64` 0.22 → 0.23 (major, mechanical), nine
+minor/patch crate bumps, and the pinned GitHub Actions SHA refresh.
+
+### Fixed — next-version.sh scanned four releases of commits
+Release tags live on main-side merge commits that are never ancestors of
+develop, so `git describe` from develop walked back to v2.22.2 and the
+auto-detected bump had been correct only by coincidence since then (it
+proposed minor for this deps-only release). Now picks the highest `v*`
+tag by version sort; `tag..HEAD` ranges work regardless of ancestry.
+
 ## [2.27.0] - 2026-07-25
 
 ### Changed — note editors are visibly resizable everywhere
