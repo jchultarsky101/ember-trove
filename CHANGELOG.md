@@ -6,6 +6,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.27.2] - 2026-07-25
+
 ### Changed — backlog sweep: CTA classes on heat tokens, form-control radius, modal radius
 - All primary CTA backgrounds migrate from raw `amber-*` utilities to the
   phase-3 heat tokens: `bg-amber-600 → bg-ember`, `hover:bg-amber-700 →
