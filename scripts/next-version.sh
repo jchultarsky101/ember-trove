@@ -23,8 +23,13 @@ IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
 if [ -n "$1" ]; then
   BUMP="$1"
 else
-  # Auto-detect from commits since last tag
-  LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+  # Auto-detect from commits since the last release tag.
+  # NOT `git describe`: release tags live on main-side merge commits that are
+  # never ancestors of develop (Git Flow), so describe walks back to whatever
+  # ancient tag happens to be reachable and scans several releases of commits
+  # (found 2026-07-25: it reached v2.22.2 and proposed minor for a deps-only
+  # release). `A..HEAD` works fine even when A is not an ancestor.
+  LAST_TAG=$(git tag --list 'v*' --sort=-v:refname | head -1)
   if [ -z "$LAST_TAG" ]; then
     COMMITS=$(git log --oneline 2>/dev/null)
   else
