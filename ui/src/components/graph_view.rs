@@ -84,23 +84,27 @@ struct EdgeHover {
 
 // ── Node-type helpers ────────────────────────────────────────────────────────
 
+// Earth-tone categorical palette (2026-07-25, approved comp): ember stays the
+// one warm anchor; the other hues keep their family but drop saturation so the
+// graph doesn't fight the heat-scale semantics. Shape remains the primary
+// (color-blind-safe) type encoding, which is what makes the muting affordable.
 pub(crate) fn node_fill(nt: &NodeType) -> &'static str {
     match nt {
-        NodeType::Article => "#d97706",
-        NodeType::Project => "#2563eb",
-        NodeType::Area => "#16a34a",
-        NodeType::Resource => "#9333ea",
-        NodeType::Reference => "#dc2626",
+        NodeType::Article => "#d97706",   // ember
+        NodeType::Project => "#5c6f96",   // slate-indigo
+        NodeType::Area => "#78864f",      // moss
+        NodeType::Resource => "#8a5a7e",  // plum
+        NodeType::Reference => "#a1493c", // brick (red reserved for urgency)
     }
 }
 
 pub(crate) fn node_stroke_color(nt: &NodeType) -> &'static str {
     match nt {
         NodeType::Article => "#92400e",
-        NodeType::Project => "#1e40af",
-        NodeType::Area => "#166534",
-        NodeType::Resource => "#6b21a8",
-        NodeType::Reference => "#991b1b",
+        NodeType::Project => "#3e4c6b",
+        NodeType::Area => "#535e34",
+        NodeType::Resource => "#61415a",
+        NodeType::Reference => "#74332a",
     }
 }
 
@@ -875,10 +879,10 @@ pub fn GraphView() -> impl IntoView {
                            text-[10px] mb-0.5">"Nodes (click to filter)"</p>
                 <div class="flex flex-col gap-1">
                     <LegendToggle label="Article"   color="#d97706" shape="circle"   show=show_articles />
-                    <LegendToggle label="Project"   color="#2563eb" shape="diamond"  show=show_projects />
-                    <LegendToggle label="Area"      color="#16a34a" shape="rect"     show=show_areas />
-                    <LegendToggle label="Resource"  color="#9333ea" shape="hexagon"  show=show_resources />
-                    <LegendToggle label="Reference" color="#dc2626" shape="triangle" show=show_references />
+                    <LegendToggle label="Project"   color="#5c6f96" shape="diamond"  show=show_projects />
+                    <LegendToggle label="Area"      color="#78864f" shape="rect"     show=show_areas />
+                    <LegendToggle label="Resource"  color="#8a5a7e" shape="hexagon"  show=show_resources />
+                    <LegendToggle label="Reference" color="#a1493c" shape="triangle" show=show_references />
                 </div>
                 // Orphans-only maintenance lens.
                 <button
