@@ -3,7 +3,6 @@ use common::{
     note::{CreateNoteRequest, UpdateNoteRequest},
 };
 use leptos::prelude::*;
-use leptos::wasm_bindgen::JsCast;
 
 use crate::components::icon_button::{IconButton, IconButtonVariant};
 use crate::components::resizable_editor::ResizableEditor;
@@ -334,6 +333,32 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                                                 let orig_color = RwSignal::new(note.color.clone());
                                                 let save_error = RwSignal::new(Option::<String>::None);
 
+                                                // Shared by Ctrl+Enter (editor on_submit) and the Save
+                                                // button; Escape and Cancel share do_cancel.
+                                                let do_save = Callback::new(move |()| {
+                                                    let new_body = edit_body.get_untracked().trim().to_string();
+                                                    if new_body.is_empty() { return; }
+                                                    let req = UpdateNoteRequest {
+                                                        body: new_body,
+                                                        color: edit_color.get_untracked(),
+                                                    };
+                                                    wasm_bindgen_futures::spawn_local(async move {
+                                                        match crate::api::update_note(note_id, &req).await {
+                                                            Ok(_) => {
+                                                                editing.set(false);
+                                                                save_error.set(None);
+                                                                refresh.update(|n| *n += 1);
+                                                            }
+                                                            Err(e) => save_error.set(Some(format!("{e}"))),
+                                                        }
+                                                    });
+                                                });
+                                                let do_cancel = Callback::new(move |()| {
+                                                    editing.set(false);
+                                                    edit_body.set(orig_body.get_untracked());
+                                                    edit_color.set(orig_color.get_untracked());
+                                                });
+
                                                 // Pre-render Markdown (computed once per note in this iteration)
                                                 let body_html  = render_markdown_plain(&note.body);
                                                 let ts_display = ts.clone();
@@ -379,62 +404,21 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
 
                                                         // ── Edit mode ─────────────────────────
                                                         {move || editing.get().then(move || view! {
-                                                            <textarea
-                                                                class="w-full bg-transparent text-sm
-                                                                    text-stone-800 dark:text-stone-200
-                                                                    resize-y min-h-[80px] focus:outline-none"
-                                                                style=move || editor_heights.get()
-                                                                    .get(&note_id.0)
-                                                                    .map(|h| format!("height: {h}px;"))
-                                                                    .unwrap_or_default()
-                                                                prop:value=move || edit_body.get()
-                                                                on:input=move |ev| edit_body.set(event_target_value(&ev))
-                                                                on:mouseup=move |ev| {
-                                                                    if let Some(t) = ev.target()
-                                                                        && let Ok(el) = t.dyn_into::<web_sys::HtmlElement>()
-                                                                    {
-                                                                        let h = el.offset_height();
-                                                                        if h > 0
-                                                                            && editor_heights.get_untracked().get(&note_id.0).copied() != Some(h)
-                                                                        {
-                                                                            editor_heights.update(|m| { m.insert(note_id.0, h); });
-                                                                            wasm_bindgen_futures::spawn_local(async move {
-                                                                                // Best-effort: losing a height pref is cosmetic.
-                                                                                let _ = crate::api::set_editor_pref("note", note_id.0, h).await;
-                                                                            });
-                                                                        }
-                                                                    }
-                                                                }
-                                                                on:keydown=move |ev: web_sys::KeyboardEvent| {
-                                                                    if ev.key() == "Escape" {
-                                                                        editing.set(false);
-                                                                        edit_body.set(orig_body.get_untracked());
-                                                                        edit_color.set(orig_color.get_untracked());
-                                                                    }
-                                                                    if ev.key() == "Enter"
-                                                                        && (ev.ctrl_key() || ev.meta_key())
-                                                                    {
-                                                                        let new_body =
-                                                                            edit_body.get_untracked().trim().to_string();
-                                                                        if new_body.is_empty() { return; }
-                                                                        let req = UpdateNoteRequest {
-                                                                            body: new_body,
-                                                                            color: edit_color.get_untracked(),
-                                                                        };
-                                                                        wasm_bindgen_futures::spawn_local(async move {
-                                                                            match crate::api::update_note(note_id, &req).await {
-                                                                                Ok(_) => {
-                                                                                    editing.set(false);
-                                                                                    save_error.set(None);
-                                                                                    refresh.update(|n| *n += 1);
-                                                                                }
-                                                                                Err(e) => {
-                                                                                    save_error.set(Some(format!("{e}")));
-                                                                                }
-                                                                            }
-                                                                        });
-                                                                    }
-                                                                }
+                                                            <ResizableEditor
+                                                                value=edit_body
+                                                                placeholder="Note…"
+                                                                initial_height=editor_heights.get_untracked().get(&note_id.0).copied()
+                                                                on_resize=Callback::new(move |h: i32| {
+                                                                    editor_heights.update(|m| { m.insert(note_id.0, h); });
+                                                                    wasm_bindgen_futures::spawn_local(async move {
+                                                                        // Best-effort: losing a height pref is cosmetic.
+                                                                        let _ = crate::api::set_editor_pref("note", note_id.0, h).await;
+                                                                    });
+                                                                })
+                                                                on_submit=do_save
+                                                                on_escape=do_cancel
+                                                                class="w-full bg-transparent text-sm text-stone-800 dark:text-stone-200 \
+                                                                    resize-y min-h-[80px] focus:outline-none".to_string()
                                                             />
                                                             {move || save_error.get().map(|msg| view! {
                                                                 <p class="text-xs text-red-500 mt-1">{msg}</p>
@@ -445,40 +429,14 @@ pub fn NotePanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                                                                     <IconButton
                                                                         icon="close"
                                                                         label="Cancel"
-                                                                        on_click=Callback::new(move |()| {
-                                                                            editing.set(false);
-                                                                            edit_body.set(orig_body.get_untracked());
-                                                                            edit_color.set(orig_color.get_untracked());
-                                                                        })
+                                                                        on_click=do_cancel
                                                                     />
                                                                     <IconButton
                                                                         icon="check"
                                                                         label="Save"
                                                                         variant=IconButtonVariant::Save
                                                                         disabled=Signal::derive(move || edit_body.get().trim().is_empty())
-                                                                        on_click=Callback::new(move |()| {
-                                                                            let new_body =
-                                                                                edit_body.get_untracked().trim().to_string();
-                                                                            if new_body.is_empty() { return; }
-                                                                            let req = UpdateNoteRequest {
-                                                                                body: new_body,
-                                                                                color: edit_color.get_untracked(),
-                                                                            };
-                                                                            wasm_bindgen_futures::spawn_local(async move {
-                                                                                match crate::api::update_note(
-                                                                                    note_id, &req,
-                                                                                ).await {
-                                                                                    Ok(_) => {
-                                                                                        editing.set(false);
-                                                                                        save_error.set(None);
-                                                                                        refresh.update(|n| *n += 1);
-                                                                                    }
-                                                                                    Err(e) => {
-                                                                                        save_error.set(Some(format!("{e}")));
-                                                                                    }
-                                                                                }
-                                                                            });
-                                                                        })
+                                                                        on_click=do_save
                                                                     />
                                                                 </div>
                                                             </div>
