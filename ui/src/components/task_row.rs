@@ -427,7 +427,7 @@ pub fn KanbanTaskRow(
                                     type="date"
                                     class="text-xs bg-stone-100 dark:bg-stone-700 \
                                            text-stone-700 dark:text-stone-300 \
-                                           rounded px-2 py-0.5 focus:outline-none \
+                                           rounded-lg px-2 py-0.5 focus:outline-none \
                                            focus:ring-1 focus:ring-amber-500"
                                     title="Due date (optional)"
                                     prop:value=move || edit_due.get()
@@ -436,7 +436,7 @@ pub fn KanbanTaskRow(
                                 <select
                                     class="text-xs bg-stone-100 dark:bg-stone-700 \
                                            text-stone-700 dark:text-stone-300 \
-                                           rounded px-2 py-0.5 focus:outline-none \
+                                           rounded-lg px-2 py-0.5 focus:outline-none \
                                            focus:ring-1 focus:ring-amber-500"
                                     title="Recurrence"
                                     on:change=move |ev| edit_recurrence.set(event_target_value(&ev))

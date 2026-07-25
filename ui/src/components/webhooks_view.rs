@@ -120,8 +120,8 @@ pub fn WebhooksView() -> impl IntoView {
             <div class="flex items-center justify-between mb-1">
                 <h1 class="text-lg font-semibold text-stone-900 dark:text-stone-100">"Webhooks"</h1>
                 <button
-                    class="px-3 py-1.5 text-sm font-medium rounded-lg bg-amber-600
-                           hover:bg-amber-700 text-white transition-colors cursor-pointer"
+                    class="px-3 py-1.5 text-sm font-medium rounded-lg bg-ember
+                           hover:bg-ember-strong text-white transition-colors cursor-pointer"
                     on:click=open_create
                 >
                     "New Webhook"
@@ -233,8 +233,8 @@ pub fn WebhooksView() -> impl IntoView {
                                 "Cancel"
                             </button>
                             <button
-                                class="px-3 py-1.5 text-sm font-medium rounded-lg bg-amber-600
-                                       hover:bg-amber-700 text-white transition-colors cursor-pointer
+                                class="px-3 py-1.5 text-sm font-medium rounded-lg bg-ember
+                                       hover:bg-ember-strong text-white transition-colors cursor-pointer
                                        disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled=move || saving.get()
                                 on:click=move |_| submit()

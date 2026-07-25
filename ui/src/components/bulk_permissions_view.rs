@@ -361,7 +361,7 @@ fn PermRow(
             } else {
                 view! {
                     <select
-                        class="text-xs px-2 py-1 rounded border border-stone-200 dark:border-stone-600
+                        class="text-xs px-2 py-1 rounded-lg border border-stone-200 dark:border-stone-600
                                bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300
                                focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
                         on:change=move |ev| on_role_change(event_target_value(&ev))

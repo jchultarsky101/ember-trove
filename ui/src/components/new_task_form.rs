@@ -106,7 +106,7 @@ pub fn NewTaskForm(
             <div class="flex items-center gap-2">
                 <select
                     class="text-xs bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300
-                        rounded px-2 py-1 focus:outline-none"
+                        rounded-lg px-2 py-1 focus:outline-none"
                     prop:value=move || new_priority.get()
                     on:change=move |ev| new_priority.set(event_target_value(&ev))
                 >
@@ -117,14 +117,14 @@ pub fn NewTaskForm(
                 <input
                     type="date"
                     class="text-xs bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300
-                        rounded px-2 py-1 focus:outline-none"
+                        rounded-lg px-2 py-1 focus:outline-none"
                     title="Optional due date"
                     prop:value=move || new_due.get()
                     on:input=move |ev| new_due.set(event_target_value(&ev))
                 />
                 <select
                     class="text-xs bg-stone-100 dark:bg-stone-700 text-stone-700 dark:text-stone-300
-                        rounded px-2 py-1 focus:outline-none"
+                        rounded-lg px-2 py-1 focus:outline-none"
                     title="Recurrence"
                     prop:value=move || new_recurrence.get()
                     on:change=move |ev| new_recurrence.set(event_target_value(&ev))

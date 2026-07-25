@@ -140,7 +140,7 @@ pub fn PermissionPanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                     <div class="flex gap-2">
                         <input
                             type="email"
-                            class="flex-1 px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
+                            class="flex-1 px-2 py-1 text-xs rounded-lg border border-stone-300 dark:border-stone-600
                                 bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none
                                 focus:ring-1 focus:ring-amber-500"
                             placeholder="Email address\u{2026}"
@@ -148,7 +148,7 @@ pub fn PermissionPanel(node_id: NodeId, is_owner: bool) -> impl IntoView {
                             on:input=move |ev| email_input.set(event_target_value(&ev))
                         />
                         <select
-                            class="px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
+                            class="px-2 py-1 text-xs rounded-lg border border-stone-300 dark:border-stone-600
                                 bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300
                                 focus:outline-none"
                             prop:value=move || role_input.get()

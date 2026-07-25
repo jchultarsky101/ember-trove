@@ -446,7 +446,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
                                 <select
                                     class="text-xs bg-stone-100 dark:bg-stone-700
                                         text-stone-700 dark:text-stone-300
-                                        rounded px-2 py-0.5 focus:outline-none"
+                                        rounded-lg px-2 py-0.5 focus:outline-none"
                                     prop:value=move || edit_priority.get()
                                     on:change=move |ev| edit_priority.set(event_target_value(&ev))
                                 >
@@ -458,7 +458,7 @@ fn TaskRow(task: Task, task_refresh: RwSignal<u32>) -> impl IntoView {
                                     type="date"
                                     class="text-xs bg-stone-100 dark:bg-stone-700
                                         text-stone-700 dark:text-stone-300
-                                        rounded px-2 py-0.5 focus:outline-none"
+                                        rounded-lg px-2 py-0.5 focus:outline-none"
                                     title="Due date (optional)"
                                     prop:value=move || edit_due.get()
                                     on:input=move |ev| edit_due.set(event_target_value(&ev))
