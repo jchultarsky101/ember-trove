@@ -6,7 +6,21 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [2.26.0] - 2026-07-24
+## [2.27.0] - 2026-07-25
+
+### Changed — note editors are visibly resizable everywhere
+Long notes were hard to edit: the field opened at ~4 lines and the only way
+to grow it was the native bottom-right corner grip — tiny and nearly
+invisible on tinted note cards, so it read as fixed. `ResizableEditor` now
+renders an always-visible drag bar along the editor's bottom edge; drag it
+(mouse or touch, pointer-capture keeps the drag alive) to resize, with the
+native corner grip still available. The node page's note *edit* field —
+previously a hand-rolled textarea duplicating the shared component's
+resize/persist logic — now renders through `ResizableEditor` too, so every
+note surface (node-panel add + edit, notes-view compose) shares one look
+and behavior; per-note heights keep persisting via the editor-prefs API
+(drag once, the editor reopens at that size). Task title editors inherit
+the same drag bar.
 
 ### Added — display typeface, heat tokens, and the spark (design phase 3)
 The identity pass, implementing the approved comp:
