@@ -3,7 +3,15 @@
 Living document: current state, backlog, and the decisions behind the architecture.
 Keep it current as part of each change (see `POLICY.md` §10).
 
-## Current state (2026-07-24)
+## Current state (2026-07-25)
+
+- **v2.27.0 shipped — visibly resizable note/task editors (PR #71):**
+  `ResizableEditor` gained an always-visible bottom drag bar (pointer
+  events, capture, 64px floor; native corner grip kept); the node page's
+  note edit field converged on the shared component (its hand-rolled
+  textarea duplicated the resize/persist logic); save/cancel dedup'd.
+  Per-note heights persist via editor-prefs as before.
+
 
 - **v2.26.0 shipped — design refresh (three-phase arc, PRs #63/#66/#65):**
   full UI audit → approved interactive comp → three stacked slices.

@@ -6,6 +6,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.27.0] - 2026-07-25
+
 ### Changed — note editors are visibly resizable everywhere
 Long notes were hard to edit: the field opened at ~4 lines and the only way
 to grow it was the native bottom-right corner grip — tiny and nearly
