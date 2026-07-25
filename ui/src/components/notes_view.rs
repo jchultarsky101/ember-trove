@@ -286,8 +286,8 @@ pub fn NotesView() -> impl IntoView {
                         <NodePicker selected=selected_node placeholder="Attach to a node (optional)…" />
                     </div>
                     <button
-                        class="ml-auto px-3 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-medium
-                            hover:bg-amber-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        class="ml-auto px-3 py-1.5 rounded-lg bg-ember text-white text-sm font-medium
+                            hover:bg-ember-strong transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         disabled=move || posting.get() || body.get().trim().is_empty()
                         on:click=move |_| do_post()
                     >

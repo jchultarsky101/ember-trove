@@ -52,6 +52,7 @@
    code; existing amber-* classes migrate incrementally as files are touched. */
 @theme {
   --color-ember: #d97706;     /* the one primary (amber-600) */
+  --color-ember-strong: #b45309; /* primary hover/pressed (amber-700) */
   --color-glow: #fbbf24;      /* heat-1: today, focus, carried */
   --color-heat-high: #ea580c; /* heat-2: imminent */
   --color-heat-max: #dc2626;  /* heat-3: overdue, destructive */

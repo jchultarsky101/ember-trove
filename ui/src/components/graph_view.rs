@@ -603,7 +603,7 @@ pub fn GraphView() -> impl IntoView {
                                     cursor-pointer transition-colors flex items-center gap-1 \
                                     border-r border-stone-200 dark:border-stone-700";
                         if edge_create_mode.get() {
-                            format!("{base} bg-amber-600/90 text-white")
+                            format!("{base} bg-ember/90 text-white")
                         } else {
                             format!("{base} text-stone-600 dark:text-stone-300 \
                                      hover:bg-stone-50 dark:hover:bg-stone-800")
@@ -648,7 +648,7 @@ pub fn GraphView() -> impl IntoView {
                                     cursor-pointer transition-colors \
                                     border-r border-stone-200 dark:border-stone-700";
                         if re_layouting.get() {
-                            format!("{base} bg-amber-600/90 text-white opacity-70 cursor-wait")
+                            format!("{base} bg-ember/90 text-white opacity-70 cursor-wait")
                         } else {
                             format!("{base} text-stone-600 dark:text-stone-300 \
                                      hover:bg-stone-50 dark:hover:bg-stone-800")
@@ -821,7 +821,7 @@ pub fn GraphView() -> impl IntoView {
                                 </button>
                                 <button
                                     class="px-3 py-1.5 text-sm font-medium rounded-lg
-                                           bg-amber-600 hover:bg-amber-700 text-white
+                                           bg-ember hover:bg-ember-strong text-white
                                            disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                     disabled=move || edge_saving.get()
                                     on:click=move |_| {

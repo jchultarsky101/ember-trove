@@ -312,7 +312,7 @@ pub fn AddFavoriteModal(
                                 "Cancel"
                             </button>
                             <button
-                                class="px-4 py-2 text-sm font-medium bg-amber-600 hover:bg-amber-700
+                                class="px-4 py-2 text-sm font-medium bg-ember hover:bg-ember-strong
                                        text-white rounded-lg disabled:opacity-50 cursor-pointer"
                                 disabled=move || loading.get()
                                 on:click=move |_| handle_submit()

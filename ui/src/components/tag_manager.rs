@@ -75,7 +75,7 @@ fn ColorPicker(
             <div class="flex items-center gap-2">
                 <input
                     type="color"
-                    class="w-7 h-7 rounded cursor-pointer border border-stone-300
+                    class="w-7 h-7 rounded-lg cursor-pointer border border-stone-300
                            dark:border-stone-600 bg-transparent p-0.5"
                     prop:value=move || value.get()
                     on:input=move |ev| value.set(event_target_value(&ev))
@@ -357,7 +357,7 @@ pub fn TagManager() -> impl IntoView {
                                                                             />
                                                                             <input
                                                                                 type="text"
-                                                                                class="flex-1 px-2 py-1 text-sm rounded
+                                                                                class="flex-1 px-2 py-1 text-sm rounded-lg
                                                                                        border border-stone-300
                                                                                        dark:border-stone-600
                                                                                        bg-transparent

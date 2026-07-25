@@ -200,7 +200,7 @@ fn MonthGrid(
                                     type="text"
                                     autofocus
                                     placeholder="New task…"
-                                    class="w-full text-xs rounded border border-amber-400
+                                    class="w-full text-xs rounded-lg border border-amber-400
                                            bg-white dark:bg-stone-800
                                            text-stone-800 dark:text-stone-200
                                            px-1.5 py-0.5 focus:outline-none

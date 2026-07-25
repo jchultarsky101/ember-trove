@@ -541,7 +541,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                             <input
                                 type="text"
                                 node_ref=search_input_ref
-                                class="w-full px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
+                                class="w-full px-2 py-1 text-xs rounded-lg border border-stone-300 dark:border-stone-600
                                     bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none
                                     focus:ring-1 focus:ring-amber-500"
                                 placeholder="Search for a node…"
@@ -591,7 +591,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                             }}
                             </Suspense></div>
                         <select
-                            class="px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
+                            class="px-2 py-1 text-xs rounded-lg border border-stone-300 dark:border-stone-600
                                 bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300
                                 focus:outline-none"
                             prop:value=move || edge_type_input.get()
@@ -607,7 +607,7 @@ fn EdgePanel(node_id: NodeId) -> impl IntoView {
                     <div class="flex gap-2">
                         <input
                             type="text"
-                            class="flex-1 px-2 py-1 text-xs rounded border border-stone-300 dark:border-stone-600
+                            class="flex-1 px-2 py-1 text-xs rounded-lg border border-stone-300 dark:border-stone-600
                                 bg-transparent text-stone-900 dark:text-stone-100 focus:outline-none
                                 focus:ring-1 focus:ring-amber-500"
                             placeholder="Label (optional)..."

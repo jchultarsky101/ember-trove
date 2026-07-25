@@ -66,7 +66,7 @@ pub fn NodePicker(
                             type="text"
                             placeholder=placeholder.clone()
                             class="flex-1 min-w-0 text-xs bg-stone-100 dark:bg-stone-700
-                                text-stone-700 dark:text-stone-300 rounded px-2 py-1 focus:outline-none"
+                                text-stone-700 dark:text-stone-300 rounded-lg px-2 py-1 focus:outline-none"
                             prop:value=move || query.get()
                             on:input=move |ev| query.set(event_target_value(&ev))
                             on:keydown=move |ev: leptos::ev::KeyboardEvent| {
