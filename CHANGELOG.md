@@ -6,6 +6,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.28.0] - 2026-07-25
+
 ### Changed — graph node palette muted to earth tones
 The graph's node-type fills were the last saturated Tailwind-600 categoricals
 from before the design refresh. Per the approved comp, ember (Article) stays
