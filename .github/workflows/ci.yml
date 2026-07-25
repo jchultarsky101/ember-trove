@@ -21,7 +21,7 @@ jobs:
     name: rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust (pinned via rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -44,7 +44,7 @@ jobs:
             target: aarch64-apple-darwin
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust (pinned via rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust (pinned via rust-toolchain.toml) + wasm32 target
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -111,7 +111,7 @@ jobs:
     # gated and does not contribute here).
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust (pinned via rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -130,7 +130,7 @@ jobs:
           restore-keys: ubuntu-cargo-cov-
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2
+        uses: taiki-e/install-action@7572810d7dd469b651bb7793945692cf78da5dd7 # v2
         with:
           tool: cargo-llvm-cov
 
@@ -142,7 +142,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust (pinned via rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -157,7 +157,7 @@ jobs:
           restore-keys: ubuntu-cargo-audit-
 
       - name: Install cargo-audit
-        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2
+        uses: taiki-e/install-action@7572810d7dd469b651bb7793945692cf78da5dd7 # v2
         with:
           tool: cargo-audit
 
@@ -172,7 +172,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust (pinned via rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -187,7 +187,7 @@ jobs:
           restore-keys: ubuntu-cargo-deny-
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2
+        uses: taiki-e/install-action@7572810d7dd469b651bb7793945692cf78da5dd7 # v2
         with:
           tool: cargo-deny
 
@@ -217,7 +217,7 @@ jobs:
           --health-retries 10
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust (pinned via rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -264,7 +264,7 @@ jobs:
           --health-retries 10
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust (pinned via rust-toolchain.toml)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -291,7 +291,7 @@ jobs:
     # Builds both images to catch Dockerfile errors before a release deploy.
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
@@ -326,7 +326,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run e2e suite
         run: ./scripts/e2e.sh
       - name: Upload Playwright report
