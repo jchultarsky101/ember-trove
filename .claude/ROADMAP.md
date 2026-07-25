@@ -5,6 +5,15 @@ Keep it current as part of each change (see `POLICY.md` §10).
 
 ## Current state (2026-07-25)
 
+- **v2.28.0 shipped — earth-tone graph palette (PR #73):** approved comp
+  (brick-red variant) implemented; ember (Article) is the sole warm anchor,
+  Project/Area/Resource/Reference muted to slate-indigo #5c6f96 / moss
+  #78864f / plum #8a5a7e / brick #a1493c with darkened strokes; legend and
+  minimap follow. Saturated red #dc2626 (heat-max) is now reserved for
+  urgency. Edge colors deliberately unchanged — revisit only if the node
+  change lands well. As-approved record:
+  https://claude.ai/code/artifact/11bff6cb-2a3d-4c29-b084-89d52e89a57c
+
 - **v2.27.2 shipped — backlog sweep (PR #72):** all primary CTA backgrounds
   moved onto the phase-3 heat tokens (`bg-ember`/`hover:bg-ember-strong`,
   new `--color-ember-strong` token, identical hexes — zero visual change);
