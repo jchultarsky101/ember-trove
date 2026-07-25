@@ -182,7 +182,7 @@ pub fn ToastOverlay() -> impl IntoView {
                             "check_circle",
                         ),
                         ToastLevel::Error => ("bg-red-600 text-white", "error"),
-                        ToastLevel::Info  => ("bg-amber-600 text-white", "info"),
+                        ToastLevel::Info  => ("bg-ember text-white", "info"),
                     };
                     view! {
                         <div class=format!(

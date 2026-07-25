@@ -246,7 +246,7 @@ pub fn NodeList() -> impl IntoView {
                                 let active = !archived_on && status_filter.get() == value_cmp;
                                 let base = "px-2.5 py-0.5 text-xs rounded-full font-medium transition-colors";
                                 if active {
-                                    format!("{base} bg-amber-600 text-white")
+                                    format!("{base} bg-ember text-white")
                                 } else {
                                     format!("{base} bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700")
                                 }

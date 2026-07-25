@@ -188,7 +188,7 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
                                                                         <input
                                                                             type="text"
                                                                             class="text-sm border border-stone-300 dark:border-stone-600
-                                                                                   rounded px-2 py-1 w-full
+                                                                                   rounded-lg px-2 py-1 w-full
                                                                                    bg-white dark:bg-stone-800
                                                                                    text-stone-900 dark:text-stone-100
                                                                                    focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -199,7 +199,7 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
                                                                         <input
                                                                             type="url"
                                                                             class="text-sm border border-stone-300 dark:border-stone-600
-                                                                                   rounded px-2 py-1 w-full
+                                                                                   rounded-lg px-2 py-1 w-full
                                                                                    bg-white dark:bg-stone-800
                                                                                    text-stone-900 dark:text-stone-100
                                                                                    focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -308,7 +308,7 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
                                                     <input
                                                         type="text"
                                                         class="text-sm border border-stone-300 dark:border-stone-600
-                                                               rounded px-2 py-1 w-full
+                                                               rounded-lg px-2 py-1 w-full
                                                                bg-white dark:bg-stone-800
                                                                text-stone-900 dark:text-stone-100
                                                                focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -319,7 +319,7 @@ pub fn LinksPanel(node_id: NodeId, is_editor: bool) -> impl IntoView {
                                                     <input
                                                         type="url"
                                                         class="text-sm border border-stone-300 dark:border-stone-600
-                                                               rounded px-2 py-1 w-full
+                                                               rounded-lg px-2 py-1 w-full
                                                                bg-white dark:bg-stone-800
                                                                text-stone-900 dark:text-stone-100
                                                                focus:outline-none focus:ring-1 focus:ring-amber-500"

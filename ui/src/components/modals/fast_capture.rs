@@ -231,8 +231,8 @@ pub fn FastCaptureModal(
                         </button>
                         <button
                             type="button"
-                            class="px-4 py-1.5 rounded-lg bg-amber-600 text-white text-sm \
-                                   hover:bg-amber-700 disabled:opacity-50"
+                            class="px-4 py-1.5 rounded-lg bg-ember text-white text-sm \
+                                   hover:bg-ember-strong disabled:opacity-50"
                             prop:disabled=move || loading.get()
                             on:click=move |_| submit_pending.set(true)
                         >

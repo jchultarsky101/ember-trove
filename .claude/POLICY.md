@@ -173,10 +173,12 @@ Every change updates, as applicable:
 
 ## 13. Coverage
 
-- CI reports line coverage via `cargo llvm-cov` over `--workspace --exclude ui`.
-  It is **report-only** today (no hard threshold) so it never blocks on the existing
-  suite. New code should ship with tests that hold or raise coverage; convert the report
-  to a `--fail-under` gate once the baseline is comfortable (one-line change in `ci.yml`).
+- CI enforces line coverage via `cargo llvm-cov` over `--workspace --exclude ui`:
+  a **hard gate** with the floor set ~2 points under the measured baseline (24%
+  floor / 25.96% baseline as of v2.23.0) so it never blocks the existing suite but
+  catches a real regression. New code should ship with tests that hold or raise
+  coverage; raise the floor deliberately as the suite grows (one line in `ci.yml`).
+  UI is WASM and excluded — testable logic belongs in `common/` to be counted.
 
 ---
 

@@ -305,7 +305,7 @@ pub fn AttachmentPanel(node_id: NodeId) -> impl IntoView {
                             // Upload button
                             <button
                                 class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs
-                                    font-medium bg-amber-600 hover:bg-amber-700 text-white
+                                    font-medium bg-ember hover:bg-ember-strong text-white
                                     transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                 disabled=move || upload_progress.get().is_some()
                                 on:click=on_upload

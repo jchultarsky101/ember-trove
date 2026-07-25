@@ -355,7 +355,7 @@ pub fn CreateNodeModal(
                             </button>
                             <button
                                 class="px-4 py-2 text-sm font-medium rounded-lg
-                                       bg-amber-600 hover:bg-amber-700
+                                       bg-ember hover:bg-ember-strong
                                        text-white
                                        disabled:opacity-50 disabled:cursor-not-allowed
                                        transition-colors flex items-center gap-1.5"

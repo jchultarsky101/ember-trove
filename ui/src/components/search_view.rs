@@ -388,7 +388,7 @@ pub fn SearchView() -> impl IntoView {
                                                 <div class="flex items-center gap-1.5 px-3 py-2">
                                                     <input
                                                         type="text"
-                                                        class="flex-1 text-xs px-2 py-1 rounded
+                                                        class="flex-1 text-xs px-2 py-1 rounded-lg
                                                             border border-stone-300 dark:border-stone-600
                                                             bg-white dark:bg-stone-800
                                                             text-stone-800 dark:text-stone-200
@@ -399,8 +399,8 @@ pub fn SearchView() -> impl IntoView {
                                                         on:input=move |ev| preset_name.set(event_target_value(&ev))
                                                     />
                                                     <button
-                                                        class="text-xs px-2 py-1 rounded bg-amber-600 text-white
-                                                            hover:bg-amber-700 transition-colors"
+                                                        class="text-xs px-2 py-1 rounded bg-ember text-white
+                                                            hover:bg-ember-strong transition-colors"
                                                         on:click=move |_| {
                                                             let name = preset_name.get_untracked()
                                                                 .trim()
@@ -490,7 +490,7 @@ pub fn SearchView() -> impl IntoView {
                         <span class="text-xs text-stone-400 dark:text-stone-500 shrink-0">"From"</span>
                         <input
                             type="date"
-                            class="text-xs rounded border border-stone-300 dark:border-stone-600
+                            class="text-xs rounded-lg border border-stone-300 dark:border-stone-600
                                 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300
                                 px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
                             prop:value=move || updated_after.get()
@@ -499,7 +499,7 @@ pub fn SearchView() -> impl IntoView {
                         <span class="text-xs text-stone-400 dark:text-stone-500 shrink-0">"To"</span>
                         <input
                             type="date"
-                            class="text-xs rounded border border-stone-300 dark:border-stone-600
+                            class="text-xs rounded-lg border border-stone-300 dark:border-stone-600
                                 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300
                                 px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
                             prop:value=move || updated_before.get()
@@ -508,7 +508,7 @@ pub fn SearchView() -> impl IntoView {
                     </div>
                     // Sort
                     <select
-                        class="text-xs rounded border border-stone-300 dark:border-stone-600
+                        class="text-xs rounded-lg border border-stone-300 dark:border-stone-600
                             bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300
                             px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-amber-400"
                         prop:value=move || sort.get()
@@ -558,7 +558,7 @@ pub fn SearchView() -> impl IntoView {
                                     let active = node_type_filter.get() == value_owned;
                                     if active {
                                         "px-2.5 py-0.5 text-xs rounded-full font-medium \
-                                         bg-amber-600 text-white transition-colors"
+                                         bg-ember text-white transition-colors"
                                     } else {
                                         "px-2.5 py-0.5 text-xs rounded-full font-medium \
                                          text-stone-500 dark:text-stone-400 \
@@ -966,7 +966,7 @@ fn Pagination(
                         class=move || format!(
                             "px-3 py-1.5 text-xs rounded-md transition-colors {}",
                             if is_current {
-                                "bg-amber-600 text-white font-medium"
+                                "bg-ember text-white font-medium"
                             } else {
                                 "border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
                             }

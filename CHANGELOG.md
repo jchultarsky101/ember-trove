@@ -6,6 +6,27 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.27.2] - 2026-07-25
+
+### Changed — backlog sweep: CTA classes on heat tokens, form-control radius, modal radius
+- All primary CTA backgrounds migrate from raw `amber-*` utilities to the
+  phase-3 heat tokens: `bg-amber-600 → bg-ember`, `hover:bg-amber-700 →
+  hover:bg-ember-strong` (new `--color-ember-strong` token, amber-700),
+  `bg-amber-600/90 → bg-ember/90` — 13 files, identical hex values, zero
+  visual change. Contextual dark-variant and text ambers stay for the
+  incremental migration (they need per-theme token values to move).
+- Native `<input>`/`<select>`/`<textarea>` controls drop the last bare
+  `rounded` (4px) for the standard `rounded-lg` — 25 sites (task form
+  selects/date, search date filters, links/permissions/node-view inline
+  forms). Badges and chips deliberately keep their tighter radius.
+- The change-password modal card joins the `rounded-2xl` modal convention
+  (was the last `rounded-xl` modal).
+
+### Documentation — POLICY §13 caught up with reality
+The coverage section still said "report-only today"; CI has enforced a 24%
+floor since v2.23.0. §13 now describes the hard gate and the
+floor-follows-baseline rule.
+
 ## [2.27.1] - 2026-07-25
 
 ### Tooling — weekly dependency bumps (Dependabot #67, #68, #69, #70)

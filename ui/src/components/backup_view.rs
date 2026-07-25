@@ -76,8 +76,8 @@ pub fn BackupView() -> impl IntoView {
                         </p>
                     </div>
                     <button
-                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-600
-                            text-white text-sm font-medium hover:bg-amber-700
+                        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-ember
+                            text-white text-sm font-medium hover:bg-ember-strong
                             transition-colors"
                         on:click=move |_| show_create_form.set(true)
                     >
@@ -109,8 +109,8 @@ pub fn BackupView() -> impl IntoView {
                         />
                         <div class="flex gap-2">
                             <button
-                                class="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600
-                                    text-white text-sm font-medium hover:bg-amber-700
+                                class="flex items-center gap-2 px-4 py-2 rounded-lg bg-ember
+                                    text-white text-sm font-medium hover:bg-ember-strong
                                     disabled:opacity-40 transition-colors"
                                 on:click=on_confirm_create
                                 disabled=move || creating.get()
