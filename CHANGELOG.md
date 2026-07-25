@@ -6,6 +6,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — graph node palette muted to earth tones
+The graph's node-type fills were the last saturated Tailwind-600 categoricals
+from before the design refresh. Per the approved comp, ember (Article) stays
+the one warm anchor and the other four hues keep their family but drop
+saturation: Project `#2563eb → #5c6f96` (slate-indigo), Area `#16a34a →
+#78864f` (moss), Resource `#9333ea → #8a5a7e` (plum), Reference `#dc2626 →
+#a1493c` (brick — red is reserved for urgency). Strokes and legend follow.
+Shapes remain the primary (color-blind-safe) type encoding; edge colors are
+deliberately unchanged.
+
 ## [2.27.2] - 2026-07-25
 
 ### Changed — backlog sweep: CTA classes on heat tokens, form-control radius, modal radius
