@@ -58,7 +58,7 @@ utoipa-swagger-ui = { version = "9", features = ["axum"] }
 # We pin `aws_lc_rs` — the provider rustls/the AWS SDK already use (.claude/rules/api.md),
 # so the tree stays single-crypto — and deliberately NOT `rust_crypto`, which would
 # pull the pure-Rust `rsa` crate (RUSTSEC-2023-0071, Marvin timing). (v2.20.2)
-jsonwebtoken = { version = "10", features = ["aws_lc_rs"] }
+jsonwebtoken = { version = "11", features = ["aws_lc_rs"] }
 reqwest      = { version = "0.13", features = ["json", "form"] }
 axum-extra   = { version = "0.12", features = ["cookie-private"] }
 urlencoding  = "2"
