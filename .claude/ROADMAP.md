@@ -5,6 +5,16 @@ Keep it current as part of each change (see `POLICY.md` §10).
 
 ## Current state (2026-07-25)
 
+- **v2.27.2 shipped — backlog sweep (PR #72):** all primary CTA backgrounds
+  moved onto the phase-3 heat tokens (`bg-ember`/`hover:bg-ember-strong`,
+  new `--color-ember-strong` token, identical hexes — zero visual change);
+  the last 25 bare-`rounded` form controls normalized to `rounded-lg`;
+  change-password modal joined `rounded-2xl`; POLICY §13 corrected (coverage
+  is a hard 24% gate since v2.23.0, not report-only). Remaining amber →
+  token migration (dark-variant/text ambers) deferred: needs per-theme
+  token values. Graph node-type categorical palette reconciliation awaits
+  a design decision (mock first).
+
 - **v2.27.0 shipped — visibly resizable note/task editors (PR #71):**
   `ResizableEditor` gained an always-visible bottom drag bar (pointer
   events, capture, 64px floor; native corner grip kept); the node page's
